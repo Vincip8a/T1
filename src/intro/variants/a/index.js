@@ -398,6 +398,7 @@ export function runIntro({ getTargetRect, reducedMotion = false } = {}) {
       resolveDone();
     },
   };
+  controller._dbg = { ipod, scene, render };
   controller.play();
   return controller;
 }
