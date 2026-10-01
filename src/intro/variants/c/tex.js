@@ -37,11 +37,11 @@ export function capFit(t, w, h) {
   return t;
 }
 
-export function roundRect(g, x, y, w, h, r) { g.beginPath(); g.roundRect(x, y, w, h, r); }
+const rrect = (g, x, y, w, h, r) => { g.beginPath(); g.roundRect(x, y, w, h, r); };
 const dot = (g, x, y, r, c) => { if (c) g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); };
 
 /** Text: weight, colour, alignment, letter spacing (px). */
-export function text(g, s, x, y, size, weight = 600, color = '#000', align = 'left', spacing = 0) {
+function text(g, s, x, y, size, weight = 600, color = '#000', align = 'left', spacing = 0) {
   g.font = `${weight} ${size}px ${FONT}`;
   g.fillStyle = color;
   g.textAlign = align;
@@ -78,8 +78,8 @@ export function brushed(seed, base, spread, S = 512, h = [0.5, 0.9], n = S * 3) 
   return c;
 }
 
-/** Contrast studio wrap (linear): [startDeg, endDeg, value] bands around the horizon,
- *  optionally ramping to w, darkening towards the floor. */
+/** Contrast studio wrap (linear): [startDeg, endDeg, value(, end)] bands around the horizon,
+ *  darkening towards the floor through a soft (not hard-edged) horizon. */
 export function stripCanvas(bands) {
   const [c, g] = canvas(1024, 64);
   const grd = g.createLinearGradient(0, 0, 1024, 0);
@@ -88,8 +88,7 @@ export function stripCanvas(bands) {
   g.fillStyle = grd; g.fillRect(0, 0, 1024, 64);
   g.globalCompositeOperation = 'multiply';
   const vg = g.createLinearGradient(0, 0, 0, 64);
-  // dark horizon just above eye level: a band across the pitched polished back
-  [[0, '#fff'], [0.43, '#eee'], [0.445, '#161616'], [0.475, '#161616'], [0.49, '#aaa'], [0.7, '#888'], [1, '#444']]
+  [[0, '#fff'], [0.42, '#e6e6e6'], [0.46, '#303030'], [0.5, '#9a9a9a'], [0.7, '#888'], [1, '#444']]
     .forEach(([o, c]) => vg.addColorStop(o, c));
   g.fillStyle = vg; g.fillRect(0, 0, 1024, 64);
   return c;
@@ -104,11 +103,7 @@ function inset(g, cx, cy, r, dy, blur, color) {
   g.fillStyle = '#000'; g.fill();
   g.restore();
 }
-/** Filled ring band r0..r1 around (cx, cy). */
-function band(g, cx, cy, r0, r1, color) {
-  g.beginPath(); g.arc(cx, cy, r1, 0, 2 * Math.PI); g.moveTo(cx + r0, cy); g.arc(cx, cy, r0, 0, 2 * Math.PI, true);
-  g.fillStyle = color; g.fill();
-}
+function band(g, cx, cy, r1, color) { dot(g, cx, cy, r1, color); }
 
 /** Click-wheel face: the DOM wheel's satin gradient, recess shading, the centre button's seam
  *  and MENU / ⏮ / ⏭ / ⏯ glyphs (hand-off match). */
@@ -124,8 +119,8 @@ export function wheelCanvas(dMm, labelFactor, cbMm) {
   inset(g, R, R, R, -0.2 * u, 0.3 * u, 'rgba(255,255,255,.9)');
   // centre-button seam: white lower lip, dark hairline (DOM box-shadows, top layer last)
   const cb = cbMm * px;
-  band(g, R, R + 0.19 * u, 0, cb + 0.13 * u, 'rgba(255,255,255,.65)');
-  band(g, R, R, 0, cb + 0.15 * u, 'rgba(100,104,110,.5)');
+  band(g, R, R + 0.19 * u, cb + 0.13 * u, 'rgba(255,255,255,.65)');
+  band(g, R, R, cb + 0.15 * u, 'rgba(100,104,110,.5)');
   const col = COLORS.wheelLabel;
   // = DOM label (0.05em tracking), doubled ±0.04 mm to keep its weight through mip filtering
   for (const d of [-0.04, 0.04]) text(g, 'MENU', R + (0.0525 + d) * px, R - lr, 2.1 * px, 700, col, 'center', 0.105 * px);
@@ -164,7 +159,7 @@ export function faceToneCanvas(stops) {
 
 /** Logic board: solder mask, orthogonal trace buses with 45° jogs, vias, pads, silkscreen. */
 export function pcbCanvas(wMm, hMm, parts, holes, seed = 7) {
-  const px = 14, W = wMm * px, H = hMm * px;
+  const px = 12, W = wMm * px, H = hMm * px;
   const [c, g] = canvas(W, H);
   const r = rng(seed);
   const X = (x) => (x + wMm / 2) * px, Y = (y) => (hMm / 2 - y) * px;
@@ -174,26 +169,22 @@ export function pcbCanvas(wMm, hMm, parts, holes, seed = 7) {
     g.fillStyle = `rgba(${r() > 0.5 ? '255,255,255' : '0,0,0'},${0.02 + r() * 0.03})`;
     dot(g, r() * W, r() * H, 10 + r() * 50);
   }
-  g.lineCap = 'round'; g.lineJoin = 'round';
+  g.lineCap = g.lineJoin = 'round';
   // parallel buses: run, 45° jog, run
   for (let b = 0; b < 26; b++) {
-    const n = 3 + Math.floor(r() * 9), pitch = 5 + r() * 3, horiz = r() > 0.5;
-    let x = r() * W, y = r() * H;
-    const l1 = 60 + r() * 260, jog = (r() > 0.5 ? 1 : -1) * (20 + r() * 50), l2 = 40 + r() * 220;
+    const n = 3 + Math.floor(r() * 9), pitch = 4.5 + r() * 2.5, horiz = r() > 0.5;
+    const x = r() * W, y = r() * H;
+    const l1 = 50 + r() * 220, jog = (r() > 0.5 ? 1 : -1) * (18 + r() * 42), l2 = 34 + r() * 190, aj = Math.abs(jog);
     g.strokeStyle = `rgba(95,180,120,${0.35 + r() * 0.25})`; g.lineWidth = 2;
     for (let k = 0; k < n; k++) {
-      const o = k * pitch;
-      g.beginPath();
-      if (horiz) { g.moveTo(x, y + o); g.lineTo(x + l1, y + o); g.lineTo(x + l1 + Math.abs(jog), y + o + jog); g.lineTo(x + l1 + Math.abs(jog) + l2, y + o + jog); }
-      else { g.moveTo(x + o, y); g.lineTo(x + o, y + l1); g.lineTo(x + o + jog, y + l1 + Math.abs(jog)); g.lineTo(x + o + jog, y + l1 + Math.abs(jog) + l2); }
-      g.stroke();
+      const o = k * pitch, P = horiz ? (a, b) => g.lineTo(x + a, y + o + b) : (a, b) => g.lineTo(x + o + b, y + a);
+      g.beginPath(); P(0, 0); P(l1, 0); P(l1 + aj, jog); P(l1 + aj + l2, jog); g.stroke();
     }
   }
-  // vias
-  for (let i = 0; i < 220; i++) {
+  for (let i = 0; i < 220; i++) { // vias
     const x = r() * W, y = r() * H;
-    dot(g, x, y, 3.2, '#c9a85a');
-    dot(g, x, y, 1.4, '#0f3322');
+    dot(g, x, y, 2.8, '#c9a85a');
+    dot(g, x, y, 1.2, '#0f3322');
   }
   // footprints: pad rows + silkscreen outline + designator
   parts.forEach((ch) => {
@@ -213,14 +204,17 @@ export function pcbCanvas(wMm, hMm, parts, holes, seed = 7) {
   return c;
 }
 
-/** Laser-etched IC top. */
-export function chipCanvas(lines, seed) {
-  const [c, g] = canvas(192, 192);
-  const r = rng(seed);
-  g.fillStyle = '#1b1c1e'; g.fillRect(0, 0, 192, 192);
-  for (let i = 0; i < 500; i++) { g.fillStyle = `rgba(255,255,255,${r() * 0.04})`; g.fillRect(r() * 192, r() * 192, 2, 2); }
-  lines.forEach((l, i) => text(g, l, 96, 70 + i * 28, i ? 20 : 26, 500, '#8d9095', 'center'));
-  dot(g, 22, 22, 8, '#4a4c50');
+/** Laser-etched IC tops, one 160 px cell each (4 × 2 atlas). */
+export function chipAtlas(list) {
+  const S = 160, [c, g] = canvas(4 * S, 2 * S);
+  const r = rng(3);
+  g.fillStyle = '#1b1c1e'; g.fillRect(0, 0, 4 * S, 2 * S);
+  for (let i = 0; i < 1600; i++) { g.fillStyle = `rgba(255,255,255,${r() * 0.04})`; g.fillRect(r() * 4 * S, r() * 2 * S, 2, 2); }
+  list.forEach((lines, i) => {
+    const x = (i % 4) * S, y = ((i / 4) | 0) * S;
+    lines.forEach((l, k) => text(g, l, x + S / 2, y + 58 + k * 24, k ? 17 : 22, 500, '#8d9095', 'center'));
+    dot(g, x + 20, y + 20, 7, '#4a4c50');
+  });
   return c;
 }
 
@@ -237,23 +231,16 @@ export function batteryCanvas(wMm, hMm) {
   text(g, 'Do not puncture, crush or heat above 60 °C', m, m + 6.4 * px, 1.0 * px, 400, '#8a8e94');
   text(g, 'LP-616-0550  ·  Lot 26K14', m, H - m - 0.6 * px, 1.0 * px, 400, '#8a8e94');
   const lx = W - m - 16 * px, ly = m - 0.4 * px, lw = 16 * px, lh = H - 2 * m + 0.8 * px;
-  roundRect(g, lx, ly, lw, lh, 0.6 * px); g.fillStyle = '#e8e9eb'; g.fill();
+  rrect(g, lx, ly, lw, lh, 0.6 * px); g.fillStyle = '#e8e9eb'; g.fill();
   barcode(g, lx + 1.2 * px, ly + 1.2 * px, lw - 2.4 * px, 4.4 * px, r);
   text(g, '7 26450 1 18', lx + lw / 2, ly + 7.2 * px, 1.05 * px, 500, '#222', 'center');
-  const tx = lx + 3.6 * px, ty = ly + lh - 4 * px, ts = 2.6 * px;
-  g.strokeStyle = '#141518'; g.lineWidth = 0.22 * px;
-  g.beginPath(); g.moveTo(tx, ty - ts * 0.55); g.lineTo(tx + ts * 0.6, ty + ts * 0.5); g.lineTo(tx - ts * 0.6, ty + ts * 0.5); g.closePath(); g.stroke();
-  text(g, '!', tx, ty + ts * 0.08, 1.6 * px, 800, '#141518', 'center');
-  const bx = tx + 5 * px;
-  g.strokeRect(bx - ts * 0.35, ty - ts * 0.4, ts * 0.7, ts * 0.9);
-  g.beginPath(); g.moveTo(bx - ts * 0.6, ty - ts * 0.6); g.lineTo(bx + ts * 0.6, ty + ts * 0.65); g.moveTo(bx + ts * 0.6, ty - ts * 0.6); g.lineTo(bx - ts * 0.6, ty + ts * 0.65); g.stroke();
-  text(g, 'CE', bx + 4.4 * px, ty, 1.7 * px, 500, '#141518', 'center');
+  text(g, '⚠  ♻  CE', lx + lw / 2, ly + lh - 3.4 * px, 2.2 * px, 600, '#141518', 'center');
   return c;
 }
 
-/** 1.8" drive top cover: brushed steel, spindle emboss, screw holes, product label. */
+/** 1.8" drive top cover: brushed steel, spindle emboss, screw holes, breather hole, label. */
 export function driveCanvas(wMm, hMm) {
-  const px = 13, W = wMm * px, H = hMm * px;
+  const px = 12, W = wMm * px, H = hMm * px;
   const [c, g] = canvas(W, H);
   const r = rng(5);
   g.fillStyle = COLORS.drive; g.fillRect(0, 0, W, H);
@@ -271,8 +258,11 @@ export function driveCanvas(wMm, hMm) {
     g.strokeStyle = '#2a2c30'; g.lineWidth = 2;
     g.beginPath(); g.moveTo(x * px - 0.6 * px, y * px); g.lineTo(x * px + 0.6 * px, y * px); g.moveTo(x * px, y * px - 0.6 * px); g.lineTo(x * px, y * px + 0.6 * px); g.stroke();
   });
+  // breather hole: the tell-tale of a 1.8" drive
+  text(g, '⚠ DO NOT COVER THIS HOLE', W - 3.5 * px, H * 0.405, 1.25 * px, 600, '#3a3d42', 'right');
+  dot(g, W - 7 * px, H * 0.445, 0.75 * px, '#2a2c30'); dot(g, W - 7 * px, H * 0.445, 0.35 * px, '#08090a');
   const lx = 3.5 * px, ly = hMm * 0.5 * px, lw = W - 7 * px, lh = hMm * 0.44 * px;
-  roundRect(g, lx, ly, lw, lh, 0.8 * px); g.fillStyle = '#eef0f2'; g.fill();
+  rrect(g, lx, ly, lw, lh, 0.8 * px); g.fillStyle = '#eef0f2'; g.fill();
   g.fillStyle = '#20242a'; g.fillRect(lx, ly, lw, 5.2 * px);
   text(g, '1.8" HARD DISK DRIVE', lx + 1.8 * px, ly + 2.6 * px, 2.2 * px, 700, '#f2f3f5');
   text(g, '160 GB', lx + lw - 1.8 * px, ly + 2.6 * px, 2.6 * px, 800, '#f2f3f5', 'right');
@@ -280,7 +270,8 @@ export function driveCanvas(wMm, hMm) {
     .forEach((s, i) => text(g, s, lx + 1.8 * px, ly + 7.6 * px + i * 2.4 * px, 1.55 * px, 500, '#25282d'));
   barcode(g, lx + 1.8 * px, ly + lh - 7.2 * px, lw * 0.55, 3.6 * px, r);
   const qx = lx + lw - 9.5 * px, qy = ly + lh - 9.8 * px, qs = 0.5 * px;
-  for (let i = 0; i < 15; i++) for (let j = 0; j < 15; j++) if (r() > 0.5 || i < 1 || j < 1) { g.fillStyle = '#111'; g.fillRect(qx + i * qs, qy + j * qs, qs, qs); }
+  g.fillStyle = '#111';
+  for (let i = 0; i < 15; i++) for (let j = 0; j < 15; j++) if (r() > 0.5 || i < 1 || j < 1) g.fillRect(qx + i * qs, qy + j * qs, qs, qs);
   text(g, 'DO NOT PRESS  ·  ESD SENSITIVE', lx + 1.8 * px, ly + lh - 1.6 * px, 1.2 * px, 600, '#5b2020');
   return c;
 }
@@ -311,10 +302,10 @@ export function shellInnerCanvas(wMm, hMm) {
   const r = rng(21);
   g.fillStyle = '#8d9298'; g.fillRect(0, 0, W, H);
   for (let i = 0; i < 500; i++) { const v = 120 + Math.floor(r() * 60); g.fillStyle = `rgba(${v},${v},${v},0.25)`; g.fillRect(r() * W, r() * H, 20 + r() * 100, 1); }
-  roundRect(g, 6 * px, 8 * px, W - 12 * px, H * 0.62, 2 * px); g.fillStyle = '#1d1f22'; g.fill();
+  rrect(g, 6 * px, 8 * px, W - 12 * px, H * 0.62, 2 * px); g.fillStyle = '#1d1f22'; g.fill();
   g.fillStyle = '#3a3d42';
-  [[10, 14], [W / px - 22, 14], [10, 50], [W / px - 22, 50]].forEach(([x, y]) => { roundRect(g, x * px, y * px, 12 * px, 7 * px, px); g.fill(); });
-  roundRect(g, 8 * px, H * 0.76, 16 * px, 8 * px, 0.6 * px); g.fillStyle = '#e9e6dc'; g.fill();
+  [[10, 14], [W / px - 22, 14], [10, 50], [W / px - 22, 50]].forEach(([x, y]) => { rrect(g, x * px, y * px, 12 * px, 7 * px, px); g.fill(); });
+  rrect(g, 8 * px, H * 0.76, 16 * px, 8 * px, 0.6 * px); g.fillStyle = '#e9e6dc'; g.fill();
   text(g, 'QC  PASS', 9 * px, H * 0.76 + 2.6 * px, 1.6 * px, 700, '#2a2c30');
   barcode(g, 9 * px, H * 0.76 + 4.4 * px, 12 * px, 2.6 * px, r);
   return c;
@@ -326,7 +317,7 @@ export function glassAlphaCanvas(wMm, hMm, innerW, innerH) {
   const [c, g] = canvas(W, H);
   g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
   g.fillStyle = 'rgb(46,46,46)'; // clear acrylic over the active area
-  roundRect(g, (W - innerW * px) / 2, (H - innerH * px) / 2, innerW * px, innerH * px, 2);
+  rrect(g, (W - innerW * px) / 2, (H - innerH * px) / 2, innerW * px, innerH * px, 2);
   g.fill();
   return c;
 }
@@ -336,23 +327,30 @@ export function flexRingCanvas(dMm, rIn, rOut) {
   const S = 512, px = S / dMm, c0 = S / 2;
   const [c, g] = canvas(S, S);
   g.fillStyle = COLORS.flex; g.fillRect(0, 0, S, S);
-  const seg = 16;
-  for (let i = 0; i < seg; i++) {
-    const a0 = (i / seg) * Math.PI * 2 + 0.03, a1 = ((i + 1) / seg) * Math.PI * 2 - 0.03;
+  for (let i = 0; i < 16; i++) {
+    const a0 = (i / 16) * Math.PI * 2 + 0.03, a1 = ((i + 1) / 16) * Math.PI * 2 - 0.03;
     g.beginPath(); g.arc(c0, c0, (rOut - 0.8) * px, a0, a1); g.arc(c0, c0, (rIn + 0.8) * px, a1, a0, true); g.closePath();
     g.fillStyle = i % 2 ? '#d99a45' : '#cf8f3a'; g.fill();
     g.strokeStyle = 'rgba(110,55,8,0.55)'; g.lineWidth = 1.5; g.stroke();
   }
-  g.strokeStyle = 'rgba(240,190,110,0.7)'; g.lineWidth = 1.5;
+  g.strokeStyle = 'rgba(240,190,110,0.7)';
   for (const rr of [rIn + 0.35, rOut - 0.35]) { g.beginPath(); g.arc(c0, c0, rr * px, 0, 7); g.stroke(); }
   return c;
 }
 
-/** Copper-on-kapton flex traces (tiles). */
+/** Copper-on-kapton flex traces (tiles; traces run along v). */
 export function flexCanvas() {
   const [c, g] = canvas(128, 128);
   g.fillStyle = COLORS.flex; g.fillRect(0, 0, 128, 128);
-  g.strokeStyle = 'rgba(120,60,10,0.55)'; g.lineWidth = 2;
-  for (let i = 0; i < 12; i++) { g.beginPath(); g.moveTo(6 + i * 10.5, 0); g.lineTo(6 + i * 10.5, 128); g.stroke(); }
+  g.fillStyle = 'rgba(120,60,10,0.5)';
+  for (let i = 0; i < 12; i++) g.fillRect(5 + i * 10.5, 0, 2.5, 128);
+  return c;
+}
+
+/** Soft contact shadow: a blurred rounded rect (device footprint), drawn via an offset shadow. */
+export function shadowCanvas() {
+  const [c, g] = canvas(256, 96);
+  g.shadowColor = 'rgba(0,0,0,0.9)'; g.shadowBlur = 22; g.shadowOffsetX = 1000;
+  rrect(g, 38 - 1000, 30, 180, 36, 18); g.fill();
   return c;
 }
