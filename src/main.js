@@ -5,7 +5,7 @@ import { loadConfig, prefersReducedMotion } from './shared/config.js';
 import { createDesktop } from './window/index.js';
 
 const params = new URLSearchParams(location.search);
-const introVariant = params.get('intro') ?? 'a';
+const introVariant = params.get('intro') ?? 'c';
 const ipodVariant = params.get('ipod') ?? 'c';
 
 const [config, { runIntro }, { mountIpod }] = await Promise.all([

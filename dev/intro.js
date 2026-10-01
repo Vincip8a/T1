@@ -1,6 +1,6 @@
 // Dev harness: runs an intro variant against a dashed dummy target box (red outline = expected final rect).
 const params = new URLSearchParams(location.search);
-const variant = params.get('variant') ?? 'a';
+const variant = params.get('variant') ?? 'c';
 const { runIntro } = await import(`../src/intro/variants/${variant}/index.js`);
 const target = document.getElementById('target');
 const intro = runIntro({
