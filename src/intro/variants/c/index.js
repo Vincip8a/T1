@@ -1,25 +1,29 @@
 // Intro variant C: "studio teardown". A silver iPod Classic rises into frame showing its
-// mirror-polished back, turns to a 3/4 front view, bursts apart along its own depth axis
-// (front-to-back cascade), holds while the camera orbits the stack, then seats back together
-// back-to-front with a physical click (each landing nudges the chassis), and turns to face the
-// viewer, landing pixel-aligned on getTargetRect() under a soft-box glint. Pure function of t.
+// mirror-polished back, swings to a 3/4 front view and bursts apart along its own depth axis
+// during the last part of the turn (front-to-back cascade), holds while the camera orbits to its
+// widest pose, then seats back together back-to-front with a physical click (each landing nudges
+// the chassis, glints and settles), and turns to face the viewer, landing pixel-aligned on
+// getTargetRect(). Pure function of t: same t → same frame.
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { IPOD } from '../../../shared/ipodSpec.js';
 import { loadConfig } from '../../../shared/config.js';
 import { buildIpod, FACE_BEVEL } from './model.js';
+import { stripCanvas } from './tex.js';
 
 const DEG = Math.PI / 180;
 const HALF_D = IPOD.depth / 2;
 const FOV_HERO = 26, FOV_END = 20;
-const D = 7.0;
-const ENV_END = 0.25, GLASS_FROM = 0.5, GLASS_END = 0.0; // final environment rotations (fix the hand-off look)
-const FACE_GLOW = 0.12; // hand-off fill on the front plate (matches the DOM iPod's tone)
+const D = 6.5;
+const ENV_END = 0.25; // final room rotation (fixes the hand-off look)
+const GLASS_FROM = 0.55, GLASS_END = 0.0, GLASS_Z = Math.PI / 4; // diagonal glint on the display glass
+const FACE_GLOW = 0.05; // hand-off fill on the front plate (matches the DOM iPod's tone)
+const END_EXPOSURE = 0.94;
 const TL = {
-  rise: 1.3,
-  ex0: 1.5, exS: 0.07, exD: 1.25,
-  re0: 4.35, reS: 0.085, reD: 0.62,
-  cam0: 4.95,
+  rise: 1.0,
+  ex0: 1.2, exS: 0.07, exD: 1.25,
+  re0: 4.3, reS: 0.085, reD: 0.62,
+  cam0: 4.6,
 };
 // exploded-stack slot per part (front → back); battery gets its own slot behind the drive
 const LAYER = { faceplate: 0, screenGlass: 1, clickWheel: 1, lcd: 2, wheelFlex: 2, logicBoard: 3, storage: 4, battery: 5, midframe: 6, backShell: 7 };
@@ -30,17 +34,10 @@ const lerp = (a, b, k) => a + (b - a) * k;
 const smooth = (a, b, x) => { const u = clamp01((x - a) / (b - a)); return u * u * (3 - 2 * u); };
 const p3out = (u) => 1 - (1 - u) ** 3;
 const inOutCubic = (u) => (u < 0.5 ? 4 * u * u * u : 1 - (-2 * u + 2) ** 3 / 2);
-function bezier(x1, y1, x2, y2) {
-  const f = (a, b, s) => 3 * a * s * (1 - s) ** 2 + 3 * b * s * s * (1 - s) + s ** 3;
-  return (x) => {
-    if (x <= 0) return 0;
-    if (x >= 1) return 1;
-    let lo = 0, hi = 1, s = x;
-    for (let i = 0; i < 22; i++) { s = (lo + hi) / 2; if (f(x1, x2, s) < x) lo = s; else hi = s; }
-    return f(y1, y2, s);
-  };
-}
-const arrive = bezier(0.5, 0, 0.82, 0.76); // lift off gently, arrive with intent (then the click)
+/** Lift off gently, arrive with intent (end slope 4/3, then the click). Closed form, no solver. */
+const arrive = (u) => u * u * (5 / 3 - (2 / 3) * u);
+/** Smooth max: ≥ max(a, b), no kink when the framing guard takes over. */
+const smax = (a, b, w) => 0.5 * (a + b + Math.sqrt((a - b) ** 2 + w * w));
 /** Monotone-ish Hermite spline through [t, v] keys; flat tangents at the ends and at extrema. */
 function spline(keys) {
   const n = keys.length;
@@ -60,105 +57,98 @@ function spline(keys) {
     return (2 * s3 - 3 * s2 + 1) * v0 + (s3 - 2 * s2 + s) * h * m[i] + (-2 * s3 + 3 * s2) * v1 + (s3 - s2) * h * m[i + 1];
   };
 }
-// Orbit: yaw (camera towards the device's right) and elevation. Landscape spreads the stack
-// sideways, portrait looks down on it so the layers spread vertically.
+// Orbit: yaw (camera towards the device's right) and elevation. The opening turn passes the
+// edge-on profile early (t≈0.75, still rising); the widest pose (apex) is held at 3.9 s before
+// reassembly starts at 4.3 s. Landscape spreads the stack sideways, portrait looks down on it.
+const YAW_IN = [[0, 166], [0.5, 124], [0.8, 76], [1.35, 38]];
 const ORBIT = {
   land: {
-    yaw: spline([[0, 198], [0.95, 112], [1.95, 28], [3.0, 36], [4.45, 66], [5.6, 33], [D, 0]]),
-    pitch: spline([[0, 12], [1.95, 7], [3.0, 12], [4.45, 19], [5.6, 8], [D, 0]]),
+    yaw: spline([...YAW_IN, [2.2, 27], [3.0, 40], [3.9, 64], [5.05, 33], [D, 0]]),
+    pitch: spline([[0, 12], [1.35, 7], [2.6, 12], [3.9, 19], [5.05, 8], [D, 0]]),
   },
   port: {
-    yaw: spline([[0, 198], [0.95, 112], [1.95, 20], [3.0, 18], [4.45, 26], [5.6, 12], [D, 0]]),
-    pitch: spline([[0, 12], [1.95, 18], [3.0, 44], [4.45, 54], [5.6, 18], [D, 0]]),
+    yaw: spline([...YAW_IN, [2.2, 20], [3.0, 18], [3.9, 26], [5.05, 12], [D, 0]]),
+    pitch: spline([[0, 12], [1.35, 18], [2.6, 44], [3.9, 54], [5.05, 18], [D, 0]]),
   },
 };
 
-/** Studio environment: RoomEnvironment plus a large front soft box (face brightness), two
- *  crisp strip lights and dark flags so the polished steel shows real contrast. */
-function studio() {
-  const room = new RoomEnvironment();
-  const geo = new THREE.BoxGeometry();
-  const mats = [];
-  const box = (x, y, z, sx, sy, sz, v) => {
-    const m = new THREE.MeshBasicMaterial({ color: new THREE.Color(v, v, v) });
+/** Two studios, one PMREM pass each.
+ *  room: RoomEnvironment + a hot front soft box, a broad dim wrap on the camera side (keeps
+ *  the anodised face lit at oblique yaw) and strips/flags for the internals.
+ *  contrast: dark cyclorama with soft boxes, hot strips and black flags around the horizon for
+ *  the mirror steel; its dark sector (with one thin strip) serves the display glass and LCD
+ *  through per-material envMapRotation. */
+function studios(stripTex) {
+  const geo = new THREE.BoxGeometry(), mats = [];
+  const box = (s, x, y, z, sx, sy, sz, v, map = null) => {
+    const m = new THREE.MeshBasicMaterial({ color: new THREE.Color(v, v, v), map, side: THREE.DoubleSide });
     mats.push(m);
     const o = new THREE.Mesh(geo, m);
     o.position.set(x, y, z); o.scale.set(sx, sy, sz);
-    room.add(o);
+    s.add(o);
+    return o;
   };
-  box(-5, 7, 13.8, 8, 7, 0.2, 1.6);       // front soft box, high left (hot)
-  box(3, 4, 13.85, 16, 10, 0.2, 0.55);     // broad dimmer front fill (gives the face a falloff)
-  box(0, -2, 13.9, 26, 3, 0.2, 0.05);      // dark band below it (gives the face a gradient)
-  box(-14.8, 4, 4, 0.2, 14, 1.4, 9);       // left strip
-  box(14.6, 5, -3, 0.2, 14, 1.2, 7);       // right rim strip
-  box(14.8, 2, 7, 0.2, 9, 8, 0.03);        // right flag
-  box(-14.8, 2, -8, 0.2, 9, 9, 0.03);      // left-back flag
-  box(0, -2, -13.9, 24, 6, 0.2, 0.04);     // back flag (for the polished back)
-  return { room, dispose() { geo.dispose(); mats.forEach((m) => m.dispose()); room.traverse((o) => { o.geometry?.dispose(); o.material?.dispose?.(); }); } };
+  const room = new RoomEnvironment();
+  box(room, -5, 7, 13.8, 8, 7, 0.2, 1.6);        // front soft box, high left (hot)
+  box(room, 3, 4, 13.85, 16, 10, 0.2, 0.55);      // broad dimmer front fill (face falloff)
+  box(room, 0, -2, 13.9, 26, 3, 0.2, 0.05);       // dark band below it (face gradient)
+  box(room, -14.85, 3, 7, 0.2, 18, 14, 0.62);     // camera-side wrap (left wall, front half)
+  box(room, 0, 4, 13.97, 30, 18, 0.2, 0.5);       // camera-side wrap (front wall)
+  box(room, -14.8, 4, 4, 0.2, 14, 1.4, 9);        // left strip
+  box(room, 14.6, 5, -3, 0.2, 14, 1.2, 7);        // right rim strip
+  box(room, 14.8, 2, 7, 0.2, 9, 8, 0.03);         // right flag
+  box(room, -14.8, 2, -8, 0.2, 9, 9, 0.03);       // left-back flag
+  const con = new THREE.Scene();
+  const cyl = new THREE.Mesh(new THREE.CylinderGeometry(12, 12, 26, 96, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 2.4, 2.4), map: stripTex, side: THREE.DoubleSide }));
+  mats.push(cyl.material);
+  con.add(cyl);
+  box(con, 0, 12.5, 0, 26, 0.2, 26, 1.1);  // ceiling soft box
+  box(con, 0, -12.5, 0, 26, 0.2, 26, 0.01); // black floor
+  return {
+    room, con,
+    dispose() { geo.dispose(); cyl.geometry.dispose(); mats.forEach((m) => m.dispose()); room.traverse((o) => { o.geometry?.dispose(); o.material?.dispose?.(); }); },
+  };
 }
+// horizon bands for the contrast studio (deg from +Z towards +X, value): the polished back
+// sweeps 60°→180° while it faces the camera, crossing two hot strips and a black flag.
+const BANDS = [
+  [0, 16, 0.5], [16, 24, 1], [24, 40, 0.42], [40, 58, 0.015], [58, 75, 0.45], [75, 83, 1], [83, 108, 0.62],
+  [108, 133, 0.012], [133, 140, 1], [140, 180, 0.5], [180, 219, 0.006], [219, 223, 0.4], [223, 226, 0.006],
+  [226, 227.5, 0.16], [227.5, 268, 0.006], [268, 300, 0.4], [300, 309, 1], [309, 330, 0.03], [330, 360, 0.5],
+];
 
-/** Dark studio for the display glass + LCD: black with one soft diagonal strip, so the
- *  screen stays deep black with a single glossy reflection. */
-function glassStudio() {
-  const s = new THREE.Scene();
-  const geo = new THREE.PlaneGeometry(1, 1);
-  const mk = (v, x, y, z, sx, sy, rz) => {
-    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: new THREE.Color(v, v, v), side: THREE.DoubleSide }));
-    m.position.set(x, y, z); m.lookAt(0, 0, 0); m.rotateZ(rz); m.scale.set(sx, sy, 1);
-    s.add(m);
-  };
-  mk(1.2, -0.35, 0.75, 10, 0.32, 30, 0.785);  // main diagonal strip (upper-left of the screen)
-  mk(0.4, -0.12, 0.52, 10, 0.07, 30, 0.785);  // thin companion line
-  mk(0.04, 0, -9, 6, 30, 8, 0);             // faint floor bounce
-  return { s, dispose() { geo.dispose(); s.traverse((o) => o.material?.dispose()); } };
-}
-
-/** Chrome studio for the mirror-polished steel: large soft boxes and strips against a dark
- *  room, so the back reads as bright polished metal with crisp reflections, not gunmetal. */
-function chromeStudio() {
-  const s = new THREE.Scene();
-  const geo = new THREE.PlaneGeometry(1, 1);
-  const mk = (v, x, y, z, sx, sy) => {
-    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: new THREE.Color(v, v, v * 1.03), side: THREE.DoubleSide }));
-    m.position.set(x, y, z); m.lookAt(0, 0, 0); m.scale.set(sx, sy, 1);
-    s.add(m);
-  };
-  mk(0.85, 0, 0, -14, 40, 40); mk(0.85, -14, 0, 0, 40, 40); mk(0.85, 14, 0, 0, 40, 40); mk(0.95, 0, 0, 14, 40, 40);
-  mk(1.1, 0, 14, 0, 40, 40); mk(0.06, 0, -14, 0, 40, 40);
-  // dark flags + hot strips around the horizon: bands sweep across the polished steel as it turns
-  for (let i = 0; i < 12; i++) {
-    const a = (i / 12) * Math.PI * 2 + 0.2, c = Math.cos(a), sn = Math.sin(a);
-    mk(i % 3 === 1 ? 4 : 0.03, 12.5 * sn, 1, 12.5 * c, i % 3 === 1 ? 1.3 : 2.6 + (i % 2), 26);
-  }
-  mk(0.05, 0, -3.5, 13.4, 40, 5); // dark floor line (gives the steel a horizon)
-  return { s, dispose() { geo.dispose(); s.traverse((o) => o.material?.dispose()); } };
-}
+const NOOP = { duration: 0, done: Promise.resolve(), skip() {}, seek() {}, pause() {}, play() {}, dispose() {} };
 
 export function runIntro({ getTargetRect, reducedMotion = false, config = null } = {}) {
   const duration = reducedMotion ? 1.0 : D;
 
+  // Renderer first: without WebGL return a finished no-op controller (the DOM iPod takes over)
+  // and leave nothing behind in the DOM.
   const canvas = document.createElement('canvas');
+  let renderer;
+  try {
+    const attrs = { alpha: true, antialias: true, depth: true, stencil: false, premultipliedAlpha: true, powerPreference: 'high-performance' };
+    const gl = canvas.getContext('webgl2', attrs);
+    if (!gl) return NOOP;
+    renderer = new THREE.WebGLRenderer({ canvas, context: gl, ...attrs });
+  } catch {
+    return NOOP;
+  }
   canvas.setAttribute('aria-hidden', 'true');
   canvas.dataset.intro = 'c';
   canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none;z-index:50;background:transparent;opacity:1';
   document.body.append(canvas);
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setClearColor(0x000000, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NeutralToneMapping;
-  renderer.toneMappingExposure = 1.0;
-  renderer.debug.checkShaderErrors = false; // no blocking link-status queries on first use
 
   const scene = new THREE.Scene();
   const pmrem = new THREE.PMREMGenerator(renderer);
-  const st = studio();
-  const envRT = pmrem.fromScene(st.room, 0.03);
-  st.dispose();
+  const stripTex = new THREE.CanvasTexture(stripCanvas(BANDS));
+  const st = studios(stripTex);
+  const envRT = pmrem.fromScene(st.room, 0.03), conRT = pmrem.fromScene(st.con, 0.015);
+  st.dispose(); stripTex.dispose();
   scene.environment = envRT.texture;
-  const gs = glassStudio(), cs = chromeStudio();
-  const glassRT = pmrem.fromScene(gs.s, 0.02, 0.1, 100, { size: 128 }), chromeRT = pmrem.fromScene(cs.s, 0.02);
-  gs.dispose(); cs.dispose();
 
   const key = new THREE.DirectionalLight(0xfffaf2, 1.6); key.position.set(-0.6, 1.0, 0.8);
   const rim = new THREE.DirectionalLight(0xdce8ff, 2.2); rim.position.set(1.0, 0.45, -0.9);
@@ -169,8 +159,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
   scene.add(rig);
   const ipod = buildIpod({ maxAniso: Math.min(8, renderer.capabilities.getMaxAnisotropy()) });
   const { glass, panel, face } = ipod.mats;
-  glass.envMap = panel.envMap = glassRT.texture;
-  ipod.mats.steel.envMap = ipod.mats.back.envMap = chromeRT.texture;
+  for (const m of [glass, panel, ipod.mats.steel, ipod.mats.back]) m.envMap = conRT.texture;
   const chassis = new THREE.Group(); // receives the landing nudges
   chassis.position.z = HALF_D;        // rotate about the device centre
   chassis.add(ipod.model);
@@ -192,11 +181,19 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
   const iOf = (id) => parts.findIndex((p) => p.id === id);
   const SHELL = SHELL_IDS.map(iOf);
   const INTERNAL = parts.map((_, i) => i).filter((i) => !SHELL.includes(i));
-  const iBoard = iOf('logicBoard'), iFrame = iOf('midframe');
-  const E = new Float32Array(N);
+  const iBoard = iOf('logicBoard'), iFrame = iOf('midframe'), iWheel = iOf('clickWheel'), iFlex = iOf('wheelFlex');
+  const E = new Float32Array(N), G = new Float32Array(N);
+  // per-material contact glint bookkeeping: [material, base envMapIntensity, part indices]
+  const glint = new Map();
+  parts.forEach((p, i) => p.group.traverse((o) => {
+    if (!o.material) return;
+    const g = glint.get(o.material) ?? [o.material, o.material.envMapIntensity ?? 1, []];
+    if (!g[2].includes(i)) g[2].push(i);
+    glint.set(o.material, g);
+  }));
 
-  // ---- layout (viewport dependent, recomputed on resize) ----
-  const L = { vw: 0, vh: 0, spread: 1, dz: [], screwOff: [], dHero: 600, dAsm: 600, o: ORBIT.land, portrait: false };
+  // ---- layout (viewport dependent, recomputed on resize / DPR change) ----
+  const L = { vw: 0, vh: 0, dpr: 0, spread: 1, dz: [], screwOff: [], corners: [], dHero: 600, dAsm: 600, o: ORBIT.land, portrait: false };
   const tmpV = new THREE.Vector3(), tmpE = new THREE.Euler(), tmpQ = new THREE.Quaternion();
 
   function computeExplode(gap) {
@@ -214,23 +211,22 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     const centre = (cursor + gap) / 2;
     return dz.map((d) => d + (-HALF_D - centre));
   }
-  /** Camera distance from the rig origin so all points fit inside ±mx/±my NDC. */
-  function fitDistance(points, yaw, pitch, fov, aspect, mx, my, cx = 0, cy = 0) {
+  /** Camera distance from the rig origin so all points (+ rig offset ox/oy) fit inside ±mx/±my NDC. */
+  function fitDistance(points, q, fov, aspect, mx, my, ox = 0, oy = 0, dzOf = null) {
     const t = Math.tan((fov * DEG) / 2);
-    tmpQ.setFromEuler(tmpE.set(-pitch * DEG, -yaw * DEG, 0, 'XYZ'));
     let d = 0;
-    for (const p of points) {
-      tmpV.copy(p); tmpV.z += HALF_D; tmpV.applyQuaternion(tmpQ);
-      d = Math.max(d, tmpV.z + Math.abs(tmpV.x - cx) / (t * aspect * mx), tmpV.z + Math.abs(tmpV.y - cy) / (t * my));
-    }
+    points.forEach((p, k) => {
+      tmpV.copy(p); tmpV.z += HALF_D + (dzOf ? dzOf(k) : 0); tmpV.applyQuaternion(q);
+      d = Math.max(d, tmpV.z + Math.abs(tmpV.x + ox) / (t * aspect * mx), tmpV.z + Math.abs(tmpV.y + oy) / (t * my));
+    });
     return d;
   }
+  const qOf = (yaw, pitch) => tmpQ.setFromEuler(tmpE.set(-pitch * DEG, -yaw * DEG, 0, 'XYZ'));
   /** Centre of the rotated point cloud (camera-aligned x/y), to keep the stack centred. */
-  function centreOf(points, yaw, pitch) {
-    tmpQ.setFromEuler(tmpE.set(-pitch * DEG, -yaw * DEG, 0, 'XYZ'));
+  function centreOf(points, q) {
     const e = [Infinity, Infinity, -Infinity, -Infinity];
     for (const p of points) {
-      tmpV.copy(p); tmpV.z += HALF_D; tmpV.applyQuaternion(tmpQ);
+      tmpV.copy(p); tmpV.z += HALF_D; tmpV.applyQuaternion(q);
       e[0] = Math.min(e[0], tmpV.x); e[1] = Math.min(e[1], tmpV.y); e[2] = Math.max(e[2], tmpV.x); e[3] = Math.max(e[3], tmpV.y);
     }
     return [(e[0] + e[2]) / 2, (e[1] + e[3]) / 2];
@@ -240,9 +236,10 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
   };
 
   function layout() {
-    const vw = window.innerWidth, vh = window.innerHeight;
-    if (vw === L.vw && vh === L.vh) return;
-    L.vw = vw; L.vh = vh;
+    const vw = window.innerWidth, vh = window.innerHeight, dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (vw === L.vw && vh === L.vh && dpr === L.dpr) return;
+    if (dpr !== L.dpr) renderer.setPixelRatio(dpr);
+    L.vw = vw; L.vh = vh; L.dpr = dpr;
     renderer.setSize(vw, vh, false);
     const aspect = vw / vh;
     L.portrait = aspect < 0.9;
@@ -251,13 +248,15 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     L.dz = computeExplode(17 * L.spread);
     L.screwOff = ipod.screwBase.map((b, j) => new THREE.Vector3(Math.sign(b.x) * (5 + (j % 3)) * L.spread, b.y * 0.04, (7 + (j % 2) * 3) * L.spread));
     const exploded = [], assembled = [];
-    parts.forEach((p, i) => { boxPoints(p.box, L.dz[i], exploded); boxPoints(p.box, 0, assembled); });
+    L.corners = [];
+    parts.forEach((p, i) => { boxPoints(p.box, L.dz[i], exploded); boxPoints(p.box, 0, assembled); boxPoints(p.box, 0, L.corners); });
     ipod.screwBase.forEach((b, j) => { const v = b.clone().add(L.screwOff[j]); v.z += L.dz[j < 4 ? iBoard : iFrame]; exploded.push(v); });
-    const mx = L.portrait ? 0.9 : 0.84, my = L.portrait ? 0.78 : 0.86;
-    [L.cx, L.cy] = centreOf(exploded, L.o.yaw(3.6), L.o.pitch(3.6));
-    L.dHero = Math.max(...[2.9, 3.6, 4.45].map((t) => fitDistance(exploded, L.o.yaw(t), L.o.pitch(t), FOV_HERO, aspect, mx, my, L.cx, L.cy)));
-    L.dAsm = fitDistance(assembled, 30, 8, FOV_HERO, aspect, 0.6, 0.6);
-    L.rise = L.dAsm * Math.tan((FOV_HERO * DEG) / 2) + IPOD.height * 0.62;
+    L.mx = L.portrait ? 0.86 : 0.84; L.my = L.portrait ? 0.78 : 0.86;
+    [L.cx, L.cy] = centreOf(exploded, qOf(L.o.yaw(3.3), L.o.pitch(3.3)));
+    L.dHero = Math.max(...[2.6, 3.3, 3.9, 4.25].map((t) => fitDistance(exploded, qOf(L.o.yaw(t), L.o.pitch(t)), FOV_HERO, aspect, L.mx, L.my, -L.cx, -L.cy)));
+    L.dAsm = fitDistance(assembled, qOf(30, 8), FOV_HERO, aspect, 0.6, 0.6);
+    // start fully below the frame, even for the camera's pulled-back opening distance
+    L.rise = 1.25 * L.dAsm * Math.tan((FOV_HERO * DEG) / 2) + IPOD.height * 0.75;
   }
 
   function targetRect() {
@@ -289,13 +288,15 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
 
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), eul = new THREE.Euler(), pv = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
   const tHero = Math.tan((FOV_HERO * DEG) / 2);
+  const dzLive = (k) => L.dz[k >> 3] * E[k >> 3]; // corner k belongs to part k/8
+  const reStart = (i) => TL.re0 + (N - 1 - (i === iWheel ? 0 : i)) * TL.reS; // wheel seats with the front plate
 
   /** Screws ride with their host part and back out / drive in (spinning) around it. */
   function placeScrews(t) {
     for (let j = 0; j < ipod.screwBase.length; j++) {
       const h = j < 4 ? iBoard : iFrame, k = j % 4;
       const out = p3out(clamp01((t - (TL.ex0 + h * TL.exS + 0.06 + k * 0.03)) / 0.85));
-      const back = inOutCubic(clamp01((t - (TL.re0 + (N - 1 - h) * TL.reS - 0.14 + k * 0.025)) / (TL.reD + 0.08)));
+      const back = inOutCubic(clamp01((t - (reStart(h) - 0.14 + k * 0.025)) / (TL.reD + 0.08)));
       const e = out * (1 - back);
       pv.copy(ipod.screwBase[j]).addScaledVector(L.screwOff[j], e);
       pv.z += L.dz[h] * E[h];
@@ -309,14 +310,15 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     layout();
     if (reducedMotion) {
       const u = clamp01(t / duration);
-      rig.rotation.set(0, 0, 0); rig.position.set(0, 0, 0); chassis.position.set(0, 0, HALF_D);
+      rig.rotation.set(0, 0, 0); rig.position.set(0, 0, 0); chassis.position.set(0, 0, HALF_D); chassis.rotation.set(0, 0, 0);
       parts.forEach((p) => { p.group.position.set(0, 0, p.z0); p.group.rotation.set(0, 0, 0); });
       INTERNAL.forEach((i) => { parts[i].group.visible = false; });
       ipod.screws.visible = false;
       shadow.visible = false;
       scene.environmentRotation.set(0, ENV_END, 0);
-      glass.envMapRotation.set(0, GLASS_END, 0); panel.envMapRotation.copy(glass.envMapRotation);
+      glass.envMapRotation.set(0, GLASS_END, GLASS_Z); panel.envMapRotation.copy(glass.envMapRotation);
       face.emissiveIntensity = FACE_GLOW;
+      renderer.toneMappingExposure = END_EXPOSURE;
       applyCamera(1, 0);
       camera.position.z = HALF_D + (camera.position.z - HALF_D) * (1 + 0.04 * (1 - p3out(u)));
       camera.updateProjectionMatrix();
@@ -325,54 +327,72 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     const yaw = L.o.yaw(t), pitch = L.o.pitch(t);
     rig.rotation.set(-pitch * DEG, -yaw * DEG, 0, 'XYZ');
     const rise = -L.rise * (1 - p3out(clamp01(t / TL.rise)));
-    const bob = 1.2 * Math.sin((t - 2.2) * 2.1) * smooth(2.2, 3.0, t) * (1 - smooth(4.0, 4.6, t));
-    const env = smooth(1.45, 2.7, t) * (1 - smooth(4.3, 5.5, t));
-    rig.position.set(-L.cx * env, rise + bob - L.cy * env, 0);
+    const bob = 1.2 * Math.sin((t - 1.9) * 2.1) * smooth(1.9, 2.7, t) * (1 - smooth(3.9, 4.4, t));
+    const env = smooth(1.15, 2.4, t) * (1 - smooth(4.25, 5.3, t));
+    const ox = -L.cx * env, oy = bob - L.cy * env;
+    rig.position.set(ox, rise + oy, 0);
 
-    // parts: front-to-back cascade out, back-to-front back in; landing nudges on the chassis
+    // parts: front-to-back cascade out, back-to-front back in; landing nudges on the chassis,
+    // a per-part settle (front plate + wheel, back shell) and a small specular contact glint
     let nudge = 0, wob = 0;
     for (let i = 0; i < N; i++) {
       const p = parts[i];
       const out = p3out(clamp01((t - (TL.ex0 + i * TL.exS)) / TL.exD));
-      const rs = TL.re0 + (N - 1 - i) * TL.reS;
+      const rs = reStart(i);
       const back = arrive(clamp01((t - rs) / TL.reD));
       const e = out * (1 - back);
       E[i] = e;
       p.group.position.set(0, 0, p.z0 + L.dz[i] * e);
-      const sgn = i % 2 ? -1 : 1, amp = (1.8 + (i % 3) * 0.8) * DEG;
-      const tilt = amp * (Math.sin(Math.PI * out) * (1 - back) * 0.7 + sgn * Math.sin(Math.PI * back) * 0.8);
-      p.group.rotation.set(tilt, tilt * 0.45 * sgn, 0);
+      const j = i === iWheel ? 0 : i; // the wheel rides home with the front plate: same tilt
+      const sgn = j % 2 ? -1 : 1, amp = (1.8 + (j % 3) * 0.8) * DEG;
+      // the plate levels out over its last quarter, so it never seats skewed over the wheel
+      let tilt = amp * (Math.sin(Math.PI * out) * (1 - back) * 0.7 + sgn * Math.sin(Math.PI * back) * 0.8 * (j ? 1 : 1 - smooth(0.7, 0.95, back)));
       const tau = t - (rs + TL.reD);
-      if (tau > 0 && tau < 0.6) {
+      G[i] = tau > -0.3 && tau < 0.3 ? Math.exp(-((tau / 0.09) ** 2)) : 0;
+      if (tau > 0 && tau < 0.7) {
         const k = Math.exp(-tau / 0.055) * Math.sin(tau * 52);
-        const w = i === 0 ? 2.2 : i === N - 1 ? 1.4 : 0.5; // heavier parts, bigger click
-        nudge += -Math.sign(L.dz[i]) * w * 0.55 * k;
-        wob += (i === 0 ? 0.6 : 0.15) * k;
+        if (i !== iWheel) {
+          const w = i === 0 ? 2.2 : i === N - 1 ? 1.4 : 0.5; // heavier parts, bigger click
+          nudge += -Math.sign(L.dz[i]) * w * 0.55 * k;
+          wob += (i === 0 ? 0.6 : 0.15) * k;
+        }
+        if (j === 0 || i === N - 1) tilt -= sgn * amp * 0.55 * Math.exp(-tau / 0.09) * Math.sin((Math.PI * tau) / 0.12);
       }
+      p.group.rotation.set(tilt, tilt * 0.45 * sgn, 0);
+    }
+    for (const [m, base, ids] of glint.values()) {
+      let g = 0;
+      for (const i of ids) g = Math.max(g, G[i]);
+      m.envMapIntensity = base * (1 + 0.3 * g);
     }
     chassis.position.set(0, 0, HALF_D + nudge);
     chassis.rotation.set(wob * DEG, 0, 0);
     placeScrews(t);
     let closed = true;
     for (const i of SHELL) if (E[i] >= 1e-4) closed = false;
-    for (const i of INTERNAL) parts[i].group.visible = !closed;
+    // once the plate is nearly home the wheel annulus is the only window onto the flex/board
+    const veiled = t > reStart(0) && E[0] < 0.08;
+    for (const i of INTERNAL) parts[i].group.visible = !closed && !(veiled && (i === iFlex || i === iBoard));
     ipod.screws.visible = !closed;
 
     // reflections: slow drift + a soft-box sweep across the face as it turns home
-    const sweep = smooth(5.55, D, t);
-    scene.environmentRotation.set(0, lerp(-0.7, ENV_END - 0.55, smooth(0, 5.4, t)) + 0.55 * sweep, 0);
-    glass.envMapRotation.set(0, lerp(GLASS_FROM, GLASS_END, sweep), 0);
+    const sweep = smooth(5.2, D, t);
+    scene.environmentRotation.set(0, lerp(-0.7, ENV_END - 0.55, smooth(0, 5.1, t)) + 0.55 * sweep, 0);
+    glass.envMapRotation.set(0, lerp(GLASS_FROM, GLASS_END, sweep), GLASS_Z);
     panel.envMapRotation.copy(glass.envMapRotation);
 
     const b = inOutCubic(clamp01((t - TL.cam0) / (D - TL.cam0)));
-    const dHero = lerp(L.dAsm * (1 + 0.12 * (1 - p3out(clamp01(t / 1.9)))), L.dHero, env);
-    applyCamera(b, dHero * tHero);
+    const dHero = lerp(L.dAsm * (1 + 0.12 * (1 - p3out(clamp01(t / 1.6)))), L.dHero, env);
+    // framing guard: the live pose (partly exploded, close camera) must stay inside the margins
+    const dReq = fitDistance(L.corners, rig.quaternion, FOV_HERO, L.vw / L.vh, L.mx, L.my, ox, oy, dzLive);
+    applyCamera(b, smax(dHero * tHero, dReq * tHero, 0.04 * dHero * tHero));
     face.emissiveIntensity = FACE_GLOW * b * b;
+    renderer.toneMappingExposure = lerp(1, END_EXPOSURE, b * b);
 
     shadow.visible = b < 1;
     shadow.position.set(0, -IPOD.height / 2 - 9 - 7 * env + rise, -12);
     shadow.scale.set(lerp(78, 175 * L.spread, env), lerp(11, 22, env), 1);
-    shadow.material.opacity = 0.5 * smooth(0.5, 1.3, t) * (1 - b);
+    shadow.material.opacity = 0.5 * smooth(0.4, 1.1, t) * (1 - b);
     return 1;
   }
 
@@ -386,26 +406,19 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
 
   let resolveDone;
   const done = new Promise((r) => { resolveDone = r; });
-  // hand-off: draw the final aligned frame, then a 220 ms cross-fade into the DOM iPod
-  function handoff() {
-    raf = 0;
-    if (disposed || !handedOff) return; // a seek() reclaimed the canvas meanwhile
+  /** Draw the final aligned frame synchronously, then resolve `done` and cross-fade (220 ms)
+   *  into the DOM iPod. Programs and textures are warmed in the constructor, so this is cheap. */
+  function finish() {
+    if (finished || disposed) return;
+    finished = true; playing = false;
+    cancelAnimationFrame(raf); raf = 0;
+    t = duration; handedOff = true;
     render();
     canvas.style.transition = 'none'; canvas.style.opacity = '1';
     void canvas.offsetWidth;
     canvas.style.transition = 'opacity 220ms ease-out';
     canvas.style.opacity = '0';
-  }
-  function finish(deferDraw = false) {
-    if (finished) return;
-    finished = true; playing = false;
-    cancelAnimationFrame(raf);
-    t = duration; handedOff = true;
-    resolveDone(); // never wait on GPU work: skip() must settle `done` immediately
-    // A skip from mid-animation may need the final pose's first-ever draw (slow
-    // on software GL), so it runs on the next frame instead of inside skip().
-    if (deferDraw) raf = requestAnimationFrame(handoff);
-    else handoff();
+    resolveDone();
   }
   function frame(now) {
     if (!playing || disposed) return;
@@ -418,58 +431,53 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
   }
   const onResize = () => { if (!playing) render(); };
   window.addEventListener('resize', onResize);
+  // DPR changes (window dragged to another display) without a resize event
+  let mq = null;
+  const onDpr = () => { watchDpr(); onResize(); };
+  const watchDpr = () => {
+    mq?.removeEventListener?.('change', onDpr);
+    mq = window.matchMedia?.(`(resolution: ${window.devicePixelRatio || 1}dppx)`) ?? null;
+    mq?.addEventListener?.('change', onDpr);
+  };
+  watchDpr();
+  const onLost = () => finish(); // GPU reset / context loss: go straight to the DOM iPod
+  canvas.addEventListener('webglcontextlost', onLost);
 
   const brand = (cfg) => { if (!disposed && cfg?.brand) { ipod.setBrand(cfg.brand); if (!playing) render(); } };
   if (config) brand(config);
   else loadConfig(new URL(`${import.meta.env.BASE_URL}config.json`, location.href).href).then(brand).catch(() => {});
 
   layout();
-  pose(2.9); // everything visible once → compile all programs up front
+  pose(3.4); // everything visible once → compile all programs up front
   INTERNAL.forEach((i) => { parts[i].group.visible = true; });
   renderer.compile(scene, camera);
   ipod.textures.forEach((x) => renderer.initTexture(x)); // upload now, not mid-explosion
   render();
 
-  /** Test hook: projected front-face bbox vs the target rect at the current t (viewport px). */
-  function measure() {
-    pose(t);
-    scene.updateMatrixWorld(true);
-    camera.updateMatrixWorld(); // project() reads matrixWorldInverse, normally refreshed by render()
-    const ext = [Infinity, Infinity, -Infinity, -Infinity];
-    for (const [x, y] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-      tmpV.set((x * IPOD.width) / 2, (y * IPOD.height) / 2, -FACE_BEVEL).applyMatrix4(ipod.model.matrixWorld).project(camera);
-      const px = (tmpV.x * 0.5 + 0.5) * L.vw, py = (0.5 - tmpV.y * 0.5) * L.vh;
-      ext[0] = Math.min(ext[0], px); ext[1] = Math.min(ext[1], py); ext[2] = Math.max(ext[2], px); ext[3] = Math.max(ext[3], py);
-    }
-    const r = targetRect();
-    const err = Math.max(Math.abs(ext[0] - r.left), Math.abs(ext[1] - r.top), Math.abs(ext[2] - (r.left + r.width)), Math.abs(ext[3] - (r.top + r.height)));
-    return { left: ext[0], top: ext[1], right: ext[2], bottom: ext[3], target: { left: r.left, top: r.top, width: r.width, height: r.height }, err };
-  }
-
   const controller = {
     duration,
     done,
-    skip() { if (!disposed) finish(true); },
+    skip() { finish(); },
     seek(s) {
       if (disposed) return;
       t = Math.max(0, Math.min(duration, Number(s) || 0));
       if (handedOff) { handedOff = false; finished = false; cancelAnimationFrame(raf); canvas.style.transition = 'none'; }
       render();
     },
-    pause() { if (!playing) return; playing = false; cancelAnimationFrame(raf); }, // keeps a pending hand-off
+    pause() { if (!playing) return; playing = false; cancelAnimationFrame(raf); },
     play() {
       if (playing || finished || disposed) return;
-      if (t >= duration) t = 0;
+      if (t >= duration) { finish(); return; } // already at the end: hand off
       playing = true; last = 0;
       raf = requestAnimationFrame(frame);
     },
-    _measure: measure,
-    _three: { scene, renderer, ipod, key, rim },
     dispose() {
       if (disposed) return;
       disposed = true; playing = false;
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', onResize);
+      mq?.removeEventListener?.('change', onDpr);
+      canvas.removeEventListener('webglcontextlost', onLost);
       const mats = new Set(), geos = new Set();
       scene.traverse((o) => {
         if (o.geometry) geos.add(o.geometry);
@@ -483,7 +491,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
       });
       ipod.textures.forEach((x) => x.dispose());
       shadowTex.dispose();
-      envRT.dispose(); glassRT.dispose(); chromeRT.dispose();
+      envRT.dispose(); conRT.dispose();
       pmrem.dispose();
       renderer.dispose();
       renderer.forceContextLoss?.();
@@ -491,6 +499,26 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
       resolveDone();
     },
   };
+
+  // Dev-only verification hook (stripped from production builds): projected front-face bbox
+  // vs the target rect at the current t, in viewport px. Lets harnesses assert alignment numerically.
+  if (import.meta.env.DEV) {
+    controller._measure = () => {
+      pose(t);
+      scene.updateMatrixWorld(true);
+      camera.updateMatrixWorld();
+      const ext = [Infinity, Infinity, -Infinity, -Infinity];
+      for (const [x, y] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+        tmpV.set((x * IPOD.width) / 2, (y * IPOD.height) / 2, -FACE_BEVEL).applyMatrix4(ipod.model.matrixWorld).project(camera);
+        const px = (tmpV.x * 0.5 + 0.5) * L.vw, py = (0.5 - tmpV.y * 0.5) * L.vh;
+        ext[0] = Math.min(ext[0], px); ext[1] = Math.min(ext[1], py); ext[2] = Math.max(ext[2], px); ext[3] = Math.max(ext[3], py);
+      }
+      const r = targetRect();
+      const err = Math.max(Math.abs(ext[0] - r.left), Math.abs(ext[1] - r.top), Math.abs(ext[2] - (r.left + r.width)), Math.abs(ext[3] - (r.top + r.height)));
+      return { left: ext[0], top: ext[1], right: ext[2], bottom: ext[3], target: { left: r.left, top: r.top, width: r.width, height: r.height }, err };
+    };
+    controller._three = { scene, renderer, ipod, key, rim };
+  }
   controller.play();
   return controller;
 }
