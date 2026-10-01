@@ -17,7 +17,7 @@ const FOV_HERO = 26, FOV_END = 20;
 const D = 6.5;
 const ENV_END = 0.25; // final room rotation (fixes the hand-off look)
 const GLASS_FROM = 2.75, GLASS_END = 2.27, GLASS_Z = Math.PI / 4; // diagonal glint on the display glass
-const FACE_GLOW = 0.05, WHEEL_GLOW = 0.1; // hand-off fill (matches the DOM iPod's tone)
+const FACE_GLOW = 0, WHEEL_GLOW = 0.1, FACE_END_ENV = 0.84; // hand-off fill (matches the DOM iPod's tone)
 const END_EXPOSURE = 0.94;
 const TL = {
   rise: 1.0,
@@ -92,8 +92,8 @@ function studios(stripTex) {
   box(room, -5, 7, 13.8, 8, 7, 0.2, 1.6);        // front soft box, high left (hot)
   box(room, 3, 4, 13.85, 16, 10, 0.2, 0.55);      // broad dimmer front fill (face falloff)
   box(room, 0, -2, 13.9, 26, 3, 0.2, 0.05);       // dark band below it (face gradient)
-  box(room, -14.85, 3, 7, 0.2, 18, 14, 0.62);     // camera-side wrap (left wall, front half)
-  box(room, 0, 4, 13.97, 30, 18, 0.2, 0.5);       // camera-side wrap (front wall)
+  box(room, -14.85, 3, 7, 0.2, 18, 14, 0.85);     // camera-side wrap (left wall, front half)
+  box(room, 0, 4, 13.97, 30, 18, 0.2, 0.7);       // camera-side wrap (front wall)
   box(room, -14.8, 4, 4, 0.2, 14, 1.4, 9);        // left strip
   box(room, 14.6, 5, -3, 0.2, 14, 1.2, 7);        // right rim strip
   box(room, 14.8, 2, 7, 0.2, 9, 8, 0.03);         // right flag
@@ -318,6 +318,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
       shadow.visible = false;
       scene.environmentRotation.set(0, ENV_END, 0);
       glass.envMapRotation.set(0, GLASS_END, GLASS_Z); panel.envMapRotation.copy(glass.envMapRotation);
+      face.envMapIntensity = FACE_END_ENV;
       face.emissiveIntensity = FACE_GLOW; wheel.emissiveIntensity = centre.emissiveIntensity = WHEEL_GLOW;
       renderer.toneMappingExposure = END_EXPOSURE;
       applyCamera(1, 0);
@@ -361,10 +362,11 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
       }
       p.group.rotation.set(tilt, tilt * 0.45 * sgn, 0);
     }
+    const b = inOutCubic(clamp01((t - TL.cam0) / (D - TL.cam0)));
     for (const [m, base, ids] of glint.values()) {
       let g = 0;
       for (const i of ids) g = Math.max(g, G[i]);
-      m.envMapIntensity = base * (1 + 0.3 * g);
+      m.envMapIntensity = base * (1 + 0.3 * g) * (m === face ? lerp(1, FACE_END_ENV, b * b) : 1);
     }
     chassis.position.set(0, 0, HALF_D + nudge);
     chassis.rotation.set(wob * DEG, 0, 0);
@@ -382,7 +384,6 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     glass.envMapRotation.set(0, lerp(GLASS_FROM, GLASS_END, sweep), GLASS_Z);
     panel.envMapRotation.copy(glass.envMapRotation);
 
-    const b = inOutCubic(clamp01((t - TL.cam0) / (D - TL.cam0)));
     const dHero = lerp(L.dAsm * (1 + 0.12 * (1 - p3out(clamp01(t / 1.6)))), L.dHero, env);
     // framing guard: the live pose (partly exploded, close camera) must stay inside the margins
     const dReq = fitDistance(L.corners, rig.quaternion, FOV_HERO, L.vw / L.vh, L.mx, L.my, ox, oy, dzLive);

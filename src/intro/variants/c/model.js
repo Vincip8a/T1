@@ -101,7 +101,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     // lower metalness + lighter base: a satin anodised layer keeps a diffuse floor, so the
     // plate never drops to grey card when the soft box leaves the reflection cone
     mats.face = phys({
-      color: '#d5d8db', metalness: 0.7, roughness: 0.44, roughnessMap: fine,
+      color: '#dcdfe2', metalness: 0.62, roughness: 0.44, roughnessMap: fine,
       anisotropy: 0.3, clearcoat: 0.25, clearcoatRoughness: 0.28,
       emissive: '#ffffff', emissiveIntensity: 0,
       emissiveMap: T.capFit(tx(T.faceGlowCanvas(), { color: false }), W, H),
