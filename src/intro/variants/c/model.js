@@ -12,6 +12,7 @@ const SX = (x) => x - W / 2;
 const SY = (y) => H / 2 - y;
 /** Front-plate edge bevel: the full W×H outline is reached at z = -FACE_BEVEL. */
 export const FACE_BEVEL = 0.25;
+const SEG = 16; // per 45° arc: hole, wheel and sensor base share one tessellation (even gap)
 
 function rrPath(p, w, h, r, cx = 0, cy = 0) {
   r = Math.max(0.05, Math.min(r, w / 2 - 0.01, h / 2 - 0.01));
@@ -57,9 +58,12 @@ function ext(shape, depth, b = 0, segs = 3, curveSegments = 14) {
 export function buildIpod({ maxAniso = 8 } = {}) {
   const textures = [];
   const tx = (c, o = {}) => { const t = T.tex(c, { aniso: maxAniso, ...o }); textures.push(t); return t; };
-  // One shared, world-scaled brushing texture (cap uv = mm): tiles every 40 mm.
+  // World-scaled brushing (cap uv = mm): coarse for drive/LCD steel (40 mm tile), and a much
+  // finer, quieter one for the anodised front plate (sub-pixel streaks, 20 mm tile).
   const brush = tx(T.brushed(3, 128, 16), { color: false, wrap: true });
   brush.repeat.set(1 / 40, 1 / 40);
+  const fine = tx(T.brushed(4, 200, 8, 1024, [0.3, 0.3], 9000), { color: false, wrap: true });
+  fine.repeat.set(1 / 20, 1 / 20);
 
   const model = new THREE.Group();
   const parts = {};
@@ -93,13 +97,15 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     const s = rr(W, H, IPOD.cornerRadius, b);
     s.holes.push(rrHole(sw.width, sw.height, sw.radius, b, ...swc));
     s.holes.push(circle(R + 0.12 + b, true, ...whc));
+    // lower metalness + lighter base: a satin anodised layer keeps a diffuse floor, so the
+    // plate never drops to grey card when the soft box leaves the reflection cone
     mats.face = phys({
-      color: COLORS.aluminium, metalness: 0.82, roughness: 0.42, roughnessMap: brush,
-      anisotropy: 0.55, clearcoat: 0.25, clearcoatRoughness: 0.28,
+      color: '#d5d8db', metalness: 0.7, roughness: 0.44, roughnessMap: fine,
+      anisotropy: 0.3, clearcoat: 0.25, clearcoatRoughness: 0.28,
       emissive: '#ffffff', emissiveIntensity: 0,
       emissiveMap: T.capFit(tx(T.faceGlowCanvas(), { color: false }), W, H),
     });
-    const g = ext(s, 0.8, b, 3, 20);
+    const g = ext(s, 0.8, b, 3, SEG);
     add(p, g, mats.face);
   }
 
@@ -109,7 +115,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     const gw = sw.width - 0.1, gh = sw.height - 0.1;
     const alpha = T.capFit(tx(T.glassAlphaCanvas(gw, gh, IPOD.screen.width + 0.6, IPOD.screen.height + 0.6), { color: false }), gw, gh);
     mats.glass = phys({
-      color: '#020304', metalness: 0, roughness: 0.04, clearcoat: 1, clearcoatRoughness: 0.03,
+      color: '#030303', metalness: 0, roughness: 0.04, clearcoat: 1, clearcoatRoughness: 0.03,
       transparent: true, alphaMap: alpha, ior: 1.49, specularIntensity: 1, envMapIntensity: 1,
     });
     add(p, ext(rr(gw, gh, sw.radius, 0.1), 0.6, 0.1, 2, 8), mats.glass, swc[0], swc[1], 0);
@@ -123,11 +129,13 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     s.holes.push(circle(CB + 0.1 + bw, true));
     const map = T.capFit(tx(T.wheelCanvas(wh.diameter, IPOD.wheelLabels.radiusFactor)), wh.diameter, wh.diameter);
     mats.wheel = phys({ color: '#e4e4e4', map, roughness: 0.42, metalness: 0, clearcoat: 0.3, clearcoatRoughness: 0.3 });
-    add(p, ext(s, 1.3, bw, 3, 24), mats.wheel, whc[0], whc[1], 0);
+    add(p, ext(s, 1.3, bw, 3, SEG), mats.wheel, whc[0], whc[1], 0);
     mats.centre = phys({ color: COLORS.centerButton, metalness: 0.45, roughness: 0.4, roughnessMap: brush, anisotropy: 0.4, clearcoat: 0.3, clearcoatRoughness: 0.3 });
     add(p, ext(circle(CB - 0.2), 1.2, 0.2, 3, 14), mats.centre, whc[0], whc[1], -0.08);
-    const ws = circle(R + 0.5); ws.holes.push(circle(CB - 2, true));
-    add(p, ext(ws, 0.2, 0, 1, 12), std({ color: '#3a3c40', roughness: 0.8 }), whc[0], whc[1], -1.35);
+    // sensor base behind the wheel: mid grey like the gap shade, and wide enough to cover the
+    // annulus while the front plate seats, so no board colour flashes through it
+    const ws = circle(R + 2.5); ws.holes.push(circle(CB - 2, true));
+    add(p, ext(ws, 0.2, 0, 1, SEG), std({ color: '#8a8d91', roughness: 0.8 }), whc[0], whc[1], -1.35);
   }
 
   // ---------- click-wheel flex: capacitive sensor ring on kapton ----------
@@ -135,10 +143,11 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     const p = mk('wheelFlex');
     const ft = tx(T.flexCanvas(), { wrap: true });
     ft.repeat.set(1 / 10, 1 / 10);
-    const fmat = std({ color: '#ffffff', map: ft, metalness: 0.25, roughness: 0.32 });
+    const kap = (map) => phys({ color: '#ffffff', map, metalness: 0.2, roughness: 0.34, clearcoat: 0.85, clearcoatRoughness: 0.14 });
+    const fmat = kap(ft);
     const ro = R - 3, ring = circle(ro); ring.holes.push(circle(9.5, true));
     const rmap = T.capFit(tx(T.flexRingCanvas(2 * ro, 9.5, ro)), 2 * ro, 2 * ro);
-    add(p, ext(ring, 0.15, 0, 1, 12), std({ color: '#ffffff', map: rmap, metalness: 0.2, roughness: 0.3 }), whc[0], whc[1], 0);
+    add(p, ext(ring, 0.15, 0, 1, 12), kap(rmap), whc[0], whc[1], 0);
     add(p, ext(rr(9, 30, 1.2), 0.15), fmat, whc[0] + 6, whc[1] + R + 12, 0);
     add(p, ext(rr(10, 4, 0.6), 0.35), std({ color: '#ece9e1', roughness: 0.6 }), whc[0] + 6, whc[1] + R + 26, 0.2);
     mats.flex = fmat;
@@ -175,7 +184,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
   {
     const p = mk('logicBoard');
     const pcb = T.capFit(tx(T.pcbCanvas(BW, BH, [...chips, ...others], holes)), BW, BH);
-    add(p, ext(rr(BW, BH, 3, 0.1), 0.8, 0.1), std({ color: '#ffffff', map: pcb, roughness: 0.42, metalness: 0.05 }), 0, BY, BZ);
+    add(p, ext(rr(BW, BH, 3, 0.1), 0.8, 0.1), phys({ color: '#ffffff', map: pcb, roughness: 0.5, metalness: 0.05, clearcoat: 0.55, clearcoatRoughness: 0.22 }), 0, BY, BZ);
     const chipGeo = new THREE.BoxGeometry(1, 1, 1);
     chips.forEach((c, i) => {
       const m = add(p, chipGeo, std({ map: tx(T.chipCanvas(c.lines, i + 3)), roughness: 0.5 }), c.x, c.y + BY, BZ + c.d / 2);
@@ -230,7 +239,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     add(p, ext(rr(dw, dh, 2.2, 0.3), 4.3, 0.3), std({ color: '#5a5f66', metalness: 0.7, roughness: 0.5 }), 0, cy, -0.5);
     const label = T.capFit(tx(T.driveCanvas(dw - 0.6, dh - 0.6)), dw - 0.8, dh - 0.8);
     add(p, ext(rr(dw - 0.6, dh - 0.6, 2, 0.1), 0.5, 0.1), std({ color: '#ffffff', map: label, metalness: 0.75, roughness: 0.34, roughnessMap: brush }), 0, cy, 0);
-    const rubber = std({ color: '#1b1c1f', roughness: 0.85, metalness: 0 });
+    const rubber = phys({ color: '#1b1c1f', roughness: 0.85, metalness: 0, sheen: 0.4, sheenColor: '#555', sheenRoughness: 0.6 });
     const bump = ext(rr(9, 12, 2.6, 0.9), 5.2, 0.9, 3);
     [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sy]) => add(p, bump, rubber, sx * (dw / 2 - 2.4), cy + sy * (dh / 2 - 3.6), 0.2));
     add(p, ext(rr(34, 7, 0.8), 0.15), mats.flex, -4, cy - dh / 2 - 2.5, -0.3);
@@ -257,16 +266,18 @@ export function buildIpod({ maxAniso = 8 } = {}) {
   {
     const p = mk('backShell');
     const w2 = W - 0.3, h2 = H - 0.3, cr = IPOD.cornerRadius - 0.15;
-    const steel = phys({ color: COLORS.steel, metalness: 1, roughness: 0.06, clearcoat: 0.6, clearcoatRoughness: 0.04 });
+    const steel = phys({ color: '#dfe1e3', metalness: 1, roughness: 0.06, clearcoat: 0.6, clearcoatRoughness: 0.04 });
+    // side wall runs back into the plate's full-width belt, so the plate's 0.9 mm radius is
+    // the only edge: one continuous curved tub, no stepped lip where the two meet
     const ring = rr(w2, h2, cr, 0.25);
     ring.holes.push(rrHole(w2 - 1.2, h2 - 1.2, cr - 0.6, 0.25));
-    add(p, ext(ring, 8.6, 0.25, 3, 18), steel, 0, 0, 8.6);
+    add(p, ext(ring, 8.85, 0.25, 3, 18), steel, 0, 0, 8.6);
     mats.steel = steel;
     const bw = w2 - 1.8, bh = h2 - 1.8;
     const [cC, rC] = T.backCanvases(bw, bh, {});
     const cT = T.capFit(tx(cC), bw, bh), rT = T.capFit(tx(rC, { color: false }), bw, bh);
     back = { cC, rC, cT, rT, bw, bh };
-    const backMat = phys({ color: COLORS.steel, map: cT, metalness: 1, roughness: 1, roughnessMap: rT, clearcoat: 0.6, clearcoatRoughness: 0.04 });
+    const backMat = phys({ color: '#dfe1e3', map: cT, metalness: 1, roughness: 1, roughnessMap: rT, clearcoat: 0.6, clearcoatRoughness: 0.04 });
     add(p, ext(rr(w2, h2, cr, 0.9), 1.7, 0.9, 6, 18), backMat, 0, 0, 0.6);
     mats.back = backMat;
     const inner = T.capFit(tx(T.shellInnerCanvas(w2 - 1.4, h2 - 1.4)), w2 - 1.4, h2 - 1.4);

@@ -66,21 +66,39 @@ function barcode(g, x, y, w, h, r, ink = '#111') {
   }
 }
 
-/** Fine, low-contrast brushing (linear grey around `base`), seamlessly tiling. */
-export function brushed(seed, base, spread, S = 512) {
+/** Low-contrast brushing (linear grey around `base`), seamlessly tiling. `h` = streak height
+ *  range in px: coarse for drive/LCD steel, sub-pixel for the anodised front plate. */
+export function brushed(seed, base, spread, S = 512, h = [0.5, 0.9], n = S * 3) {
   const [c, g] = canvas(S, S);
   const r = rng(seed);
   g.fillStyle = `rgb(${base},${base},${base})`;
   g.fillRect(0, 0, S, S);
-  for (let i = 0; i < S * 3; i++) {
+  for (let i = 0; i < n; i++) {
     const v = Math.round(base + (r() - 0.5) * spread * 2);
     g.globalAlpha = 0.2 + r() * 0.45;
     g.fillStyle = `rgb(${v},${v},${v})`;
-    const y = r() * S, len = 60 + r() * S * 0.8, x = r() * S, h = 0.5 + r() * 0.9;
-    g.fillRect(x, y, len, h);
-    if (x + len > S) g.fillRect(x - S, y, len, h);
+    const y = r() * S, len = 60 + r() * S * 0.8, x = r() * S, hh = h[0] + r() * h[1];
+    g.fillRect(x, y, len, hh);
+    if (x + len > S) g.fillRect(x - S, y, len, hh);
   }
   g.globalAlpha = 1;
+  return c;
+}
+
+/** Contrast studio wrap (linear): [startDeg, endDeg, value] bands around the horizon,
+ *  darkening towards the floor. Soft boxes, hot strips and black flags for polished steel. */
+export function stripCanvas(bands) {
+  const [c, g] = canvas(1024, 64);
+  const grd = g.createLinearGradient(0, 0, 1024, 0);
+  for (const [a, b, v] of bands) {
+    const k = `rgb(${(v * 255) | 0},${(v * 255) | 0},${(v * 255) | 0})`;
+    grd.addColorStop(a / 360 + 0.0015, k); grd.addColorStop(b / 360 - 0.0015, k);
+  }
+  g.fillStyle = grd; g.fillRect(0, 0, 1024, 64);
+  g.globalCompositeOperation = 'multiply';
+  const vg = g.createLinearGradient(0, 0, 0, 64);
+  vg.addColorStop(0, '#fff'); vg.addColorStop(0.55, '#ddd'); vg.addColorStop(1, '#444');
+  g.fillStyle = vg; g.fillRect(0, 0, 1024, 64);
   return c;
 }
 
@@ -245,7 +263,7 @@ export function backCanvases(wMm, hMm, { monogram = '', name = '', line = '' } =
     g.fillStyle = rough ? 'rgb(16,16,16)' : '#ffffff';
     g.fillRect(0, 0, W, H);
     g.save(); g.translate(Math.round(W), 0); g.scale(-1, 1);
-    const ink = rough ? 'rgb(150,150,150)' : '#b9bdc3';
+    const ink = rough ? 'rgb(74,74,74)' : '#dcdcdc'; // frosted laser etch: rougher, ~13% darker, neutral
     if (monogram) text(g, monogram, W / 2, H * 0.38, 15 * px, { weight: 300, color: ink, align: 'center', spacing: 0.6 * px });
     if (name) text(g, name, W / 2, H * 0.76, 2.4 * px, { weight: 500, color: ink, align: 'center', spacing: 0.1 * px });
     if (line) text(g, line, W / 2, H * 0.8, 1.35 * px, { weight: 400, color: ink, align: 'center' });
@@ -271,12 +289,12 @@ export function shellInnerCanvas(wMm, hMm) {
   return c;
 }
 
-/** Display-window print: opaque black mask border, tinted clear centre (alpha, linear). */
+/** Display-window print: opaque black mask border, nearly clear centre (alpha, linear). */
 export function glassAlphaCanvas(wMm, hMm, innerW, innerH) {
   const px = 8, W = wMm * px, H = hMm * px;
   const [c, g] = canvas(W, H);
   g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
-  g.fillStyle = 'rgb(165,165,165)';
+  g.fillStyle = 'rgb(46,46,46)'; // clear acrylic over the active area
   roundRect(g, (W - innerW * px) / 2, (H - innerH * px) / 2, innerW * px, innerH * px, 2);
   g.fill();
   return c;

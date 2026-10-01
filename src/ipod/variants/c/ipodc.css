@@ -1,8 +1,10 @@
 /* iPod Classic (6th/7th gen, silver), variant C.
    Hardware: every size is calc(var(--ipodc-u) * <mm>) with --ipodc-u = var(--ipod-h) / 103.5;
    the mm values are copied from IPOD (ipodSpec.js) into --ipodc-mm-* by index.js.
-   Screen UI: logical 320×240 px. One logical px = --ipodc-p = 100cqw / 320 of the LCD container,
-   so text renders at its true size (crisp) and always matches the current --ipod-h. */
+   Screen UI: logical 320×240 px. One logical px = --ipodc-p = 100cqw / 320 of the LCD container
+   (with a --ipod-h based fallback where container units are missing).
+   Motion: every transition / animation lives in the prefers-reduced-motion: no-preference block
+   at the end, so reduced motion holds before any JS runs. */
 
 @property --ipodc-p {
   syntax: '<length>';
@@ -14,6 +16,7 @@
   --ipodc-h: var(--ipod-h, 560px);
   --ipodc-u: calc(var(--ipodc-h) / var(--ipodc-mm-h, 103.5));
   --ipodc-font: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", "Nimbus Sans", sans-serif;
+  --ipodc-gloss: linear-gradient(180deg, #a3cbf6 0%, var(--ipodc-c-uiHighlightTop) 46%, #4b8fdc 54%, var(--ipodc-c-uiHighlightBottom) 100%);
   position: relative;
   flex: none;
   box-sizing: border-box;
@@ -34,19 +37,8 @@
   font-family: var(--ipodc-font);
   /* satin anodised aluminium: soft vertical light falloff + gentle cylindrical side shading */
   background:
-    linear-gradient(180deg,
-      rgba(255, 255, 255, .34) 0%,
-      rgba(255, 255, 255, .14) 20%,
-      rgba(255, 255, 255, .03) 46%,
-      rgba(0, 0, 0, .02) 72%,
-      rgba(0, 0, 0, .075) 100%),
-    linear-gradient(90deg,
-      rgba(0, 0, 0, .06) 0%,
-      rgba(255, 255, 255, .09) 7%,
-      rgba(255, 255, 255, 0) 26%,
-      rgba(255, 255, 255, 0) 74%,
-      rgba(255, 255, 255, .07) 93%,
-      rgba(0, 0, 0, .07) 100%),
+    linear-gradient(180deg, rgba(255, 255, 255, .34) 0%, rgba(255, 255, 255, .14) 20%, rgba(255, 255, 255, .03) 46%, rgba(0, 0, 0, .02) 72%, rgba(0, 0, 0, .075) 100%),
+    linear-gradient(90deg, rgba(0, 0, 0, .06) 0%, rgba(255, 255, 255, .09) 7%, rgba(255, 255, 255, 0) 26% 74%, rgba(255, 255, 255, .07) 93%, rgba(0, 0, 0, .07) 100%),
     var(--ipodc-c-aluminium);
   box-shadow:
     /* polished steel rim hugging the front plate, very slight edge highlight */
@@ -58,12 +50,14 @@
     0 calc(var(--ipodc-u) * 2.2) calc(var(--ipodc-u) * 6) rgba(0, 0, 0, .15);
 }
 .ipodc.is-revealed { visibility: inherit; }
+/* keyboard focus only: a pointer press focuses the iPod too, but must not draw the ring */
 .ipodc:focus-visible {
   outline: 3px solid #0b4fc4; /* ≥ 4.5:1 on the light window and the desktop */
   outline-offset: 4px;
 }
+.ipodc[data-input="pointer"]:focus-visible { outline: none; }
 
-/* fine satin grain (procedural SVG noise, set from JS) */
+/* fine satin grain (procedural, near-isotropic SVG noise set from JS) */
 .ipodc::before {
   content: "";
   position: absolute;
@@ -72,7 +66,7 @@
   background-image: var(--ipodc-noise);
   background-size: calc(var(--ipodc-u) * 52) calc(var(--ipodc-u) * 52);
   mix-blend-mode: soft-light;
-  opacity: .16;
+  opacity: .08;
   pointer-events: none;
   z-index: -1;
 }
@@ -84,8 +78,8 @@
 }
 
 /* ───────────── top edge: hold switch + headphone jack hints ─────────────
-   The front plate meets the steel rim at the top; both openings just break that line, which is
-   enough to read the 3/4 silhouette of the real device. Everything stays inside the body rect. */
+   Both openings just break the rim line at the top, which is enough to read the silhouette of
+   the real device. Everything stays inside the body rect. */
 .ipodc-edge {
   position: absolute;
   left: 0; right: 0; top: 0;
@@ -102,9 +96,7 @@
   background:
     linear-gradient(180deg, #e9ebee 0%, #b4b8bd 55%, #8f9399 100%) left / 52% 78% no-repeat,
     linear-gradient(180deg, #17181a 0%, #2c2e31 70%, #45484c 100%);
-  box-shadow:
-    0 calc(var(--ipodc-u) * .1) 0 rgba(255, 255, 255, .55),
-    inset 0 0 0 calc(var(--ipodc-u) * .06) rgba(0, 0, 0, .45);
+  box-shadow: 0 calc(var(--ipodc-u) * .1) 0 rgba(255, 255, 255, .55), inset 0 0 0 calc(var(--ipodc-u) * .06) rgba(0, 0, 0, .45);
 }
 .ipodc-jack {
   /* round port seen at a grazing angle: a dark half-ellipse with a bright lip */
@@ -113,9 +105,7 @@
   height: calc(var(--ipodc-u) * .7);
   border-radius: 0 0 50% 50% / 0 0 100% 100%;
   background: radial-gradient(70% 120% at 50% 0%, #050506 0%, #1b1c1e 55%, #3c3f43 100%);
-  box-shadow:
-    0 calc(var(--ipodc-u) * .1) 0 rgba(255, 255, 255, .6),
-    inset 0 0 0 calc(var(--ipodc-u) * .07) rgba(120, 124, 130, .7);
+  box-shadow: 0 calc(var(--ipodc-u) * .1) 0 rgba(255, 255, 255, .6), inset 0 0 0 calc(var(--ipodc-u) * .07) rgba(120, 124, 130, .7);
 }
 
 /* ───────────── display window ───────────── */
@@ -150,11 +140,7 @@
   pointer-events: none;
   border-radius: inherit;
   background:
-    linear-gradient(121deg,
-      rgba(255, 255, 255, .12) 0%,
-      rgba(255, 255, 255, .065) 30%,
-      rgba(255, 255, 255, .04) 46.6%,
-      rgba(255, 255, 255, 0) 47%),
+    linear-gradient(121deg, rgba(255, 255, 255, .12) 0%, rgba(255, 255, 255, .065) 30%, rgba(255, 255, 255, .04) 46.6%, rgba(255, 255, 255, 0) 47%),
     linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, 0) 12%);
   z-index: 3;
 }
@@ -172,6 +158,10 @@
   line-height: 1.2;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+/* no container query units (older Safari / Firefox): derive the logical px from --ipod-h */
+@supports not (width: 1cqw) {
+  .ipodc-ui { --ipodc-p: calc(var(--ipodc-u) * var(--ipodc-mm-lcd-w) / 320); }
 }
 
 /* title bar */
@@ -199,7 +189,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   color: #000;
-  text-shadow: 0 calc(var(--ipodc-p) * 1) 0 rgba(255, 255, 255, .55);
   letter-spacing: -.01em;
 }
 .ipodc-ind {
@@ -208,17 +197,15 @@
   width: calc(var(--ipodc-p) * 10); height: calc(var(--ipodc-p) * 10);
   display: none;
 }
-.ipodc-ind svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ipodc-ind svg, .ipodc-batt svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .ipodc-ind.is-on { display: block; }
-.ipodc-ind .ipodc-ind-pause { display: none; }
+.ipodc-ind .ipodc-ind-pause, .ipodc-ind.is-paused .ipodc-ind-play { display: none; }
 .ipodc-ind.is-paused .ipodc-ind-pause { display: inline; }
-.ipodc-ind.is-paused .ipodc-ind-play { display: none; }
 .ipodc-batt {
   position: absolute;
   right: calc(var(--ipodc-p) * 7); top: calc(var(--ipodc-p) * 5);
   width: calc(var(--ipodc-p) * 23); height: calc(var(--ipodc-p) * 11);
 }
-.ipodc-batt svg { display: block; width: 100%; height: 100%; overflow: visible; }
 
 /* stage with the sliding screens */
 .ipodc-stage {
@@ -228,68 +215,52 @@
   background: #fff;
   touch-action: none;
 }
-.ipodc-screen {
-  position: absolute;
-  inset: 0;
-  background: #fff;
-  overflow: hidden;
-}
-.ipodc-view {
+.ipodc-screen, .ipodc-view {
   position: absolute;
   inset: 0;
   overflow: hidden;
 }
+.ipodc-screen { background: #fff; }
 .ipodc-screen.is-split .ipodc-view { right: 50%; }
 .ipodc-screen.has-sb .ipodc-view { right: calc(var(--ipodc-p) * 9); }
 .ipodc-screen.is-split.has-sb .ipodc-view { right: calc(50% + var(--ipodc-p) * 9); }
-.ipodc-content {
-  position: relative;
-  transform: translate3d(0, calc(var(--ipodc-p) * var(--ipodc-off, 0) * -1), 0);
-  transition: transform .12s cubic-bezier(.25, .7, .3, 1);
-}
-.ipodc-view.bump-down { animation: ipodc-bump-down .22s ease-out; }
-.ipodc-view.bump-up { animation: ipodc-bump-up .22s ease-out; }
+.ipodc-content { position: relative; transform: translate3d(0, calc(var(--ipodc-p) * var(--ipodc-off, 0) * -1), 0); }
 @keyframes ipodc-bump-down { 40% { transform: translateY(calc(var(--ipodc-p) * -3)); } }
 @keyframes ipodc-bump-up { 40% { transform: translateY(calc(var(--ipodc-p) * 3)); } }
 
-.ipodc-list { position: relative; margin: 0; padding: 0; outline: none; }
-/* the gliding highlight bar */
+.ipodc-list { position: relative; }
+/* the gliding highlight bar, with the 6G gloss split across its middle */
 .ipodc-hl {
   position: absolute;
   left: 0; right: 0; top: 0;
   height: calc(var(--ipodc-p) * 27);
   transform: translate3d(0, calc(var(--ipodc-p) * 27 * var(--ipodc-i, 0)), 0);
-  transition: transform .085s cubic-bezier(.25, .7, .3, 1);
-  background:
-    linear-gradient(180deg,
-      var(--ipodc-c-uiHighlightTop) 0%,
-      color-mix(in srgb, var(--ipodc-c-uiHighlightTop) 45%, var(--ipodc-c-uiHighlightBottom)) 50%,
-      var(--ipodc-c-uiHighlightBottom) 100%);
-  box-shadow: inset 0 calc(var(--ipodc-p) * 1) 0 rgba(255, 255, 255, .3), inset 0 calc(var(--ipodc-p) * -1) 0 rgba(0, 0, 0, .18);
+  background: var(--ipodc-gloss);
+  box-shadow: inset 0 calc(var(--ipodc-p) * 1) 0 rgba(255, 255, 255, .25), inset 0 calc(var(--ipodc-p) * -1) 0 rgba(0, 0, 0, .16);
   pointer-events: none;
 }
-.ipodc-row {
-  position: relative;
-  z-index: 1;
+.ipodc-list.is-empty .ipodc-hl { display: none; }
+.ipodc-row { position: relative; z-index: 1; height: calc(var(--ipodc-p) * 27); cursor: pointer; }
+.ipodc-row-a {
   display: flex;
   align-items: center;
   gap: calc(var(--ipodc-p) * 8);
-  height: calc(var(--ipodc-p) * 27);
+  height: 100%;
+  box-sizing: border-box;
   padding: 0 calc(var(--ipodc-p) * 8) 0 calc(var(--ipodc-p) * 7);
   color: #000;
   text-decoration: none;
-  cursor: pointer;
   white-space: nowrap;
+  outline: none;
   -webkit-user-drag: none;
-  transition: color .07s linear;
 }
 .ipodc-row-label {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  font: 700 calc(var(--ipodc-p) * 15.5)/calc(var(--ipodc-p) * 27) var(--ipodc-font);
-  letter-spacing: -.012em;
+  font: 700 calc(var(--ipodc-p) * 14.5)/calc(var(--ipodc-p) * 27) var(--ipodc-font);
+  letter-spacing: -.01em;
 }
 .ipodc-row-detail {
   flex: 0 1 auto;
@@ -297,10 +268,9 @@
   max-width: 58%;
   overflow: hidden;
   text-overflow: ellipsis;
-  font: 400 calc(var(--ipodc-p) * 13)/calc(var(--ipodc-p) * 27) var(--ipodc-font);
+  font: 400 calc(var(--ipodc-p) * 12.5)/calc(var(--ipodc-p) * 27) var(--ipodc-font);
   color: #808387;
   text-align: right;
-  transition: color .07s linear;
 }
 .ipodc-chev {
   flex: none;
@@ -309,11 +279,13 @@
   color: #fff;
   visibility: hidden;
 }
-.ipodc-row.is-sel { color: #fff; }
-.ipodc-row.is-sel .ipodc-row-label { text-shadow: 0 calc(var(--ipodc-p) * -1) 0 rgba(0, 30, 90, .32); }
+.ipodc-row.is-sel .ipodc-row-a { color: #fff; }
+.ipodc-row.is-sel .ipodc-row-label { text-shadow: 0 calc(var(--ipodc-p) * -1) 0 rgba(0, 30, 90, .3); }
 .ipodc-row.is-sel .ipodc-row-detail { color: rgba(255, 255, 255, .92); }
 .ipodc-row.is-sel .ipodc-chev { visibility: inherit; }
-.ipodc-row:focus { outline: none; }
+/* a link the config rejected (see console): visibly inert */
+.ipodc-row.is-dead { cursor: default; }
+.ipodc-row.is-dead .ipodc-row-a, .ipodc-row.is-dead.is-sel .ipodc-row-a { color: #a4a7ab; }
 
 /* scrollbar (only when the content overflows) */
 .ipodc-sb {
@@ -332,13 +304,10 @@
   left: 0; right: 0; top: 0;
   height: calc(var(--ipodc-p) * var(--ipodc-th, 30));
   transform: translate3d(0, calc(var(--ipodc-p) * var(--ipodc-tt, 0)), 0);
-  transition: transform .12s cubic-bezier(.25, .7, .3, 1);
   box-sizing: border-box;
   background: linear-gradient(90deg, #3f6fb3 0%, #8fb8ea 45%, #5f92d6 60%, #2d61ad 100%);
-  border-top: calc(var(--ipodc-p) * 1) solid #284f8c;
-  border-bottom: calc(var(--ipodc-p) * 1) solid #284f8c;
+  border-block: calc(var(--ipodc-p) * 1) solid #284f8c;
 }
-.ipodc-screen.is-instant *, .ipodc-screen.is-instant { transition: none !important; }
 
 /* split-screen preview pane */
 .ipodc-preview {
@@ -357,17 +326,11 @@
   pointer-events: none;
   z-index: 3;
 }
-.ipodc-pv {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  transition: opacity .45s ease;
-  overflow: hidden;
-}
+.ipodc-pv { position: absolute; inset: 0; opacity: 0; overflow: hidden; }
 .ipodc-pv.is-on { opacity: 1; }
 .ipodc-pv--icon {
   background:
-    radial-gradient(120% 70% at 50% 28%, #ffffff 0%, #f4f5f7 45%, rgba(244, 245, 247, 0) 70%),
+    radial-gradient(120% 70% at 50% 28%, #fff 0%, #f4f5f7 45%, rgba(244, 245, 247, 0) 70%),
     linear-gradient(180deg, #fbfbfc 0%, #eceef1 100%);
 }
 .ipodc-pv-floor {
@@ -393,30 +356,29 @@
 }
 .ipodc-pv svg { display: block; width: 100%; height: 100%; }
 .ipodc-pv-float-in { width: 100%; height: 100%; }
-.ipodc-pv.is-on .ipodc-pv-float,
-.ipodc-pv.is-on .ipodc-pv-float-in { animation: ipodc-float 7s ease-in-out infinite alternate; }
 @keyframes ipodc-float {
   from { transform: translateY(calc(var(--ipodc-p) * 1)) scale(1); }
-  to   { transform: translateY(calc(var(--ipodc-p) * -2)) scale(1.035); }
+  to { transform: translateY(calc(var(--ipodc-p) * -2)) scale(1.035); }
 }
-/* media: full-height cover with a slow horizontal pan that never crops the cover's own caption */
+/* media: full-height cover with a slow horizontal pan */
 .ipodc-pv--art { background: #000; }
 .ipodc-pv-cover {
+  --ipodc-cs: 218;
   position: absolute;
   left: 0; top: 0;
-  width: calc(var(--ipodc-p) * 218); height: calc(var(--ipodc-p) * 218);
   transform: translateX(calc(var(--ipodc-p) * -29));
 }
-.ipodc-pv.is-on .ipodc-pv-cover { animation: ipodc-pan 16s ease-in-out infinite alternate; }
 @keyframes ipodc-pan {
   from { transform: translateX(calc(var(--ipodc-p) * -12)); }
-  to   { transform: translateX(calc(var(--ipodc-p) * -46)); }
+  to { transform: translateX(calc(var(--ipodc-p) * -46)); }
 }
 
-/* cover art (image over a procedural fallback with the monogram) */
+/* cover art (image over a procedural fallback with the monogram); --ipodc-cs = size in logical px */
 .ipodc-art {
   position: relative;
   overflow: hidden;
+  width: calc(var(--ipodc-p) * var(--ipodc-cs));
+  height: calc(var(--ipodc-p) * var(--ipodc-cs));
   background: #222;
 }
 .ipodc-art-fb {
@@ -425,25 +387,17 @@
   display: grid;
   place-items: center;
   background:
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0) 0 30%, rgba(255, 255, 255, .07) 30.5% 31%, rgba(255, 255, 255, 0) 31.5% 44%, rgba(255, 255, 255, .06) 44.5% 45%, rgba(255, 255, 255, 0) 45.5%),
+    radial-gradient(circle, rgba(255, 255, 255, 0) 0 30%, rgba(255, 255, 255, .07) 30.5% 31%, rgba(255, 255, 255, 0) 31.5% 44%, rgba(255, 255, 255, .06) 44.5% 45%, rgba(255, 255, 255, 0) 45.5%),
     radial-gradient(120% 90% at 20% 10%, #8fd3ff 0%, rgba(143, 211, 255, 0) 55%),
     linear-gradient(145deg, #2c82d6 0%, #164f8f 55%, #07305c 100%);
-  container-type: size;
 }
 .ipodc-art-fb b {
-  font: 800 34cqw/1 var(--ipodc-font);
+  font: 800 calc(var(--ipodc-p) * var(--ipodc-cs) * .34)/1 var(--ipodc-font);
   color: rgba(255, 255, 255, .95);
   letter-spacing: -.04em;
-  text-shadow: 0 .6cqw 2cqw rgba(0, 0, 0, .35);
+  text-shadow: 0 .02em .06em rgba(0, 0, 0, .35);
 }
-.ipodc-art img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
+.ipodc-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 
 /* text page */
 .ipodc-text {
@@ -460,55 +414,50 @@
 .ipodc-text + .ipodc-list { box-shadow: 0 calc(var(--ipodc-p) * -1) 0 #d3d5d8; }
 .ipodc-text + .ipodc-list.is-empty { box-shadow: none; }
 
-/* Now Playing */
-.ipodc-np-deco { position: absolute; inset: 0; pointer-events: none; }
-.ipodc-np-count {
-  position: absolute;
-  left: calc(var(--ipodc-p) * 12); top: calc(var(--ipodc-p) * 5);
-  font: 700 calc(var(--ipodc-p) * 11)/calc(var(--ipodc-p) * 13) var(--ipodc-font);
-  color: #3b3e43;
-}
+/* ───────────── Now Playing (6G layout) ───────────── */
+.ipodc-np-deco { position: absolute; inset: 0; }
 .ipodc-np-art, .ipodc-np-refl {
+  --ipodc-cs: 96;
   position: absolute;
   left: calc(var(--ipodc-p) * 12);
-  width: calc(var(--ipodc-p) * 98); height: calc(var(--ipodc-p) * 98);
+  top: calc(var(--ipodc-p) * 11);
 }
-.ipodc-np-art { top: calc(var(--ipodc-p) * 22); box-shadow: 0 0 0 calc(var(--ipodc-p) * 1) rgba(0, 0, 0, .25); }
+.ipodc-np-art { box-shadow: 0 0 0 calc(var(--ipodc-p) * 1) rgba(0, 0, 0, .22); }
 .ipodc-np-refl {
-  top: calc(var(--ipodc-p) * 121);
+  top: calc(var(--ipodc-p) * 108);
   transform: scaleY(-1);
-  opacity: .36;
-  -webkit-mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, .25) 14%, transparent 27%);
-  mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, .25) 14%, transparent 27%);
+  opacity: .34;
+  -webkit-mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, .25) 14%, transparent 30%);
+  mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, .25) 14%, transparent 30%);
 }
 .ipodc-np-info {
   position: absolute;
-  left: calc(var(--ipodc-p) * 122); right: calc(var(--ipodc-p) * 10); top: calc(var(--ipodc-p) * 27);
+  left: calc(var(--ipodc-p) * 120); right: calc(var(--ipodc-p) * 10); top: calc(var(--ipodc-p) * 8);
 }
-.ipodc-screen.no-tracks .ipodc-np-info { top: calc(var(--ipodc-p) * 38); }
+.ipodc-screen.no-tracks .ipodc-np-info { top: calc(var(--ipodc-p) * 24); }
+.ipodc-np-info div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ipodc-np-count { font: 400 calc(var(--ipodc-p) * 11)/calc(var(--ipodc-p) * 15) var(--ipodc-font); color: #55595f; }
+.ipodc-np-title { font: 700 calc(var(--ipodc-p) * 14.5)/calc(var(--ipodc-p) * 18) var(--ipodc-font); }
+.ipodc-np-artist { font: 700 calc(var(--ipodc-p) * 13)/calc(var(--ipodc-p) * 16) var(--ipodc-font); }
+.ipodc-np-album { font: 400 calc(var(--ipodc-p) * 13)/calc(var(--ipodc-p) * 16) var(--ipodc-font); }
+.ipodc-np-by { font: 400 calc(var(--ipodc-p) * 11)/calc(var(--ipodc-p) * 15) var(--ipodc-font); color: #6b6f75; }
+.ipodc-np-by:empty { display: none; }
 
-/* compact track list beside the cover (3 visible rows, follows the playing track) */
+/* quiet track list under the meta: no rules, no selection, the playing one gets the blue speaker */
 .ipodc-np-tracks {
   position: absolute;
-  left: calc(var(--ipodc-p) * 118); right: calc(var(--ipodc-p) * 8); top: calc(var(--ipodc-p) * 87);
-  height: calc(var(--ipodc-p) * 54);
+  left: calc(var(--ipodc-p) * 116); right: calc(var(--ipodc-p) * 10); top: calc(var(--ipodc-p) * 92);
+  height: calc(var(--ipodc-p) * 45);
   overflow: hidden;
-  border-top: calc(var(--ipodc-p) * 1) solid #dcdee1;
 }
-.ipodc-np-tracks-in {
-  transform: translate3d(0, calc(var(--ipodc-p) * -18 * var(--ipodc-tt, 0)), 0);
-  transition: transform .2s ease;
-}
+.ipodc-np-tracks-in { transform: translate3d(0, calc(var(--ipodc-p) * -15 * var(--ipodc-tt, 0)), 0); }
 .ipodc-trk {
   display: flex;
   align-items: center;
-  gap: calc(var(--ipodc-p) * 4);
-  height: calc(var(--ipodc-p) * 18);
-  padding: 0 calc(var(--ipodc-p) * 2) 0 calc(var(--ipodc-p) * 4);
-  box-sizing: border-box;
-  border-bottom: calc(var(--ipodc-p) * 1) solid #eceef0;
-  font: 400 calc(var(--ipodc-p) * 12)/calc(var(--ipodc-p) * 17) var(--ipodc-font);
-  color: #4a4e54;
+  gap: calc(var(--ipodc-p) * 3);
+  height: calc(var(--ipodc-p) * 15);
+  font: 400 calc(var(--ipodc-p) * 11.5)/calc(var(--ipodc-p) * 15) var(--ipodc-font);
+  color: #6b6f75;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -520,71 +469,63 @@
   visibility: hidden;
 }
 .ipodc-trk-t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.ipodc-trk-d { flex: none; color: #8a8e93; font-size: calc(var(--ipodc-p) * 11); font-variant-numeric: tabular-nums; }
+.ipodc-trk-d { flex: none; color: #8a8e93; font-size: calc(var(--ipodc-p) * 10.5); font-variant-numeric: tabular-nums; }
 .ipodc-trk.is-cur { color: #000; font-weight: 700; }
 .ipodc-trk.is-cur .ipodc-trk-ico { visibility: inherit; }
-.ipodc-np-info div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ipodc-np-title  { font: 700 calc(var(--ipodc-p) * 14.5)/calc(var(--ipodc-p) * 19) var(--ipodc-font); color: #000; }
-.ipodc-np-artist { font: 700 calc(var(--ipodc-p) * 13)/calc(var(--ipodc-p) * 18) var(--ipodc-font); color: #000; }
-.ipodc-np-album  { font: 400 calc(var(--ipodc-p) * 13)/calc(var(--ipodc-p) * 18) var(--ipodc-font); color: #000; }
+
 .ipodc-np-prog, .ipodc-np-vol {
   position: absolute;
-  left: calc(var(--ipodc-p) * 12); right: calc(var(--ipodc-p) * 12); top: calc(var(--ipodc-p) * 152);
-  height: calc(var(--ipodc-p) * 30);
-  transition: opacity .18s ease;
+  left: calc(var(--ipodc-p) * 12); right: calc(var(--ipodc-p) * 12); top: calc(var(--ipodc-p) * 148);
+  height: calc(var(--ipodc-p) * 32);
 }
-.ipodc-np-vol { opacity: 0; display: flex; align-items: flex-start; gap: calc(var(--ipodc-p) * 6); }
+.ipodc-np-vol { opacity: 0; display: flex; align-items: flex-start; gap: calc(var(--ipodc-p) * 6); color: #55595f; }
 .ipodc-screen.is-vol .ipodc-np-vol { opacity: 1; }
 .ipodc-screen.is-vol .ipodc-np-prog { opacity: 0; }
 .ipodc-np-vol .ipodc-meter { flex: 1; }
-.ipodc-np-vol .ipodc-meter-fill { width: calc(100% * var(--ipodc-f, 0)); } /* 0 % volume really is empty */
-.ipodc-np-vol svg { flex: none; width: calc(var(--ipodc-p) * 13); height: calc(var(--ipodc-p) * 11); margin-top: calc(var(--ipodc-p) * -1); }
+.ipodc-np-vol svg { flex: none; width: calc(var(--ipodc-p) * 13); height: calc(var(--ipodc-p) * 12); fill: currentColor; }
+/* 6G capsule: grey glossy recessed track, blue gloss fill (light top, dark bottom) */
 .ipodc-meter {
-  /* 6G capsule bar: light hairline, softly rounded ends, glossy recessed track */
   position: relative;
-  height: calc(var(--ipodc-p) * 9);
+  height: calc(var(--ipodc-p) * 12);
   box-sizing: border-box;
-  border: calc(var(--ipodc-p) * 1) solid #9a9ea4;
-  border-radius: calc(var(--ipodc-p) * 2.5);
-  background: linear-gradient(180deg, #dfe1e4 0%, #fdfdfd 48%, #eceef0 52%, #f8f9fa 100%);
-  box-shadow: inset 0 calc(var(--ipodc-p) * 1) calc(var(--ipodc-p) * 1) rgba(0, 0, 0, .1);
+  border: calc(var(--ipodc-p) * 1) solid #8e9298;
+  border-radius: calc(var(--ipodc-p) * 3);
+  background: linear-gradient(180deg, #c3c6ca 0%, #e4e6e8 30%, #f9f9fa 52%, #eceef0 100%);
+  box-shadow: inset 0 calc(var(--ipodc-p) * 1) calc(var(--ipodc-p) * 1.5) rgba(0, 0, 0, .28), 0 calc(var(--ipodc-p) * 1) 0 rgba(255, 255, 255, .8);
   overflow: hidden;
 }
 .ipodc-meter-fill {
   position: absolute;
   left: 0; top: 0; bottom: 0;
-  /* a small minimum so playback reads at once, even at 0:01 */
-  width: max(calc(var(--ipodc-p) * 4), calc(100% * var(--ipodc-f, 0)));
-  transition: width .25s linear;
-  border-radius: calc(var(--ipodc-p) * 1.5) 0 0 calc(var(--ipodc-p) * 1.5);
-  background: linear-gradient(180deg, #b9dafa 0%, var(--ipodc-c-uiHighlightTop) 38%, #4e8fe0 54%, var(--ipodc-c-uiHighlightBottom) 100%);
-  box-shadow: calc(var(--ipodc-p) * 1) 0 0 rgba(0, 40, 110, .4), inset 0 calc(var(--ipodc-p) * 1) 0 rgba(255, 255, 255, .35);
+  width: calc(100% * var(--ipodc-f, 0));
+  background: var(--ipodc-gloss);
+  box-shadow: inset 0 calc(var(--ipodc-p) * 1) 0 rgba(255, 255, 255, .3);
 }
 .ipodc-np-times {
   display: flex;
   justify-content: space-between;
   margin-top: calc(var(--ipodc-p) * 4);
   font: 700 calc(var(--ipodc-p) * 12)/calc(var(--ipodc-p) * 14) var(--ipodc-font);
-  color: #000;
   font-variant-numeric: tabular-nums;
 }
+/* the Spotify action: a quiet grey footer row with chevron; blue only while the centre is engaged */
 .ipodc-screen--nowplaying .ipodc-view {
   top: auto;
   height: calc(var(--ipodc-p) * 27);
-  box-shadow: 0 calc(var(--ipodc-p) * -1) 0 #d3d5d8;
+  box-shadow: 0 calc(var(--ipodc-p) * -1) 0 #dfe1e4;
 }
 .ipodc-screen--nowplaying.no-cta .ipodc-view { display: none; }
-/* while the wheel sets the volume, the CTA steps back so the volume bar is the only focal point */
-.ipodc-screen--nowplaying .ipodc-hl,
-.ipodc-screen--nowplaying .ipodc-row,
-.ipodc-screen--nowplaying .ipodc-chev { transition: background .2s ease, color .2s ease, opacity .2s ease, box-shadow .2s ease; }
-.ipodc-screen--nowplaying.is-vol .ipodc-hl {
-  background: linear-gradient(180deg, #f3f4f5 0%, #e7e9eb 100%);
-  box-shadow: none;
+.ipodc-screen--nowplaying .ipodc-hl { background: linear-gradient(180deg, #f6f7f8 0%, #e8eaec 100%); box-shadow: none; }
+.ipodc-screen--nowplaying .ipodc-row.is-sel .ipodc-row-a { color: #5d6167; }
+.ipodc-screen--nowplaying .ipodc-row-label { font-size: calc(var(--ipodc-p) * 13); }
+.ipodc-screen--nowplaying .ipodc-row.is-sel .ipodc-row-label { text-shadow: none; }
+.ipodc-screen--nowplaying .ipodc-row.is-sel .ipodc-chev { color: #9a9ea4; }
+.ipodc.is-centre .ipodc-screen--nowplaying .ipodc-hl { background: var(--ipodc-gloss); }
+.ipodc.is-centre .ipodc-screen--nowplaying .ipodc-row.is-sel :is(.ipodc-row-a, .ipodc-chev) { color: #fff; }
+@media (hover: hover) {
+  .ipodc-screen--nowplaying .ipodc-view:hover .ipodc-hl { background: var(--ipodc-gloss); }
+  .ipodc-screen--nowplaying .ipodc-view:hover .ipodc-row.is-sel :is(.ipodc-row-a, .ipodc-chev) { color: #fff; }
 }
-.ipodc-screen--nowplaying.is-vol .ipodc-row.is-sel { color: #5d6167; }
-.ipodc-screen--nowplaying.is-vol .ipodc-row.is-sel .ipodc-row-label { text-shadow: none; }
-.ipodc-screen--nowplaying.is-vol .ipodc-row.is-sel .ipodc-chev { color: #9a9ea4; }
 
 /* toast */
 .ipodc-toast {
@@ -601,7 +542,6 @@
   color: #fff;
   text-align: center;
   opacity: 0;
-  transition: opacity .18s ease, transform .18s ease;
   pointer-events: none;
   z-index: 8;
 }
@@ -614,7 +554,7 @@
   color: rgba(255, 255, 255, .78);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.ipodc-toast.is-on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.ipodc-toast.is-on { opacity: 1; transform: translate(-50%, -50%); }
 
 /* boot */
 .ipodc-boot {
@@ -624,7 +564,6 @@
   display: grid;
   place-items: center;
   z-index: 9;
-  transition: opacity .32s ease;
 }
 .ipodc-boot[hidden] { display: none; }
 .ipodc-boot.is-out { opacity: 0; }
@@ -633,14 +572,12 @@
   letter-spacing: -.05em;
   padding: 0 .06em;
   color: transparent;
-  background: linear-gradient(180deg, #ffffff 0%, #eef0f2 46%, #b9bdc3 52%, #e9ebee 100%);
+  background: linear-gradient(180deg, #fff 0%, #eef0f2 46%, #b9bdc3 52%, #e9ebee 100%);
   -webkit-background-clip: text;
   background-clip: text;
   opacity: 0;
-  transform: scale(.985);
-  transition: opacity .34s ease, transform 1.2s ease-out;
 }
-.ipodc-boot.show-mono .ipodc-boot-mono { opacity: 1; transform: scale(1); }
+.ipodc-boot.show-mono .ipodc-boot-mono { opacity: 1; }
 
 /* ───────────── click wheel ───────────── */
 .ipodc-wheel {
@@ -652,58 +589,45 @@
   border-radius: 50%;
   touch-action: none;
   cursor: pointer;
-  /* matte light-grey plastic */
+  /* matte light-grey plastic, seated in a shallow recess of the face (dark seam, white lower lip) */
   background: radial-gradient(130% 110% at 50% 16%, #f0f1f2 0%, var(--ipodc-c-wheel) 52%, #d9dbde 100%);
   box-shadow:
-    0 0 0 calc(var(--ipodc-u) * .13) rgba(108, 112, 118, .32),
-    0 calc(var(--ipodc-u) * .17) 0 calc(var(--ipodc-u) * .12) rgba(255, 255, 255, .55),
+    0 calc(var(--ipodc-u) * -.06) 0 calc(var(--ipodc-u) * .2) rgba(0, 0, 0, .12),
+    0 0 0 calc(var(--ipodc-u) * .2) rgba(0, 0, 0, .12),
+    0 calc(var(--ipodc-u) * .22) 0 calc(var(--ipodc-u) * .2) rgba(255, 255, 255, .6),
     inset 0 calc(var(--ipodc-u) * .22) calc(var(--ipodc-u) * .45) rgba(0, 0, 0, .12),
     inset 0 calc(var(--ipodc-u) * -.15) calc(var(--ipodc-u) * .3) rgba(255, 255, 255, .7);
-  transition: transform .14s ease;
 }
 .ipodc-wheel.is-spinning { cursor: grabbing; }
 /* the wheel rocks very slightly towards a pressed button, like the real switch plate */
-.ipodc-wheel[data-press="menu"] { transform: perspective(calc(var(--ipodc-u) * 140)) rotateX(1.4deg); transition-duration: .04s; }
-.ipodc-wheel[data-press="play"] { transform: perspective(calc(var(--ipodc-u) * 140)) rotateX(-1.4deg); transition-duration: .04s; }
-.ipodc-wheel[data-press="next"] { transform: perspective(calc(var(--ipodc-u) * 140)) rotateY(1.4deg); transition-duration: .04s; }
-.ipodc-wheel[data-press="prev"] { transform: perspective(calc(var(--ipodc-u) * 140)) rotateY(-1.4deg); transition-duration: .04s; }
-.ipodc-quad-wrap, .ipodc-quad {
+.ipodc-wheel[data-press="menu"] { transform: perspective(calc(var(--ipodc-u) * 140)) rotateX(1.4deg); }
+.ipodc-wheel[data-press="play"] { transform: perspective(calc(var(--ipodc-u) * 140)) rotateX(-1.4deg); }
+.ipodc-wheel[data-press="next"] { transform: perspective(calc(var(--ipodc-u) * 140)) rotateY(1.4deg); }
+.ipodc-wheel[data-press="prev"] { transform: perspective(calc(var(--ipodc-u) * 140)) rotateY(-1.4deg); }
+.ipodc-quad {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
-  border-radius: 50%;
 }
-.ipodc-quad path { opacity: 0; transition: opacity .16s ease; }
-.ipodc-wheel[data-press="menu"] .ipodc-quad [data-q="menu"],
-.ipodc-wheel[data-press="next"] .ipodc-quad [data-q="next"],
-.ipodc-wheel[data-press="prev"] .ipodc-quad [data-q="prev"],
-.ipodc-wheel[data-press="play"] .ipodc-quad [data-q="play"] { opacity: 1; transition-duration: .03s; }
+.ipodc-quad path { opacity: 0; }
+.ipodc-wheel[data-press="menu"] [data-q="menu"],
+.ipodc-wheel[data-press="next"] [data-q="next"],
+.ipodc-wheel[data-press="prev"] [data-q="prev"],
+.ipodc-wheel[data-press="play"] [data-q="play"] { opacity: 1; }
 
 .ipodc-wbtn {
   position: absolute;
   left: 50%; top: 50%;
-  margin: 0;
-  padding: calc(var(--ipodc-u) * 1.4);
-  border: 0;
-  background: none;
   color: var(--ipodc-c-wheelLabel);
-  font: 700 calc(var(--ipodc-u) * 2.5)/1 var(--ipodc-font);
-  letter-spacing: .07em;
-  cursor: inherit;
+  font: 700 calc(var(--ipodc-u) * 2.1)/1 var(--ipodc-font);
+  letter-spacing: .05em;
   transform: translate(-50%, -50%) translate(var(--ipodc-dx, 0px), var(--ipodc-dy, 0px));
-  -webkit-tap-highlight-color: transparent;
-  outline: none;
   pointer-events: none;
 }
-.ipodc-wbtn svg {
-  display: block;
-  width: calc(var(--ipodc-u) * 4.7);
-  height: calc(var(--ipodc-u) * 2.1);
-  fill: currentColor;
-}
-.ipodc-wbtn--menu { --ipodc-dy: calc(var(--ipodc-u) * var(--ipodc-mm-lab-r) * -1); padding-left: calc(var(--ipodc-u) * 1.57); }
+.ipodc-wbtn svg { display: block; width: calc(var(--ipodc-u) * 4.7); height: calc(var(--ipodc-u) * 2.1); fill: currentColor; }
+.ipodc-wbtn--menu { --ipodc-dy: calc(var(--ipodc-u) * var(--ipodc-mm-lab-r) * -1); padding-left: .05em; }
 .ipodc-wbtn--play { --ipodc-dy: calc(var(--ipodc-u) * var(--ipodc-mm-lab-r)); }
 .ipodc-wbtn--next { --ipodc-dx: calc(var(--ipodc-u) * var(--ipodc-mm-lab-r)); }
 .ipodc-wbtn--prev { --ipodc-dx: calc(var(--ipodc-u) * var(--ipodc-mm-lab-r) * -1); }
@@ -715,13 +639,9 @@
   width: calc(var(--ipodc-u) * var(--ipodc-mm-cb-d));
   height: calc(var(--ipodc-u) * var(--ipodc-mm-cb-d));
   margin: calc(var(--ipodc-u) * var(--ipodc-mm-cb-d) / -2) 0 0 calc(var(--ipodc-u) * var(--ipodc-mm-cb-d) / -2);
-  padding: 0;
-  border: 0;
   border-radius: 50%;
   cursor: pointer;
-  outline: none;
   touch-action: none;
-  -webkit-tap-highlight-color: transparent;
   background:
     radial-gradient(90% 90% at 50% 70%, rgba(255, 255, 255, .22) 0%, rgba(255, 255, 255, 0) 60%),
     linear-gradient(180deg, rgba(0, 0, 0, .1) 0%, rgba(0, 0, 0, .025) 40%, rgba(255, 255, 255, .08) 70%, rgba(255, 255, 255, .24) 100%),
@@ -731,12 +651,10 @@
     0 calc(var(--ipodc-u) * .19) 0 calc(var(--ipodc-u) * .13) rgba(255, 255, 255, .65),
     inset 0 calc(var(--ipodc-u) * .35) calc(var(--ipodc-u) * .7) rgba(0, 0, 0, .14),
     inset 0 calc(var(--ipodc-u) * -.25) calc(var(--ipodc-u) * .45) rgba(255, 255, 255, .5);
-  transition: filter .12s ease, box-shadow .12s ease, transform .12s ease;
 }
 .ipodc-center.is-pressed {
   filter: brightness(.94);
   transform: scale(.992);
-  transition-duration: .03s;
   box-shadow:
     0 0 0 calc(var(--ipodc-u) * .15) rgba(100, 104, 110, .5),
     0 calc(var(--ipodc-u) * .19) 0 calc(var(--ipodc-u) * .13) rgba(255, 255, 255, .65),
@@ -744,22 +662,43 @@
     inset 0 calc(var(--ipodc-u) * -.2) calc(var(--ipodc-u) * .4) rgba(255, 255, 255, .42);
 }
 
-/* ───────────── reduced motion ─────────────
-   One rule: .ipodc--reduced is kept in sync with the OS setting from JS (live, via matchMedia),
-   so no separate media query is needed. Nothing moves, scales or fades. */
-.ipodc--reduced, .ipodc--reduced *, .ipodc--reduced *::before, .ipodc--reduced *::after {
-  animation: none !important;
-  transition: none !important;
+/* ───────────── motion (opt-in) ─────────────
+   Only with prefers-reduced-motion: no-preference. .is-instant suspends the list transitions for
+   one frame while a screen is laid out. The WAAPI screen slides check the same query in JS. */
+@media (prefers-reduced-motion: no-preference) {
+  .ipodc-screen:not(.is-instant) :is(.ipodc-content, .ipodc-sb-thumb) { transition: transform .12s cubic-bezier(.25, .7, .3, 1); }
+  .ipodc-screen:not(.is-instant) .ipodc-hl { transition: transform .085s cubic-bezier(.25, .7, .3, 1), background .2s ease; }
+  .ipodc-screen:not(.is-instant) :is(.ipodc-row-a, .ipodc-row-detail, .ipodc-chev) { transition: color .07s linear; }
+  .ipodc-screen:not(.is-instant) .ipodc-meter-fill { transition: width .25s linear; }
+  .ipodc-screen:not(.is-instant) .ipodc-np-tracks-in { transition: transform .2s ease; }
+  .ipodc-np-prog, .ipodc-np-vol { transition: opacity .18s ease; }
+  .ipodc-view.bump-down { animation: ipodc-bump-down .22s ease-out; }
+  .ipodc-view.bump-up { animation: ipodc-bump-up .22s ease-out; }
+  .ipodc-pv { transition: opacity .45s ease; }
+  .ipodc-pv.is-on :is(.ipodc-pv-float, .ipodc-pv-float-in) { animation: ipodc-float 7s ease-in-out infinite alternate; }
+  .ipodc-pv.is-on .ipodc-pv-cover { animation: ipodc-pan 16s ease-in-out infinite alternate; }
+  .ipodc-toast { transition: opacity .18s ease, transform .18s ease; }
+  .ipodc-toast.is-on { transform: translate(-50%, -50%) scale(1); }
+  .ipodc-boot { transition: opacity .32s ease; }
+  .ipodc-boot-mono { transform: scale(.985); transition: opacity .34s ease, transform 1.2s ease-out; }
+  .ipodc-boot.show-mono .ipodc-boot-mono { transform: scale(1); }
+  .ipodc-wheel { transition: transform .14s ease; }
+  .ipodc-wheel[data-press] { transition-duration: .04s; }
+  .ipodc-quad path { transition: opacity .16s ease; }
+  .ipodc-wheel[data-press] [data-q] { transition-duration: .03s; }
+  .ipodc-center { transition: filter .12s ease, box-shadow .12s ease, transform .12s ease; }
+  .ipodc-center.is-pressed { transition-duration: .03s; }
 }
-.ipodc--reduced .ipodc-boot-mono, .ipodc--reduced .ipodc-toast, .ipodc--reduced .ipodc-center.is-pressed { transform: none; }
-.ipodc--reduced .ipodc-toast { translate: -50% -50%; }
-.ipodc--reduced .ipodc-wheel[data-press] { transform: none; }
+/* reduced motion: nothing moves, rocks or scales */
+@media (prefers-reduced-motion: reduce) {
+  .ipodc .ipodc-wheel[data-press], .ipodc .ipodc-center.is-pressed { transform: none; }
+}
 
 /* ───────────── forced colours / high contrast ───────────── */
 @media (forced-colors: active) {
   .ipodc { border: 2px solid CanvasText; }
   .ipodc:focus-visible { outline: 3px solid Highlight; }
   .ipodc-hl { forced-color-adjust: none; background: Highlight; box-shadow: none; }
-  .ipodc-row.is-sel, .ipodc-row.is-sel .ipodc-row-detail, .ipodc-row.is-sel .ipodc-chev { forced-color-adjust: none; color: HighlightText; }
+  .ipodc-row.is-sel :is(.ipodc-row-a, .ipodc-row-detail, .ipodc-chev) { forced-color-adjust: none; color: HighlightText; }
   .ipodc-wheel, .ipodc-center { border: 1px solid ButtonText; }
 }
