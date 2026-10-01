@@ -3,7 +3,7 @@
 // front face at z = 0, back at z = -IPOD.depth.
 import * as THREE from 'three';
 import { toCreasedNormals, mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { IPOD, PARTS, COLORS } from '../../../shared/ipodSpec.js';
+import { IPOD, PARTS, COLORS } from '../../../../shared/ipodSpec.js';
 import * as T from './tex.js';
 
 const PI = Math.PI;
@@ -147,7 +147,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
   // world-scaled brushing (uv = mm): coarse steel (40 mm tile), fine anodised face (20 mm)
   const brush = tx(T.brushed(3, 128, 16), { color: false, wrap: true });
   brush.repeat.set(1 / 40, 1 / 40);
-  const fine = tx(T.brushed(4, 190, 36, 1024, [0.3, 0.3], 9000), { color: false, wrap: true });
+  const fine = tx(T.brushed(4, 196, 20, 1024, [0.3, 0.3], 9000), { color: false, wrap: true });
   fine.repeat.set(1 / 20, 1 / 20);
 
   const model = new THREE.Group();
