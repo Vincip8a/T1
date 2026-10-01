@@ -418,11 +418,8 @@ export function mountIpod(container, { config } = {}) {
     s.setIndex(i);
     sound.play('press');
     const spec = s.specs[i];
-    const a = row.link;
-    if (spec.onActivate) { e.preventDefault(); spec.onActivate(); } else if (!a) e.preventDefault();
-    else if (!a.contains(e.target)) { e.preventDefault(); followLink(a, spec); } // AT click on the option itself
-    else if (linkGuard(a)) e.preventDefault();
-    else linkFeedback(a, spec); // native navigation proceeds (new tab / mailto / download)
+    if (spec.onActivate || !row.href) { e.preventDefault(); spec.onActivate?.(); } else if (linkGuard(row)) e.preventDefault();
+    else linkFeedback(row, spec); // native navigation proceeds (new tab / mailto / download)
   });
 
   // ── mouse wheel / trackpad

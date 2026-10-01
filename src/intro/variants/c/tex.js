@@ -37,15 +37,7 @@ export function capFit(t, w, h) {
   return t;
 }
 
-export function roundRect(g, x, y, w, h, r) {
-  g.beginPath();
-  g.moveTo(x + r, y);
-  g.arcTo(x + w, y, x + w, y + h, r);
-  g.arcTo(x + w, y + h, x, y + h, r);
-  g.arcTo(x, y + h, x, y, r);
-  g.arcTo(x, y, x + w, y, r);
-  g.closePath();
-}
+export function roundRect(g, x, y, w, h, r) { g.beginPath(); g.roundRect(x, y, w, h, r); }
 
 export function text(g, s, x, y, size, { weight = 600, color = '#000', align = 'left', spacing = 0 } = {}) {
   g.font = `${weight} ${size}px ${FONT}`;
@@ -66,8 +58,7 @@ function barcode(g, x, y, w, h, r, ink = '#111') {
   }
 }
 
-/** Low-contrast brushing (linear grey around `base`), seamlessly tiling. `h` = streak height
- *  range in px: coarse for drive/LCD steel, sub-pixel for the anodised front plate. */
+/** Tiling low-contrast brushing (linear grey around `base`); `h` = streak height range px. */
 export function brushed(seed, base, spread, S = 512, h = [0.5, 0.9], n = S * 3) {
   const [c, g] = canvas(S, S);
   const r = rng(seed);
@@ -86,7 +77,7 @@ export function brushed(seed, base, spread, S = 512, h = [0.5, 0.9], n = S * 3) 
 }
 
 /** Contrast studio wrap (linear): [startDeg, endDeg, value] bands around the horizon,
- *  optionally ramping from v to w, darkening towards the floor. Soft boxes, hot strips and black flags for polished steel. */
+ *  optionally ramping to w, darkening towards the floor. */
 export function stripCanvas(bands) {
   const [c, g] = canvas(1024, 64);
   const grd = g.createLinearGradient(0, 0, 1024, 0);
@@ -95,7 +86,9 @@ export function stripCanvas(bands) {
   g.fillStyle = grd; g.fillRect(0, 0, 1024, 64);
   g.globalCompositeOperation = 'multiply';
   const vg = g.createLinearGradient(0, 0, 0, 64);
-  vg.addColorStop(0, '#fff'); vg.addColorStop(0.55, '#ddd'); vg.addColorStop(1, '#444');
+  // dark horizon just above eye level: a band across the pitched polished back
+  [[0, '#fff'], [0.43, '#eee'], [0.445, '#161616'], [0.475, '#161616'], [0.49, '#aaa'], [0.7, '#888'], [1, '#444']]
+    .forEach(([o, c]) => vg.addColorStop(o, c));
   g.fillStyle = vg; g.fillRect(0, 0, 1024, 64);
   return c;
 }
@@ -321,17 +314,5 @@ export function flexCanvas() {
   g.fillStyle = COLORS.flex; g.fillRect(0, 0, 128, 128);
   g.strokeStyle = 'rgba(120,60,10,0.55)'; g.lineWidth = 2;
   for (let i = 0; i < 12; i++) { g.beginPath(); g.moveTo(6 + i * 10.5, 0); g.lineTo(6 + i * 10.5, 128); g.stroke(); }
-  return c;
-}
-
-/** Hand-off fill for the front plate (linear grey): a soft bounce from below, so the
- *  frontal face falls off gently like the DOM iPod's studio gradient instead of going dark. */
-export function faceGlowCanvas() {
-  const [c, g] = canvas(4, 128);
-  const grd = g.createLinearGradient(0, 0, 0, 128);
-  grd.addColorStop(0, 'rgb(0,0,0)');
-  grd.addColorStop(0.4, 'rgb(70,70,70)');
-  grd.addColorStop(1, 'rgb(255,255,255)');
-  g.fillStyle = grd; g.fillRect(0, 0, 4, 128);
   return c;
 }

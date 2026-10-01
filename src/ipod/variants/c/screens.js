@@ -14,24 +14,23 @@ const fileName = (p) => String(p ?? '').split(/[?#]/)[0].split('/').pop() || '';
 export function createScreens(ctx) {
   const { L, brand, nid, timers } = ctx;
 
-  /** One option row. Links are a real <a> inside the option, so the link keeps its semantics
-   *  (described via aria-description) and modifier clicks stay native. */
+  /** One option row. A link row IS the real <a> (role=option), so there is no focusable element
+   *  nested inside an option; its link nature is given via aria-description and modifier clicks stay native. */
   function makeRow(spec) {
-    const href = spec.href ? safeHref(spec.href) : null;
-    const dead = !!spec.href && !href; // rejected link: shown greyed out and inert
-    const row = h('div', `ipodc-row${dead ? ' is-dead' : ''}`, { role: 'option', id: nid('o'), 'aria-selected': 'false', 'aria-disabled': dead && 'true' });
-    const a = h(href ? 'a' : 'span', 'ipodc-row-a');
+    const href = spec.href && safeHref(spec.href);
+    const row = h(href ? 'a' : 'div', 'ipodc-row', { role: 'option', id: nid('o'), 'aria-selected': 'false' });
     if (href) {
-      Object.assign(a, { href, tabIndex: -1, draggable: false });
+      Object.assign(row, { href, tabIndex: -1, draggable: false });
       let desc = L.link;
-      if (spec.download != null) { a.setAttribute('download', spec.download); desc = L.download; } else if (/^https?:/i.test(href)) { a.target = '_blank'; a.rel = 'noopener'; desc = L.newTab; } else if (/^mailto:/i.test(href)) desc = L.mail;
+      if (spec.download != null) { row.download = spec.download; desc = L.download; } else if (/^https?:/i.test(href)) { row.target = '_blank'; row.rel = 'noopener'; desc = L.newTab; } else if (/^mailto:/i.test(href)) desc = L.mail;
       row.setAttribute('aria-description', desc);
-      row.link = a;
+    } else if (spec.href) { // rejected link: shown greyed out and inert
+      row.classList.add('is-dead');
+      row.setAttribute('aria-disabled', 'true');
     }
-    a.append(h('span', 'ipodc-row-label', { text: spec.label ?? '' }));
-    if (spec.detail) a.append(h('span', 'ipodc-row-detail', { text: spec.detail }));
-    if (spec.sub) a.insertAdjacentHTML('beforeend', CHEVRON);
-    row.append(a);
+    row.append(h('span', 'ipodc-row-label', { text: spec.label ?? '' }));
+    if (spec.detail) row.append(h('span', 'ipodc-row-detail', { text: spec.detail }));
+    if (spec.sub) row.insertAdjacentHTML('beforeend', CHEVRON);
     return row;
   }
 
@@ -169,7 +168,7 @@ export function createScreens(ctx) {
         }
         const spec = specs[s.index];
         if (spec.onActivate) spec.onActivate();
-        else if (r.link) ctx.followLink(r.link, spec);
+        else if (r.href) ctx.followLink(r, spec);
         else { s.bump(1); return false; }
         return true;
       },

@@ -240,18 +240,20 @@
   pointer-events: none;
 }
 .ipodc-list.is-empty .ipodc-hl { display: none; }
-.ipodc-row { position: relative; z-index: 1; height: calc(var(--ipodc-p) * 27); cursor: pointer; }
-.ipodc-row-a {
+.ipodc-row {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: calc(var(--ipodc-p) * 8);
-  height: 100%;
-  box-sizing: border-box;
+  height: calc(var(--ipodc-p) * 27);
   padding: 0 calc(var(--ipodc-p) * 8) 0 calc(var(--ipodc-p) * 7);
+  box-sizing: border-box;
   color: #000;
   text-decoration: none;
   white-space: nowrap;
   outline: none;
+  cursor: pointer;
   -webkit-user-drag: none;
 }
 .ipodc-row-label {
@@ -276,16 +278,14 @@
   flex: none;
   width: calc(var(--ipodc-p) * 7); height: calc(var(--ipodc-p) * 12);
   margin-right: calc(var(--ipodc-p) * 1);
-  color: #fff;
   visibility: hidden;
 }
-.ipodc-row.is-sel .ipodc-row-a { color: #fff; }
+.ipodc-row.is-sel { color: #fff; }
 .ipodc-row.is-sel .ipodc-row-label { text-shadow: 0 calc(var(--ipodc-p) * -1) 0 rgba(0, 30, 90, .3); }
 .ipodc-row.is-sel .ipodc-row-detail { color: rgba(255, 255, 255, .92); }
 .ipodc-row.is-sel .ipodc-chev { visibility: inherit; }
 /* a link the config rejected (see console): visibly inert */
-.ipodc-row.is-dead { cursor: default; }
-.ipodc-row.is-dead .ipodc-row-a, .ipodc-row.is-dead.is-sel .ipodc-row-a { color: #a4a7ab; }
+.ipodc-row.is-dead { cursor: default; color: #a4a7ab; }
 
 /* scrollbar (only when the content overflows) */
 .ipodc-sb {
@@ -516,15 +516,14 @@
 }
 .ipodc-screen--nowplaying.no-cta .ipodc-view { display: none; }
 .ipodc-screen--nowplaying .ipodc-hl { background: linear-gradient(180deg, #f6f7f8 0%, #e8eaec 100%); box-shadow: none; }
-.ipodc-screen--nowplaying .ipodc-row.is-sel .ipodc-row-a { color: #5d6167; }
+.ipodc-screen--nowplaying .ipodc-row.is-sel { color: #5d6167; }
 .ipodc-screen--nowplaying .ipodc-row-label { font-size: calc(var(--ipodc-p) * 13); }
 .ipodc-screen--nowplaying .ipodc-row.is-sel .ipodc-row-label { text-shadow: none; }
-.ipodc-screen--nowplaying .ipodc-row.is-sel .ipodc-chev { color: #9a9ea4; }
 .ipodc.is-centre .ipodc-screen--nowplaying .ipodc-hl { background: var(--ipodc-gloss); }
-.ipodc.is-centre .ipodc-screen--nowplaying .ipodc-row.is-sel :is(.ipodc-row-a, .ipodc-chev) { color: #fff; }
+.ipodc.is-centre .ipodc-screen--nowplaying .ipodc-row.is-sel { color: #fff; }
 @media (hover: hover) {
   .ipodc-screen--nowplaying .ipodc-view:hover .ipodc-hl { background: var(--ipodc-gloss); }
-  .ipodc-screen--nowplaying .ipodc-view:hover .ipodc-row.is-sel :is(.ipodc-row-a, .ipodc-chev) { color: #fff; }
+  .ipodc-screen--nowplaying .ipodc-view:hover .ipodc-row.is-sel { color: #fff; }
 }
 
 /* toast */
@@ -672,7 +671,7 @@
 @media (prefers-reduced-motion: no-preference) {
   .ipodc-screen:not(.is-instant) :is(.ipodc-content, .ipodc-sb-thumb) { transition: transform .12s cubic-bezier(.25, .7, .3, 1); }
   .ipodc-screen:not(.is-instant) .ipodc-hl { transition: transform .085s cubic-bezier(.25, .7, .3, 1), background .2s ease; }
-  .ipodc-screen:not(.is-instant) :is(.ipodc-row-a, .ipodc-row-detail, .ipodc-chev) { transition: color .07s linear; }
+  .ipodc-screen:not(.is-instant) :is(.ipodc-row, .ipodc-row-detail, .ipodc-chev) { transition: color .07s linear; }
   .ipodc-screen:not(.is-instant) .ipodc-meter-fill { transition: width .25s linear; }
   .ipodc-screen:not(.is-instant) .ipodc-np-tracks-in { transition: transform .2s ease; }
   .ipodc-np-prog, .ipodc-np-vol { transition: opacity .18s ease; }
@@ -703,6 +702,6 @@
   .ipodc { border: 2px solid CanvasText; }
   .ipodc:focus-visible { outline: 3px solid Highlight; }
   .ipodc-hl { forced-color-adjust: none; background: Highlight; box-shadow: none; }
-  .ipodc-row.is-sel :is(.ipodc-row-a, .ipodc-row-detail, .ipodc-chev) { forced-color-adjust: none; color: HighlightText; }
+  .ipodc-row.is-sel :is(&, *) { forced-color-adjust: none; color: HighlightText; }
   .ipodc-wheel, .ipodc-center { border: 1px solid ButtonText; }
 }

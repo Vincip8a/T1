@@ -27,8 +27,7 @@ function rrPath(p, w, h, r, cx = 0, cy = 0) {
 /** Rounded rect whose bevelled (widest) outline is w×h. Holes grow by b so their wall is w×h. */
 const rr = (w, h, r, b = 0, cx = 0, cy = 0) => rrPath(new THREE.Shape(), w - 2 * b, h - 2 * b, r - b, cx, cy);
 const rrHole = (w, h, r, b = 0, cx = 0, cy = 0) => rrPath(new THREE.Path(), w + 2 * b, h + 2 * b, r + b, cx, cy);
-/** Circle as a 128-gon of plain lines: no arc joints (whose duplicate points crease the bevel
- *  normals into dark slivers), identical tessellation for hole, wheel and sensor base. */
+/** Circle as a 128-gon (no arc joints; same tessellation for hole, wheel and base). */
 const circle = (r, hole = false, cx = 0, cy = 0) => {
   const p = hole ? new THREE.Path() : new THREE.Shape();
   for (let i = 0; i < 128; i++) p[i ? 'lineTo' : 'moveTo'](cx + r * Math.cos((i * PI) / 64), cy + r * Math.sin((i * PI) / 64));
@@ -52,8 +51,7 @@ function ext(shape, depth, b = 0, segs = 3, curveSegments = 14) {
       const nz = Math.sign(n.getZ(i) + n.getZ(i + 1) + n.getZ(i + 2)) || 1;
       for (let k = 0; k < 3; k++) n.setXYZ(i + k, 0, 0, nz);
     } else for (let k = 0; k < 3; k++) uv.setXY(i + k, pos.getX(i + k), pos.getY(i + k));
-    // ^ walls/bevels: planar uv like the caps (the default wall uv flips between x and y at
-    //   45° and drags printed glyphs onto the wheel rim as dark ticks at the diagonals)
+    // ^ walls: planar uv (default wall uv flips x/y at 45° → glyph ticks on the wheel rim)
   }
   return out;
 }
@@ -61,8 +59,7 @@ function ext(shape, depth, b = 0, segs = 3, curveSegments = 14) {
 export function buildIpod({ maxAniso = 8 } = {}) {
   const textures = [];
   const tx = (c, o = {}) => { const t = T.tex(c, { aniso: maxAniso, ...o }); textures.push(t); return t; };
-  // World-scaled brushing (cap uv = mm): coarse for drive/LCD steel (40 mm tile), and a much
-  // finer, quieter one for the anodised front plate (sub-pixel streaks, 20 mm tile).
+  // world-scaled brushing (uv = mm): coarse steel (40 mm tile), fine anodised face (20 mm)
   const brush = tx(T.brushed(3, 128, 16), { color: false, wrap: true });
   brush.repeat.set(1 / 40, 1 / 40);
   const fine = tx(T.brushed(4, 200, 8, 1024, [0.3, 0.3], 9000), { color: false, wrap: true });
@@ -93,29 +90,25 @@ export function buildIpod({ maxAniso = 8 } = {}) {
   const R = wh.diameter / 2, CB = IPOD.centerButton.diameter / 2;
   const mats = {};
 
-  // ---------- front plate: anodised, finely brushed aluminium ----------
+  // front plate: anodised, finely brushed aluminium
   {
     const p = mk('faceplate');
     const b = FACE_BEVEL;
     const s = rr(W, H, IPOD.cornerRadius, b);
     s.holes.push(rrHole(sw.width, sw.height, sw.radius, b, ...swc));
     s.holes.push(circle(R + 0.12 + b, true, ...whc));
-    // lower metalness + lighter base: a satin anodised layer keeps a diffuse floor, so the
-    // plate never drops to grey card when the soft box leaves the reflection cone
+    // satin anodising keeps a diffuse floor: no grey card when the soft box leaves the cone
     mats.face = phys({
       color: '#dcdfe2', metalness: 0.62, roughness: 0.44, roughnessMap: fine,
       anisotropy: 0.3, clearcoat: 0.25, clearcoatRoughness: 0.28,
-      emissive: '#ffffff', emissiveIntensity: 0,
-      emissiveMap: T.capFit(tx(T.faceGlowCanvas(), { color: false }), W, H),
     });
     add(p, ext(s, 0.8, b, 3, SEG), mats.face);
-    // flat lip over the wheel hole's bevel: a crisp, evenly lit edge round the gap (a metallic
-    // bevel there catches dark studio corners as slivers at the diagonals)
+    // flat lip over the hole bevel (a metal bevel there shows dark slivers at the diagonals)
     const lip = circle(R + 0.6, false, ...whc); lip.holes.push(circle(R + 0.12, true, ...whc));
     add(p, new THREE.ShapeGeometry(lip), mats.face, 0, 0, 0.002);
   }
 
-  // ---------- display window: tinted acrylic with printed black mask ----------
+  // display window: tinted acrylic with printed black mask
   {
     const p = mk('screenGlass');
     const gw = sw.width - 0.1, gh = sw.height - 0.1;
@@ -127,7 +120,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     add(p, ext(rr(gw, gh, sw.radius, 0.1), 0.6, 0.1, 2, 8), mats.glass, swc[0], swc[1], 0);
   }
 
-  // ---------- click wheel + centre button (hairline gaps, no visible well) ----------
+  // click wheel + centre button (hairline gaps, no visible well)
   {
     const p = mk('clickWheel');
     const bw = 0.22;
@@ -138,13 +131,12 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     add(p, ext(s, 1.3, bw, 3, SEG), mats.wheel, whc[0], whc[1], 0);
     mats.centre = phys({ color: '#e1e4e7', emissive: COLORS.centerButton, emissiveIntensity: 0, metalness: 0.3, roughness: 0.4, roughnessMap: brush, anisotropy: 0.4, clearcoat: 0.3, clearcoatRoughness: 0.3 });
     add(p, ext(circle(CB - 0.2), 1.2, 0.2, 3, 14), mats.centre, whc[0], whc[1], -0.08);
-    // sensor base behind the wheel: mid grey like the gap shade, and wide enough to cover the
-    // annulus while the front plate seats, so no board colour flashes through it
+    // sensor base: gap-shade grey, wide enough to veil the annulus while the plate seats
     const ws = circle(R + 2.5); ws.holes.push(circle(CB - 2, true));
     add(p, ext(ws, 0.2, 0, 1, SEG), std({ color: '#8a8d91', roughness: 0.8 }), whc[0], whc[1], -1.35);
   }
 
-  // ---------- click-wheel flex: capacitive sensor ring on kapton ----------
+  // click-wheel flex: capacitive sensor ring on kapton
   {
     const p = mk('wheelFlex');
     const ft = tx(T.flexCanvas(), { wrap: true });
@@ -159,7 +151,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     mats.flex = fmat;
   }
 
-  // ---------- LCD module: brushed steel frame, dark panel, flex tail ----------
+  // LCD module: brushed steel frame, dark panel, flex tail
   {
     const p = mk('lcd');
     const fw = sw.width + 3, fh = sw.height + 3;
@@ -170,7 +162,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     add(p, ext(rr(18, 12, 1), 0.15), mats.flex, swc[0] - 8, swc[1] - fh / 2 - 5.5, -1.6);
   }
 
-  // ---------- logic board ----------
+  // logic board
   const BW = 57.4, BH = 96, BY = 0.25, BZ = -0.4;
   const chips = [
     { ref: 'U1', x: -9, y: 20, w: 13, h: 13, d: 1.0, lines: ['DN8702', '0726 K4B', 'TAIWAN'] },
@@ -228,7 +220,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     p.group.add(pas);
   }
 
-  // ---------- battery: dark Li-ion pouch ----------
+  // battery: dark Li-ion pouch
   {
     const p = mk('battery');
     const bw = 50, bh = 21, cy = SY(88.5);
@@ -238,7 +230,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     add(p, ext(rr(9, 5, 0.6), 0.15), mats.flex, 12, cy + bh / 2 + 1.5, -0.4);
   }
 
-  // ---------- 1.8" hard drive + rubber bumpers ----------
+  // 1.8" hard drive + rubber bumpers
   {
     const p = mk('storage');
     const dw = 54, dh = 71, cy = SY(41);
@@ -251,7 +243,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     add(p, ext(rr(34, 7, 0.8), 0.15), mats.flex, -4, cy - dh / 2 - 2.5, -0.3);
   }
 
-  // ---------- internal mid-frame + clips ----------
+  // internal mid-frame + clips
   {
     const p = mk('midframe');
     const zinc = std({ color: '#868b92', metalness: 0.8, roughness: 0.42, roughnessMap: brush });
@@ -267,30 +259,29 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     p.group.add(clips);
   }
 
-  // ---------- back shell: mirror-polished stainless tub ----------
+  // back shell: mirror-polished stainless tub
   let back;
   {
     const p = mk('backShell');
     const w2 = W - 0.3, h2 = H - 0.3, cr = IPOD.cornerRadius - 0.15;
     const steel = phys({ color: '#dfe1e3', metalness: 1, roughness: 0.06, clearcoat: 0.6, clearcoatRoughness: 0.04 });
-    // side wall runs back into the plate's full-width belt, so the plate's 0.9 mm radius is
-    // the only edge: one continuous curved tub, no stepped lip where the two meet
-    const ring = rr(w2, h2, cr, 0.25);
+    // side wall (a hair narrower) ends inside the plate's belt: one continuous radius, no lip
+    const ring = rr(w2 - 0.06, h2 - 0.06, cr - 0.03, 0.25);
     ring.holes.push(rrHole(w2 - 1.2, h2 - 1.2, cr - 0.6, 0.25));
-    add(p, ext(ring, 8.85, 0.25, 3, 18), steel, 0, 0, 8.6);
+    add(p, ext(ring, 9.1, 0.25, 3, 18), steel, 0, 0, 8.6);
     mats.steel = steel;
     const bw = w2 - 1.8, bh = h2 - 1.8;
     const [cC, rC] = T.backCanvases(bw, bh, {});
     const cT = T.capFit(tx(cC), bw, bh), rT = T.capFit(tx(rC, { color: false }), bw, bh);
     back = { cC, rC, cT, rT, bw, bh };
     const backMat = phys({ color: '#dfe1e3', map: cT, metalness: 1, roughness: 1, roughnessMap: rT, clearcoat: 0.6, clearcoatRoughness: 0.04 });
-    add(p, ext(rr(w2, h2, cr, 0.9), 1.7, 0.9, 6, 18), backMat, 0, 0, 0.6);
+    add(p, ext(rr(w2, h2, cr, 0.9), 1.7, 0.9, 10, 18), backMat, 0, 0, 0.6);
     mats.back = backMat;
     const inner = T.capFit(tx(T.shellInnerCanvas(w2 - 1.4, h2 - 1.4)), w2 - 1.4, h2 - 1.4);
     add(p, new THREE.ShapeGeometry(rr(w2 - 1.4, h2 - 1.4, cr - 0.7), 12), std({ map: inner, metalness: 0.55, roughness: 0.55 }), 0, 0, 0.62);
   }
 
-  // ---------- screws (instanced) ----------
+  // screws (instanced)
   const screwGeo = (() => {
     const gs = [
       new THREE.CylinderGeometry(1.55, 1.6, 0.6, 24).rotateX(PI / 2).translate(0, 0, -0.275),
