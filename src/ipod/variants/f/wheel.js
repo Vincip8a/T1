@@ -1,15 +1,15 @@
-// Rotational click-wheel input: pointer events + angle accumulation (one step per `stepDeg`),
-// click detection on the four ring sectors, and flick momentum with exponential decay.
+// Rotational click-wheel input: pointer events + angle accumulation (one step per `stepDeg`)
+// and click detection on the four ring sectors. Like the real capacitive wheel there is no
+// inertia: the highlight moves exactly as far as the finger travelled.
 export function createWheel(ring, {
   stepDeg = 20,
+  slopDeg = 9,       // movement below this still counts as a click on a sector
   onStep,            // (dir: 1 | -1) – ticks fire exactly here
   onPressStart,      // (sector) – pressed visual
   onPressEnd,        // ()
   onPress,           // (sector) – a completed click: 'menu' | 'next' | 'play' | 'prev'
-  reducedMotion = () => false,
 }) {
   let active = null;
-  let raf = 0;
   let acc = 0;
 
   const angleAt = (e) => {
@@ -24,37 +24,16 @@ export function createWheel(ring, {
     if (Math.abs(delta) > 2.5 && acc * delta < 0) acc = 0;
     acc += delta;
     let guard = 0;
-    while (acc >= stepDeg && guard++ < 6) { acc -= stepDeg; onStep(1); }
-    while (acc <= -stepDeg && guard++ < 6) { acc += stepDeg; onStep(-1); }
-  };
-
-  const stopMomentum = () => { if (raf) clearTimeout(raf); raf = 0; };
-
-  // Flick momentum emits discrete steps, so a timer (not rAF) is fine and keeps working
-  // when the page isn't painting.
-  const startMomentum = (v0) => {
-    let v = Math.max(-2.2, Math.min(2.2, v0)); // deg per ms
-    let last = performance.now();
-    const tau = 240;
-    const loop = () => {
-      const now = performance.now();
-      const dt = Math.min(now - last, 48);
-      last = now;
-      feed(v * dt);
-      v *= Math.exp(-dt / tau);
-      raf = Math.abs(v) > 0.05 ? setTimeout(loop, 16) : 0;
-    };
-    raf = setTimeout(loop, 16);
+    while (acc >= stepDeg && guard++ < 8) { acc -= stepDeg; onStep(1); }
+    while (acc <= -stepDeg && guard++ < 8) { acc += stepDeg; onStep(-1); }
   };
 
   const down = (e) => {
     if (e.button != null && e.button !== 0) return;
     if (active) return;
-    stopMomentum();
     try { ring.setPointerCapture(e.pointerId); } catch {}
     const a = angleAt(e);
-    const now = performance.now();
-    active = { id: e.pointerId, last: a, moved: 0, cum: 0, t0: now, lastMove: now, samples: [[now, 0]], dragging: false, sector: sectorOf(a) };
+    active = { id: e.pointerId, last: a, moved: 0, cum: 0, t0: performance.now(), dragging: false, sector: sectorOf(a) };
     acc = 0;
     onPressStart?.(active.sector);
     e.preventDefault();
@@ -67,16 +46,15 @@ export function createWheel(ring, {
     active.last = a;
     active.moved += Math.abs(d);
     active.cum += d;
-    const now = performance.now();
-    active.lastMove = now;
-    active.samples.push([now, active.cum]);
-    while (active.samples.length > 2 && now - active.samples[0][0] > 110) active.samples.shift();
-    if (!active.dragging && active.moved > 9) {
+    if (!active.dragging) {
+      if (active.moved <= slopDeg) return;
+      // the arc travelled while deciding "drag, not click" counts towards the first detent
       active.dragging = true;
       onPressEnd?.();
-      acc = 0;
+      feed(active.cum);
+      return;
     }
-    if (active.dragging) feed(d);
+    feed(d);
     e.preventDefault();
   };
 
@@ -85,18 +63,11 @@ export function createWheel(ring, {
     const st = active;
     active = null;
     try { ring.releasePointerCapture(e.pointerId); } catch {}
-    const now = performance.now();
     if (!st.dragging) {
       onPressEnd?.();
-      if (e.type === 'pointerup' && now - st.t0 < 700) onPress?.(st.sector);
-      return;
+      if (e.type === 'pointerup' && performance.now() - st.t0 < 700) onPress?.(st.sector);
     }
-    if (reducedMotion() || e.type !== 'pointerup' || now - st.lastMove > 70) return;
-    const s0 = st.samples[0];
-    const dt = now - s0[0];
-    if (dt < 16) return;
-    const v = (st.cum - s0[1]) / dt;
-    if (Math.abs(v) > 0.3) startMomentum(v);
+    acc = 0;
   };
 
   ring.addEventListener('pointerdown', down);
@@ -106,9 +77,10 @@ export function createWheel(ring, {
   ring.addEventListener('lostpointercapture', up);
 
   return {
-    stop: stopMomentum,
+    /** cancel a drag in progress (e.g. when the centre button takes over) */
+    stop() { if (active && !active.dragging) onPressEnd?.(); active = null; acc = 0; },
     destroy() {
-      stopMomentum();
+      active = null;
       ring.removeEventListener('pointerdown', down);
       ring.removeEventListener('pointermove', move);
       ring.removeEventListener('pointerup', up);

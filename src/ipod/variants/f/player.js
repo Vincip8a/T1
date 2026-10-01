@@ -1,6 +1,6 @@
 // Fake playback state for the Now Playing screen: elapsed time advances while "playing",
 // tracks wrap, listeners get 'state' | 'track' | 'time' | 'volume' events. Survives screen changes.
-// Timer-driven (not rAF) so progress advances even when the page isn't painting.
+// Interval-driven (not rAF) so progress advances even when the page isn't painting.
 export function createPlayer(tracks = []) {
   const parse = (s) => {
     const [m, sec] = String(s ?? '').split(':').map(Number);
@@ -8,7 +8,7 @@ export function createPlayer(tracks = []) {
     return v > 0 ? v : 180;
   };
   const listeners = new Set();
-  let raf = 0;
+  let interval = 0;
   let last = 0;
 
   const p = {
@@ -17,7 +17,7 @@ export function createPlayer(tracks = []) {
     playing: false,
     started: false,
     elapsed: 0,
-    volume: 0.62,
+    volume: 0.625,
     get track() { return tracks[p.idx]; },
     get duration() { return parse(tracks[p.idx]?.duration); },
     on(fn) { listeners.add(fn); return () => listeners.delete(fn); },
@@ -27,14 +27,14 @@ export function createPlayer(tracks = []) {
       p.playing = true;
       p.started = true;
       last = performance.now();
-      raf = setInterval(loop, 250);
+      interval = setInterval(tick, 250);
       p.emit('state');
     },
     pause() {
       if (!p.playing) return;
       p.playing = false;
-      clearInterval(raf);
-      raf = 0;
+      clearInterval(interval);
+      interval = 0;
       p.emit('state');
     },
     toggle() { p.playing ? p.pause() : p.play(); },
@@ -50,14 +50,26 @@ export function createPlayer(tracks = []) {
       else p.idx = (p.idx - 1 + tracks.length) % tracks.length;
       p.emit('track');
     },
-    nudgeVolume(d) {
-      p.volume = Math.max(0, Math.min(1, p.volume + d));
-      p.emit('volume');
+    /** jump to track i (from the track list) and make sure it is playing */
+    select(i) {
+      if (!tracks.length) return;
+      const n = ((i % tracks.length) + tracks.length) % tracks.length;
+      if (n !== p.idx) { p.idx = n; p.elapsed = 0; }
+      p.emit('track');
+      if (!p.playing) p.play();
     },
-    destroy() { clearInterval(raf); listeners.clear(); },
+    /** returns true when the volume actually changed (false at 0 % / 100 %) */
+    nudgeVolume(d) {
+      const v = Math.max(0, Math.min(1, Math.round((p.volume + d) * 1000) / 1000));
+      if (v === p.volume) return false;
+      p.volume = v;
+      p.emit('volume');
+      return true;
+    },
+    destroy() { clearInterval(interval); interval = 0; listeners.clear(); },
   };
 
-  function loop() {
+  function tick() {
     if (!p.playing) return;
     const now = performance.now();
     const dt = Math.min((now - last) / 1000, 2);
