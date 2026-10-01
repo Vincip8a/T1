@@ -3,7 +3,7 @@
 // glint) and the device lands frontal on getTargetRect(). Pure function of t.
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { IPOD } from '../../../shared/ipodSpec.js';
+import { IPOD } from '../shared/ipodSpec.js';
 import { buildIpod, FACE_BEVEL } from './model.js';
 import { stripCanvas, shadowCanvas } from './tex.js';
 

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Impressum</title>
+<meta name="robots" content="index, follow" />
+<meta name="theme-color" content="#3a6fb5" />
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    min-height: 100vh; min-height: 100dvh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 46px 16px 32px;
+    font: 13px/1.55 "Lucida Grande", "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif; color: #1c1c1c;
+    -webkit-font-smoothing: antialiased;
+    background:
+      radial-gradient(60% 38% at 22% 108%, rgba(255,255,255,.55), rgba(255,255,255,0) 70%),
+      radial-gradient(46% 30% at 82% 98%, rgba(190,235,255,.55), rgba(190,235,255,0) 70%),
+      radial-gradient(40% 52% at 8% 22%, rgba(110,215,255,.50), rgba(110,215,255,0) 70%),
+      radial-gradient(130% 100% at 50% 118%, #6cc0f7 0%, #3f9bea 36%, #1f6fd0 62%, #12489f 100%) fixed;
+    background-color: #1f6fd0;
+  }
+  .bar {
+    position: fixed; top: 0; left: 0; right: 0; height: 22px; z-index: 2;
+    display: flex; align-items: center; padding: 0 12px; gap: 14px;
+    background: linear-gradient(to bottom, rgba(255,255,255,.95), rgba(246,246,246,.92) 48%, rgba(224,224,224,.92));
+    border-bottom: 1px solid rgba(0,0,0,.42); box-shadow: 0 1px 4px rgba(0,30,90,.28);
+  }
+  .bar a { color: #000; text-decoration: none; padding: 2px 6px; border-radius: 4px; }
+  .bar a:first-child { font-weight: 700; }
+  .bar a:hover { background: linear-gradient(#5a9bf0, #2a64d8); color: #fff; }
+  .bar .right { margin-left: auto; display: flex; gap: 4px; font-size: 11px; }
+  .bar .right a { color: #3a3a3a; font-weight: 400; }
+  .bar .right a[aria-current] { color: #000; font-weight: 700; }
+  .win {
+    position: relative; width: 100%; max-width: 620px; overflow: hidden;
+    border: 1px solid rgba(0,0,0,.62); border-radius: 8px 8px 5px 5px;
+    background: linear-gradient(to bottom, #d3d3d3, #bdbdbd);
+    box-shadow: 0 2px 4px rgba(0,0,0,.28), 0 14px 28px rgba(0,16,60,.34), 0 34px 80px rgba(0,16,60,.5), inset 0 1px 0 rgba(255,255,255,.65);
+  }
+  .win::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .55; background-size: 360px 360px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='360'%3E%3Cfilter id='b'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.003 .9' numOctaves='2' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 1.6 0 0 0 -.62'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23b)'/%3E%3C/svg%3E");
+  }
+  .titlebar {
+    position: relative; height: 24px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 8px;
+    background: linear-gradient(to bottom, rgba(255,255,255,.62), rgba(255,255,255,.16) 50%, rgba(0,0,0,.05));
+    border-bottom: 1px solid rgba(0,0,0,.32); box-shadow: 0 1px 0 rgba(255,255,255,.35);
+  }
+  .lights { display: flex; gap: 8px; }
+  .lights i { width: 14px; height: 14px; border-radius: 50%; border: 1px solid #8c0c06;
+    background: radial-gradient(70% 55% at 50% 118%, #ff8a80, rgba(255,255,255,0) 72%), linear-gradient(#e8261b, #8c0c06 150%);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,.35), 0 1px 0 rgba(255,255,255,.65); }
+  .lights i:nth-child(2) { border-color: #94670a; background: radial-gradient(70% 55% at 50% 118%, #ffe38a, rgba(255,255,255,0) 72%), linear-gradient(#f3b215, #94670a 150%); }
+  .lights i:nth-child(3) { border-color: #1c6b12; background: radial-gradient(70% 55% at 50% 118%, #a6f08a, rgba(255,255,255,0) 72%), linear-gradient(#3cb52a, #1c6b12 150%); }
+  .titlebar h1 { margin: 0; font-size: 13px; font-weight: 400; text-shadow: 0 1px 0 rgba(255,255,255,.75); white-space: nowrap; }
+  .content { position: relative; padding: 18px; }
+  .paper {
+    background: #fff; border: 1px solid rgba(0,0,0,.38); border-radius: 3px; padding: 20px 22px;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.18);
+  }
+  .paper h2 { margin: 0 0 10px; font-size: 18px; }
+  .paper h3 { margin: 18px 0 4px; font-size: 13px; }
+  .paper p { margin: 0 0 8px; }
+  .ph { background: #fff6c8; border: 1px dashed #c9a400; border-radius: 3px; padding: 8px 10px; }
+  .ph b { color: #7a5a00; }
+  .foot { position: relative; display: flex; justify-content: center; padding: 0 18px 18px; }
+  .btn {
+    display: inline-block; padding: 4px 18px; border-radius: 12px; color: #000; text-decoration: none;
+    border: 1px solid #5b6f8f; background: linear-gradient(#e9f2fd, #a9c8ef 50%, #8db6ea 51%, #c7e0fb);
+    box-shadow: 0 1px 2px rgba(0,0,0,.25);
+  }
+  .btn:hover { filter: brightness(1.05); }
+  a:focus-visible { outline: 2px solid #0b4fc4; outline-offset: 2px; }
+  @media (max-width: 480px) { .content { padding: 10px; } .paper { padding: 16px; } body { padding-top: 38px; } }
+</style>
+</head>
+<body>
+<header class="bar"><a href="./">Zurück zum iPod</a><nav class="right" aria-label="Rechtliches"><a href="impressum.html" aria-current="page">Impressum</a><a href="datenschutz.html">Datenschutz</a></nav></header>
+<main class="win" aria-labelledby="wt">
+  <div class="titlebar"><div class="lights" aria-hidden="true"><i></i><i></i><i></i></div><h1 id="wt">Impressum</h1><span></span></div>
+  <div class="content">
+    <article class="paper">
+      <h2>Impressum</h2>
+      <p class="ph"><b>Platzhalter:</b> Hier steht dein Impressum (Name, Anschrift, Kontakt).</p>
+      <h3>Name und Anschrift</h3>
+      <p class="ph"><b>Platzhalter:</b> Vor- und Nachname bzw. Firma, Straße und Hausnummer, PLZ und Ort.</p>
+      <h3>Kontakt</h3>
+      <p class="ph"><b>Platzhalter:</b> E-Mail-Adresse und ein weiterer schneller Kontaktweg, z.&nbsp;B. Telefon.</p>
+      <h3>Weitere Angaben</h3>
+      <p class="ph"><b>Platzhalter:</b> Je nach Tätigkeit z.&nbsp;B. Umsatzsteuer-ID, Registereintrag oder Berufsangaben.</p>
+      <p><small>Hinweis: Diese Seite enthält nur Platzhalter und keinen Rechtstext. Bitte ersetze sie durch deine eigenen, rechtlich geprüften Angaben (z.&nbsp;B. aus einem Impressum-Generator oder von einer Rechtsberatung).</small></p>
+    </article>
+  </div>
+  <div class="foot"><a class="btn" href="./">Zurück zum iPod</a></div>
+</main>
+</body>
+</html>

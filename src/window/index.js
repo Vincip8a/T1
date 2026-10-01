@@ -1,5 +1,5 @@
 // Aqua-era desktop + brushed-metal window that frames the iPod.
-// API (see CONTRACT.md): createDesktop(host, { config }) -> { el, contentEl, setInteractive, destroy }
+// API (see ARCHITECTURE.md): createDesktop(host, { config }) -> { el, contentEl, setInteractive, destroy }
 import gsap from 'gsap';
 import './window.css';
 import { prefersReducedMotion } from '../shared/config.js';
@@ -50,14 +50,27 @@ export function createDesktop(host, { config }) {
   const barLeft = h('nav', 'dt-bar-left', { 'aria-label': 'Menüleiste' });
   barLeft.append(h('span', 'dt-mono', { 'aria-hidden': 'true' }, brand.monogram ?? ''));
   barLeft.append(h('strong', 'dt-brand', {}, brand.name ?? ''));
-  const linksBtn = h('button', 'dt-bar-item', { type: 'button' }, 'Links');
+  const linksBtn = h('button', 'dt-bar-item dt-bar-links', { type: 'button' }, 'Links');
   const mailHref = brand.email ? `mailto:${brand.email}` : null;
   const contact = mailHref
     ? h('a', 'dt-bar-item', { href: mailHref }, 'Kontakt')
     : h('span', 'dt-bar-item', {}, 'Kontakt');
   barLeft.append(linksBtn, contact);
   const clock = h('time', 'dt-clock');
-  bar.append(barLeft, clock);
+  // right side: small legal links (config.legal), then the clock
+  const barRight = h('div', 'dt-bar-right');
+  const legal = config?.legal ?? {};
+  const legalNav = h('nav', 'dt-legal', { 'aria-label': 'Rechtliches' });
+  for (const [key, label] of [['impressum', 'Impressum'], ['datenschutz', 'Datenschutz']]) {
+    const href = String(legal[key] ?? '').trim();
+    // relative pages or http(s) only
+    if (href && (/^https?:/i.test(href) || !/^[a-z][a-z\d+.-]*:|^\/\//i.test(href))) {
+      legalNav.append(h('a', 'dt-legal-link', { href }, label));
+    }
+  }
+  if (legalNav.childElementCount) barRight.append(legalNav);
+  barRight.append(clock);
+  bar.append(barLeft, barRight);
 
   // window
   const stage = h('main', 'dt-stage');

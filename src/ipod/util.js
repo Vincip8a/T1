@@ -1,4 +1,4 @@
-// Small DOM / format helpers and a timer registry shared by the variant C modules.
+// Small DOM / format helpers and a timer registry shared by the iPod UI modules.
 
 export function h(tag, cls, attrs = {}) {
   const n = document.createElement(tag);

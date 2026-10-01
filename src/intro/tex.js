@@ -1,6 +1,6 @@
 // Procedural canvas textures for intro C (no image files).
 import * as THREE from 'three';
-import { COLORS } from '../../../shared/ipodSpec.js';
+import { COLORS } from '../shared/ipodSpec.js';
 
 const { PI, abs, floor, imul, min, round } = Math;
 const FONT = '"Helvetica Neue", Helvetica, Arial, sans-serif';

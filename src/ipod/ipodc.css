@@ -1,4 +1,4 @@
-/* iPod Classic (6th/7th gen, silver), variant C.
+/* iPod Classic (6th/7th gen, silver).
    Hardware: every size is calc(var(--ipodc-u) * <mm>) with --ipodc-u = var(--ipod-h) / 103.5;
    the mm values are copied from IPOD (ipodSpec.js) into --ipodc-mm-* by index.js.
    Screen UI: logical 320×240 px. One logical px = --ipodc-p = 100cqw / 320 of the LCD container.

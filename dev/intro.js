@@ -1,7 +1,8 @@
-// Dev harness: runs an intro variant against a dashed dummy target box (red outline = expected final rect).
+// Dev harness: runs the intro against a dashed dummy target box (red outline = expected final rect).
+// ?t=2.5 seeks and pauses, ?reduced uses the reduced-motion timeline.
+import { runIntro } from '../src/intro/index.js';
+
 const params = new URLSearchParams(location.search);
-const variant = params.get('variant') ?? 'c';
-const { runIntro } = await import(`../src/intro/variants/${variant}/index.js`);
 const target = document.getElementById('target');
 const intro = runIntro({
   getTargetRect: () => target.getBoundingClientRect(),

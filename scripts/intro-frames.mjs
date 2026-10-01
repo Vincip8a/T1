@@ -1,6 +1,6 @@
 // Capture frames of the exploded-view intro at given times via the window.__intro test hook.
 //   node scripts/intro-frames.mjs <url> <outDir> [--times 0,0.5,1,...] [--w 1440 --h 900] [--mobile]
-// Requires the page to expose window.__intro = { duration, seek(t), pause() } (see CONTRACT.md).
+// Requires the page to expose window.__intro = { duration, seek(t), pause() } (see ARCHITECTURE.md).
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { launch, parseArgs, collectErrors } from './browser.mjs';

@@ -1,4 +1,4 @@
-// Procedural SVG artwork for variant C (no external assets). Gradient ids are prefixed per call
+// Procedural SVG artwork (no external assets). Gradient ids are prefixed per call
 // (`p`) so several iPods on one page never share or collide on ids.
 const esc = (s) => String(s ?? '').replace(/[<&>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 // lg(id, '0 #fff,1 #000 .5') → linear gradient (top → bottom unless x2/y2 given); stop = "offset colour [opacity]"

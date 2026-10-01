@@ -1,10 +1,10 @@
 {
-  "_comment": "Alle Inhalte des Linktrees. Platzhalter ersetzen – kein Code-Change nötig.",
+  "_comment": "Alle Inhalte des Linktrees. Platzhalter ersetzen, kein Code-Change nötig.",
   "brand": {
     "name": "Dein Name",
     "monogram": "DN",
     "tagline": "Design · Creative Direction · Musik",
-    "windowTitle": "iPod – Dein Name",
+    "windowTitle": "iPod · Dein Name",
     "email": "hallo@example.com"
   },
   "menu": [
@@ -41,7 +41,7 @@
       "label": "Work Together",
       "type": "page",
       "title": "Work Together",
-      "body": "Du planst ein Projekt? Branding, Websites, Content – lass uns sprechen. Antwort meist innerhalb von 48 Stunden.",
+      "body": "Du planst ein Projekt? Branding, Websites, Content: lass uns sprechen. Antwort meist innerhalb von 48 Stunden.",
       "actions": [
         {
           "label": "Anfrage senden",
@@ -114,6 +114,10 @@
       "actions": []
     }
   ],
+  "legal": {
+    "impressum": "impressum.html",
+    "datenschutz": "datenschutz.html"
+  },
   "settings": {
     "clickSound": true,
     "intro": "always"

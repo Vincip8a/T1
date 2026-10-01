@@ -2,7 +2,7 @@
 // Model space: mm, origin at the front-face centre, y up, front at z = 0.
 import * as THREE from 'three';
 import { toCreasedNormals, mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { IPOD, PARTS, COLORS } from '../../../shared/ipodSpec.js';
+import { IPOD, PARTS, COLORS } from '../shared/ipodSpec.js';
 import * as T from './tex.js';
 
 const { PI, abs, cos, hypot, max, min, sign, sin } = Math, V3 = THREE.Vector3;

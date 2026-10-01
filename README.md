@@ -242,18 +242,32 @@ nötigen Rechte (`pages: write`, `id-token: write`) sind darin bereits gesetzt.
 
 ## Projektstruktur
 
+Aufbau, Ablauf und Modul-Schnittstellen im Detail: [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
 ```
 .
 ├─ .github/workflows/deploy.yml  GitHub-Pages-Deployment
 ├─ public/                       wird unverändert ausgeliefert
 │  ├─ config.json                alle Inhalte der Seite
+│  ├─ impressum.html             Impressum (Platzhalter, bitte ersetzen)
+│  ├─ datenschutz.html           Datenschutzerklärung (Platzhalter, bitte ersetzen)
+│  ├─ 404.html                   eigene Fehlerseite für GitHub Pages
 │  ├─ favicon.svg                Player-Silhouette, auch bei 16 px lesbar
 │  ├─ apple-touch-icon.png       180x180, für den Homescreen
 │  ├─ og-image.png               1200x630, Social-Media-Vorschau
 │  ├─ assets/
 │  │  └─ playlist-cover.svg      600x600, Album-Cover der Playlist
 │  └─ downloads/                 die drei Platzhalter-PDFs
-├─ src/                          Anwendungscode (Vite + Three.js)
+├─ src/                          Anwendungscode
+│  ├─ main.js                    Ablauf: Desktop, iPod, Intro, Übergabe
+│  ├─ base.css                   Grundstil, Button „Intro überspringen“
+│  ├─ shared/ipodSpec.js         Maße und Farben des iPods (eine Quelle für 3D und DOM)
+│  ├─ shared/config.js           lädt config.json
+│  ├─ window/                    Aqua-Desktop, Menüleiste und Fenster
+│  ├─ ipod/                      die iPod-Oberfläche (Click Wheel, Menüs, Now Playing)
+│  └─ intro/                     3D-Intro mit Three.js (wird nachgeladen)
+├─ dev/                          Testseiten für Intro, iPod und Fenster
+├─ scripts/                      Screenshots per Headless-Chromium
 ├─ tools/                        Skripte, die alle Grafiken erzeugen
 │  ├─ lib/brand.mjs              Farben, Schrift, gezeichnete Motive
 │  ├─ lib/pdf.mjs                Seitenlayout der PDFs
@@ -263,7 +277,8 @@ nötigen Rechte (`pages: write`, `id-token: write`) sind darin bereits gesetzt.
 │  ├─ make-og.mjs                Social-Media-Bild
 │  └─ make-downloads.mjs         die drei PDFs
 ├─ index.html                    Einstiegspunkt
-├─ vite.config.js                Build-Konfiguration
+├─ vite.config.js                Build-Konfiguration (füllt Meta-Tags und <noscript> aus config.json)
+├─ ARCHITECTURE.md               Architektur für Entwickler
 └─ package.json
 ```
 

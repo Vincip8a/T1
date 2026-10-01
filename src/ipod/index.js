@@ -1,13 +1,13 @@
-// iPod Classic (6th/7th gen, silver) linktree UI – variant C.
-// API per CONTRACT.md: mountIpod(container, { config }) → { el, getShellRect, reveal, press, scroll, getState, destroy }
+// iPod Classic (6th/7th gen, silver) linktree UI.
+// API per ARCHITECTURE.md: mountIpod(container, { config }) → { el, getShellRect, reveal, press, scroll, getState, destroy }
 //
 // The LCD UI is laid out in a logical 320×240 px space with container-query units
 // (--ipodc-p = 100cqw / 320 is one logical px), so text renders at its real size and stays crisp.
 // Modules: wheel.js (click-wheel input), player.js (simulated playback), screens.js (screen
 // builders), sound.js (WebAudio ticks), art.js (procedural SVG), util.js (helpers, timers).
 import './ipodc.css';
-import { IPOD, COLORS } from '../../../shared/ipodSpec.js';
-import { prefersReducedMotion as isReduced } from '../../../shared/config.js';
+import { IPOD, COLORS } from '../shared/ipodSpec.js';
+import { prefersReducedMotion as isReduced } from '../shared/config.js';
 import { h, createTimers } from './util.js';
 import { GLYPH, playIndicator, battery, sharedDefs } from './art.js';
 import { createSound } from './sound.js';
@@ -33,6 +33,7 @@ const DEFAULT_UI = {
   download: 'Download',
   downloadStarted: 'Download gestartet',
   backHint: 'Zurück mit MENU',
+  back: 'Zurück',
   hint: 'Pfeiltasten blättern, Enter wählt, Escape zurück, Leertaste Wiedergabe.',
 };
 
@@ -87,8 +88,12 @@ export function mountIpod(container, { config } = {}) {
   // a landmark around the body (display: contents, so it adds no box); the live region sits
   // beside the body because the listbox may only own options
   const live = h('div', 'ipodc-sr', { 'aria-live': 'polite', 'aria-atomic': 'true' });
+  // the wheel is aria-hidden, so touch screen-reader users (VoiceOver, TalkBack) get MENU as an
+  // invisible button; it is outside the tab order (keyboard users have Esc / Backspace)
+  const backBtn = h('button', 'ipodc-sr', { type: 'button', tabindex: -1, hidden: '' });
+  backBtn.textContent = L.back;
   const host = h('section', 'ipodc-host', { 'aria-label': 'iPod' });
-  host.append(el, live);
+  host.append(el, backBtn, live);
   container.append(host);
 
   /** real px per logical px (to measure wrapped text) */
@@ -190,7 +195,7 @@ export function mountIpod(container, { config } = {}) {
    *  title glides in from the side the screen comes from */
   function setTitle(text, dir) {
     titleEl.textContent = text;
-    el.setAttribute('aria-label', `${text} – iPod`);
+    el.setAttribute('aria-label', `${text}, iPod`);
     if (dir && !isReduced()) titleEl.animate?.({ opacity: [0, 1], transform: [`translateX(${dir * 14}%)`, 'none'] }, { duration: SLIDE_MS, easing: EASE });
   }
 
@@ -211,6 +216,7 @@ export function mountIpod(container, { config } = {}) {
     from.node.setAttribute('aria-hidden', 'true');
     show(to);
     setTitle(to.title, dir);
+    backBtn.hidden = stack.length < 2;
     slide(from.node, to.node, dir).then(() => { if (!isCurrent(from)) from.node.remove(); });
     const extra = dir > 0 && (typeof to.summary === 'function' ? to.summary() : to.summary);
     announce([to.title, extra, to.currentLabel()].filter(Boolean).join('. '));
@@ -274,6 +280,7 @@ export function mountIpod(container, { config } = {}) {
   });
   cleanups.push(stopWheel);
   on(wheel, 'contextmenu', (e) => e.preventDefault());
+  on(backBtn, 'click', () => { press('menu'); if (stack.length < 2) focusRoot(); });
 
   // centre button: acts on pointerup inside it. It is not a <button> and has no click handler,
   // so a touch tap (whose click arrives with detail 0) can never fire a second activation.
