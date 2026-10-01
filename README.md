@@ -234,9 +234,9 @@ Einmalig einzurichten:
 Der Workflow verwendet Node 22, installiert mit `npm ci` und baut mit `npm run build`. Die
 nötigen Rechte (`pages: write`, `id-token: write`) sind darin bereits gesetzt.
 
-> **Hinweis bei Projekt-Seiten:** Liegt die Seite unter `https://<nutzer>.github.io/<repo>/`
-> statt auf einer eigenen Domain, muss in `vite.config.js` `base: '/<repo>/'` gesetzt sein,
-> sonst laufen Pfade zu Assets und Downloads ins Leere.
+> **Hinweis bei Projekt-Seiten:** `vite.config.js` nutzt `base: './'` (relative Pfade). Die Seite
+> funktioniert damit ohne Anpassung sowohl unter `https://<nutzer>.github.io/<repo>/` als auch auf
+> einer eigenen Domain – Config, Assets und Downloads werden relativ zur Seite geladen.
 
 ---
 
