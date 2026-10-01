@@ -6,7 +6,7 @@ import { createDesktop } from './window/index.js';
 
 const params = new URLSearchParams(location.search);
 const introVariant = params.get('intro') ?? 'a';
-const ipodVariant = params.get('ipod') ?? 'a';
+const ipodVariant = params.get('ipod') ?? 'c';
 
 const [config, { runIntro }, { mountIpod }] = await Promise.all([
   loadConfig(),

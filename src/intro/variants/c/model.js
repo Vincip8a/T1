@@ -122,7 +122,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     const s = circle(R - bw);
     s.holes.push(circle(CB + 0.1 + bw, true));
     const map = T.capFit(tx(T.wheelCanvas(wh.diameter, IPOD.wheelLabels.radiusFactor)), wh.diameter, wh.diameter);
-    mats.wheel = phys({ color: '#e4e4e4', map, roughness: 0.42, metalness: 0, clearcoat: 0.3, clearcoatRoughness: 0.3, sheen: 0.25, sheenColor: '#ffffff' });
+    mats.wheel = phys({ color: '#e4e4e4', map, roughness: 0.42, metalness: 0, clearcoat: 0.3, clearcoatRoughness: 0.3 });
     add(p, ext(s, 1.3, bw, 3, 24), mats.wheel, whc[0], whc[1], 0);
     mats.centre = phys({ color: COLORS.centerButton, metalness: 0.45, roughness: 0.4, roughnessMap: brush, anisotropy: 0.4, clearcoat: 0.3, clearcoatRoughness: 0.3 });
     add(p, ext(circle(CB - 0.2), 1.2, 0.2, 3, 14), mats.centre, whc[0], whc[1], -0.08);
@@ -135,10 +135,10 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     const p = mk('wheelFlex');
     const ft = tx(T.flexCanvas(), { wrap: true });
     ft.repeat.set(1 / 10, 1 / 10);
-    const fmat = phys({ color: '#ffffff', map: ft, metalness: 0.25, roughness: 0.32, clearcoat: 0.8, clearcoatRoughness: 0.15 });
+    const fmat = std({ color: '#ffffff', map: ft, metalness: 0.25, roughness: 0.32 });
     const ro = R - 3, ring = circle(ro); ring.holes.push(circle(9.5, true));
     const rmap = T.capFit(tx(T.flexRingCanvas(2 * ro, 9.5, ro)), 2 * ro, 2 * ro);
-    add(p, ext(ring, 0.15, 0, 1, 12), phys({ color: '#ffffff', map: rmap, metalness: 0.2, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.12 }), whc[0], whc[1], 0);
+    add(p, ext(ring, 0.15, 0, 1, 12), std({ color: '#ffffff', map: rmap, metalness: 0.2, roughness: 0.3 }), whc[0], whc[1], 0);
     add(p, ext(rr(9, 30, 1.2), 0.15), fmat, whc[0] + 6, whc[1] + R + 12, 0);
     add(p, ext(rr(10, 4, 0.6), 0.35), std({ color: '#ece9e1', roughness: 0.6 }), whc[0] + 6, whc[1] + R + 26, 0.2);
     mats.flex = fmat;
@@ -148,7 +148,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
   {
     const p = mk('lcd');
     const fw = sw.width + 3, fh = sw.height + 3;
-    add(p, ext(rr(fw, fh, 1.2, 0.15), 2.4, 0.15), phys({ color: COLORS.steel, metalness: 0.92, roughness: 0.3, roughnessMap: brush, anisotropy: 0.5 }), swc[0], swc[1], 0);
+    add(p, ext(rr(fw, fh, 1.2, 0.15), 2.4, 0.15), std({ color: COLORS.steel, metalness: 0.92, roughness: 0.3, roughnessMap: brush }), swc[0], swc[1], 0);
     add(p, ext(rr(sw.width - 0.6, sw.height - 0.6, 0.6), 0.1), std({ color: '#0d0e10', roughness: 0.55 }), swc[0], swc[1], 0.1);
     mats.panel = phys({ color: COLORS.lcdOff, metalness: 0, roughness: 0.3, clearcoat: 0.6, clearcoatRoughness: 0.08 });
     add(p, new THREE.PlaneGeometry(IPOD.screen.width, IPOD.screen.height), mats.panel, swc[0], swc[1], 0.12);
@@ -175,16 +175,16 @@ export function buildIpod({ maxAniso = 8 } = {}) {
   {
     const p = mk('logicBoard');
     const pcb = T.capFit(tx(T.pcbCanvas(BW, BH, [...chips, ...others], holes)), BW, BH);
-    add(p, ext(rr(BW, BH, 3, 0.1), 0.8, 0.1), phys({ color: '#ffffff', map: pcb, roughness: 0.42, metalness: 0.05, clearcoat: 0.45, clearcoatRoughness: 0.25 }), 0, BY, BZ);
+    add(p, ext(rr(BW, BH, 3, 0.1), 0.8, 0.1), std({ color: '#ffffff', map: pcb, roughness: 0.42, metalness: 0.05 }), 0, BY, BZ);
     const chipGeo = new THREE.BoxGeometry(1, 1, 1);
     chips.forEach((c, i) => {
-      const m = add(p, chipGeo, phys({ map: tx(T.chipCanvas(c.lines, i + 3)), roughness: 0.5, clearcoat: 0.2 }), c.x, c.y + BY, BZ + c.d / 2);
+      const m = add(p, chipGeo, std({ map: tx(T.chipCanvas(c.lines, i + 3)), roughness: 0.5 }), c.x, c.y + BY, BZ + c.d / 2);
       m.scale.set(c.w, c.h, c.d);
     });
-    const can = phys({ color: '#cdd1d6', metalness: 1, roughness: 0.28, roughnessMap: brush });
+    const can = std({ color: '#cdd1d6', metalness: 1, roughness: 0.28, roughnessMap: brush });
     const zif = std({ color: '#e8e1cf', roughness: 0.55 });
     const latch = std({ color: '#1a1a1c', roughness: 0.5 });
-    const shiny = phys({ color: '#e0e3e7', metalness: 1, roughness: 0.18 });
+    const shiny = std({ color: '#e0e3e7', metalness: 1, roughness: 0.18 });
     for (const o of others) {
       if (o.kind === 'can') { add(p, ext(rr(o.w, o.h, 0.8, 0.25), o.d, 0.25), can, o.x, o.y + BY, BZ + o.d); continue; }
       add(p, chipGeo, o.kind === 'zif' ? zif : shiny, o.x, o.y + BY, BZ + o.d / 2).scale.set(o.w, o.h, o.d);
@@ -218,7 +218,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     const p = mk('battery');
     const bw = 50, bh = 21, cy = SY(88.5);
     const map = T.capFit(tx(T.batteryCanvas(bw, bh)), bw - 1.2, bh - 1.2);
-    add(p, ext(rr(bw, bh, 2.4, 0.6), 2.6, 0.6, 4), phys({ color: '#ffffff', map, metalness: 0.35, roughness: 0.36, clearcoat: 0.5, clearcoatRoughness: 0.25 }), 0, cy, 0);
+    add(p, ext(rr(bw, bh, 2.4, 0.6), 2.6, 0.6, 4), std({ color: '#ffffff', map, metalness: 0.35, roughness: 0.36 }), 0, cy, 0);
     [['#b3261e', -3], ['#151515', -1]].forEach(([c, x]) => add(p, new THREE.CylinderGeometry(0.4, 0.4, 7, 10), std({ color: c, roughness: 0.4 }), x - 14, cy + bh / 2 + 3.2, -0.6));
     add(p, ext(rr(9, 5, 0.6), 0.15), mats.flex, 12, cy + bh / 2 + 1.5, -0.4);
   }
@@ -227,10 +227,10 @@ export function buildIpod({ maxAniso = 8 } = {}) {
   {
     const p = mk('storage');
     const dw = 54, dh = 71, cy = SY(41);
-    add(p, ext(rr(dw, dh, 2.2, 0.3), 4.3, 0.3), phys({ color: '#5a5f66', metalness: 0.7, roughness: 0.5 }), 0, cy, -0.5);
+    add(p, ext(rr(dw, dh, 2.2, 0.3), 4.3, 0.3), std({ color: '#5a5f66', metalness: 0.7, roughness: 0.5 }), 0, cy, -0.5);
     const label = T.capFit(tx(T.driveCanvas(dw - 0.6, dh - 0.6)), dw - 0.8, dh - 0.8);
-    add(p, ext(rr(dw - 0.6, dh - 0.6, 2, 0.1), 0.5, 0.1), phys({ color: '#ffffff', map: label, metalness: 0.75, roughness: 0.34, roughnessMap: brush, anisotropy: 0.4 }), 0, cy, 0);
-    const rubber = phys({ color: '#1b1c1f', roughness: 0.85, metalness: 0, sheen: 0.4, sheenColor: '#555' });
+    add(p, ext(rr(dw - 0.6, dh - 0.6, 2, 0.1), 0.5, 0.1), std({ color: '#ffffff', map: label, metalness: 0.75, roughness: 0.34, roughnessMap: brush }), 0, cy, 0);
+    const rubber = std({ color: '#1b1c1f', roughness: 0.85, metalness: 0 });
     const bump = ext(rr(9, 12, 2.6, 0.9), 5.2, 0.9, 3);
     [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sy]) => add(p, bump, rubber, sx * (dw / 2 - 2.4), cy + sy * (dh / 2 - 3.6), 0.2));
     add(p, ext(rr(34, 7, 0.8), 0.15), mats.flex, -4, cy - dh / 2 - 2.5, -0.3);
@@ -239,12 +239,12 @@ export function buildIpod({ maxAniso = 8 } = {}) {
   // ---------- internal mid-frame + clips ----------
   {
     const p = mk('midframe');
-    const zinc = phys({ color: '#868b92', metalness: 0.8, roughness: 0.42, roughnessMap: brush });
+    const zinc = std({ color: '#868b92', metalness: 0.8, roughness: 0.42, roughnessMap: brush });
     const s = rr(W - 1.8, H - 1.8, IPOD.cornerRadius - 0.8, 0.15);
     s.holes.push(rrHole(W - 4.6, H - 4.6, IPOD.cornerRadius - 2, 0.15));
     add(p, ext(s, 3, 0.15), zinc);
     [-6, 26].forEach((y) => add(p, ext(rr(W - 4, 2.2, 0.6, 0.1), 1.2, 0.1), zinc, 0, y, -1.6));
-    const clips = new THREE.InstancedMesh(ext(rr(1.4, 5.5, 0.5, 0.15), 2.4, 0.15), phys({ color: '#d6dade', metalness: 1, roughness: 0.22 }), 12);
+    const clips = new THREE.InstancedMesh(ext(rr(1.4, 5.5, 0.5, 0.15), 2.4, 0.15), std({ color: '#d6dade', metalness: 1, roughness: 0.22 }), 12);
     const m4 = new THREE.Matrix4();
     let i = 0;
     [-38, -14, 10, 34].forEach((y) => [-1, 1].forEach((sx) => clips.setMatrixAt(i++, m4.makeTranslation(sx * (W / 2 - 0.9), y, -0.3))));
@@ -289,7 +289,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     [-25, 42 + BY, -3.4], [25, 42 + BY, -3.4], [-25, -42 + BY, -3.4], [25, -42 + BY, -3.4],
     [-27.4, 18, -0.8], [27.4, 18, -0.8], [-27.4, -30, -0.8], [27.4, -30, -0.8],
   ].map((v) => new THREE.Vector3(...v));
-  const screws = new THREE.InstancedMesh(screwGeo, phys({ color: '#c3c8cf', metalness: 1, roughness: 0.2 }), screwBase.length);
+  const screws = new THREE.InstancedMesh(screwGeo, std({ color: '#c3c8cf', metalness: 1, roughness: 0.2 }), screwBase.length);
   screws.frustumCulled = false;
   model.add(screws);
 

@@ -148,6 +148,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NeutralToneMapping;
   renderer.toneMappingExposure = 1.0;
+  renderer.debug.checkShaderErrors = false; // no blocking link-status queries on first use
 
   const scene = new THREE.Scene();
   const pmrem = new THREE.PMREMGenerator(renderer);
@@ -156,7 +157,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
   st.dispose();
   scene.environment = envRT.texture;
   const gs = glassStudio(), cs = chromeStudio();
-  const glassRT = pmrem.fromScene(gs.s, 0.02), chromeRT = pmrem.fromScene(cs.s, 0.02);
+  const glassRT = pmrem.fromScene(gs.s, 0.02, 0.1, 100, { size: 128 }), chromeRT = pmrem.fromScene(cs.s, 0.02);
   gs.dispose(); cs.dispose();
 
   const key = new THREE.DirectionalLight(0xfffaf2, 1.6); key.position.set(-0.6, 1.0, 0.8);
@@ -385,18 +386,26 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
 
   let resolveDone;
   const done = new Promise((r) => { resolveDone = r; });
-  function finish() {
-    if (finished) return;
-    finished = true; playing = false;
-    cancelAnimationFrame(raf);
-    t = duration; render();
-    resolveDone();
-    // hand-off: 220 ms cross-fade into the DOM iPod, starting immediately
-    handedOff = true;
+  // hand-off: draw the final aligned frame, then a 220 ms cross-fade into the DOM iPod
+  function handoff() {
+    raf = 0;
+    if (disposed || !handedOff) return; // a seek() reclaimed the canvas meanwhile
+    render();
     canvas.style.transition = 'none'; canvas.style.opacity = '1';
     void canvas.offsetWidth;
     canvas.style.transition = 'opacity 220ms ease-out';
     canvas.style.opacity = '0';
+  }
+  function finish(deferDraw = false) {
+    if (finished) return;
+    finished = true; playing = false;
+    cancelAnimationFrame(raf);
+    t = duration; handedOff = true;
+    resolveDone(); // never wait on GPU work: skip() must settle `done` immediately
+    // A skip from mid-animation may need the final pose's first-ever draw (slow
+    // on software GL), so it runs on the next frame instead of inside skip().
+    if (deferDraw) raf = requestAnimationFrame(handoff);
+    else handoff();
   }
   function frame(now) {
     if (!playing || disposed) return;
@@ -425,6 +434,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
   function measure() {
     pose(t);
     scene.updateMatrixWorld(true);
+    camera.updateMatrixWorld(); // project() reads matrixWorldInverse, normally refreshed by render()
     const ext = [Infinity, Infinity, -Infinity, -Infinity];
     for (const [x, y] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
       tmpV.set((x * IPOD.width) / 2, (y * IPOD.height) / 2, -FACE_BEVEL).applyMatrix4(ipod.model.matrixWorld).project(camera);
@@ -439,14 +449,14 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
   const controller = {
     duration,
     done,
-    skip() { if (!disposed) finish(); },
+    skip() { if (!disposed) finish(true); },
     seek(s) {
       if (disposed) return;
       t = Math.max(0, Math.min(duration, Number(s) || 0));
-      if (handedOff) { handedOff = false; finished = false; canvas.style.transition = 'none'; }
+      if (handedOff) { handedOff = false; finished = false; cancelAnimationFrame(raf); canvas.style.transition = 'none'; }
       render();
     },
-    pause() { playing = false; cancelAnimationFrame(raf); },
+    pause() { if (!playing) return; playing = false; cancelAnimationFrame(raf); }, // keeps a pending hand-off
     play() {
       if (playing || finished || disposed) return;
       if (t >= duration) t = 0;

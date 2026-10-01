@@ -1,7 +1,7 @@
 // Dev harness: mounts an iPod UI variant standalone and reveals it immediately.
 import { loadConfig } from '../src/shared/config.js';
 const params = new URLSearchParams(location.search);
-const variant = params.get('variant') ?? 'a';
+const variant = params.get('variant') ?? 'c';
 const [{ mountIpod }, config] = await Promise.all([
   import(`../src/ipod/variants/${variant}/index.js`),
   loadConfig(new URL('../config.json', location.href).href),
