@@ -148,12 +148,17 @@ export function centreCanvas(dMm) {
   return c;
 }
 
-/** Front-plate tone curve (sRGB multiplier rows, top → bottom): the DOM plate's light falloff. */
+/** Front-plate tone (sRGB multiplier rows, top → bottom: the DOM plate's light falloff) with the
+ *  DOM's faint horizontal brushing hairlines (±5 %, balanced light/dark). */
 export function faceToneCanvas(stops) {
-  const [c, g] = canvas(4, 256);
-  const grd = g.createLinearGradient(0, 0, 0, 256);
+  const [c, g] = canvas(256, 1024);
+  const grd = g.createLinearGradient(0, 0, 0, 1024), r = rng(12);
   stops.forEach((v, i) => { const k = Math.round(255 * v); grd.addColorStop(i / (stops.length - 1), `rgb(${k},${k},${k})`); });
-  g.fillStyle = grd; g.fillRect(0, 0, 4, 256);
+  g.fillStyle = grd; g.fillRect(0, 0, 256, 1024);
+  for (let i = 0; i < 3000; i++) {
+    g.fillStyle = r() > 0.45 ? 'rgba(255,255,255,.07)' : 'rgba(0,0,0,.03)';
+    g.fillRect(r() * 300 - 40, r() * 1024, 24 + r() * 160, 1);
+  }
   return c;
 }
 

@@ -232,6 +232,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     ft.repeat.set(1 / 10, 1 / 10);
     const kap = (map) => phys({ color: '#ffffff', map, metalness: 0.2, roughness: 0.34, clearcoat: 0.85, clearcoatRoughness: 0.14, side: THREE.DoubleSide });
     mats.flex = kap(ft);
+    mats.ribbon = phys({ color: '#ffffff', map: ft, metalness: 0.1, roughness: 0.5, clearcoat: 0.35, clearcoatRoughness: 0.25, side: THREE.DoubleSide });
     const ring = circle(ro, false, 0, 0, 96); ring.holes.push(circle(9.5, true, 0, 0, 48));
     const rmap = T.capFit(tx(T.flexRingCanvas(2 * ro, 9.5, ro)), 2 * ro, 2 * ro);
     add(p, ext(ring, 0.15, 0, 1), kap(rmap), whc[0], whc[1], 0);
@@ -415,9 +416,9 @@ export function buildIpod({ maxAniso = 8 } = {}) {
   // live kapton ribbons: wheel flex → J2, LCD → J1 (over the top edge), drive → J4 (board back)
   const up = V(0, 1, 0), dn = V(0, -1, 0);
   const ribbons = [
-    ribbon(mats.flex, parts.wheelFlex, V(whc[0] - 6, whc[1] - ro - 1.8, -0.08), dn, parts.logicBoard, V(-15, -38 + BY - 1.5, BZ + 0.5), dn, 6.5),
-    ribbon(mats.flex, parts.lcd, V(swc[0], swc[1] + fh / 2 - 1.5, -2.45), up, parts.logicBoard, V(0, 40 + BY + 1.7, BZ + 0.55), up, 13),
-    ribbon(mats.flex, parts.storage, V(8, dcy - dh / 2 + 1.5, 0.05), dn, parts.logicBoard, V(8, -34 + BY - 1.5, BB - 0.5), dn, 10),
+    ribbon(mats.ribbon, parts.wheelFlex, V(whc[0] - 6, whc[1] - ro - 1.8, -0.08), dn, parts.logicBoard, V(-15, -38 + BY - 1.5, BZ + 0.5), dn, 6.5),
+    ribbon(mats.ribbon, parts.lcd, V(swc[0], swc[1] + fh / 2 - 1.5, -2.45), up, parts.logicBoard, V(0, 40 + BY + 1.7, BZ + 0.55), up, 13),
+    ribbon(mats.ribbon, parts.storage, V(8, dcy - dh / 2 + 1.5, 0.05), dn, parts.logicBoard, V(8, -34 + BY - 1.5, BB - 0.5), dn, 10),
   ];
   ribbons.forEach((r) => model.add(r.mesh));
 
