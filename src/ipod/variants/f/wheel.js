@@ -24,8 +24,9 @@ export function createWheel(ring, {
     if (Math.abs(delta) > 2.5 && acc * delta < 0) acc = 0;
     acc += delta;
     let guard = 0;
-    while (acc >= stepDeg && guard++ < 8) { acc -= stepDeg; onStep(1); }
-    while (acc <= -stepDeg && guard++ < 8) { acc += stepDeg; onStep(-1); }
+    const thr = stepDeg - 1e-3; // tolerate float error when a drag lands exactly on a detent
+    while (acc >= thr && guard++ < 8) { acc -= stepDeg; onStep(1); }
+    while (acc <= -thr && guard++ < 8) { acc += stepDeg; onStep(-1); }
   };
 
   const down = (e) => {
