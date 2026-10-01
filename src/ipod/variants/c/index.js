@@ -7,7 +7,7 @@
 import './ipodc.css';
 import { IPOD, COLORS } from '../../../shared/ipodSpec.js';
 import { prefersReducedMotion } from '../../../shared/config.js';
-import { NOISE_SVG, CHEVRON, GLYPH, playIndicator, battery, TOAST_ICON, SPEAKER_LO, SPEAKER_HI, SPEAKER_NOW, previewIcon } from './art.js';
+import { NOISE_SVG, CHEVRON, GLYPH, playIndicator, battery, TOAST_ICON, SPEAKER_LO, SPEAKER_HI, SPEAKER_NOW, previewIcon, sharedDefs } from './art.js';
 import { createSound } from './sound.js';
 
 const LW = IPOD.screen.pxWidth;          // 320 logical px
@@ -204,6 +204,7 @@ export function mountIpod(container, { config } = {}) {
   const edge = h('div', 'ipodc-edge', { 'aria-hidden': 'true' });
   edge.append(h('span', 'ipodc-hold'), h('span', 'ipodc-jack'));
   el.append(edge, win, wheel, live, hint);
+  el.insertAdjacentHTML('beforeend', sharedDefs(`${P}s`));
   container.append(el);
 
   /** Real px per logical px (only needed to measure wrapped text). */
@@ -529,10 +530,10 @@ export function mountIpod(container, { config } = {}) {
         : item.type === 'page' && item.actions?.length ? 'chat' : 'monogram';
     const pane = h('div', 'ipodc-pv ipodc-pv--icon');
     const ico = h('div', 'ipodc-pv-float');
-    ico.innerHTML = previewIcon(kind, nid('pv'), brand.monogram);
+    ico.innerHTML = previewIcon(kind, nid('pv'), brand.monogram, `${P}s`);
     const refl = h('div', 'ipodc-pv-refl');
     const reflIn = h('div', 'ipodc-pv-float-in');
-    reflIn.innerHTML = previewIcon(kind, nid('pv'), brand.monogram);
+    reflIn.innerHTML = previewIcon(kind, nid('pv'), brand.monogram, `${P}s`);
     refl.append(reflIn);
     pane.append(h('div', 'ipodc-pv-floor'), refl, ico);
     return pane;

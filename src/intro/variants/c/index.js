@@ -14,7 +14,7 @@ const HALF_D = IPOD.depth / 2;
 const FOV_HERO = 26, FOV_END = 20;
 const D = 7.0;
 const ENV_END = 0.25, GLASS_FROM = 0.5, GLASS_END = 0.0; // final environment rotations (fix the hand-off look)
-const FACE_GLOW = 0.12, ENV_K = 1; // hand-off fill on the front plate (matches the DOM iPod's tone)
+const FACE_GLOW = 0.12; // hand-off fill on the front plate (matches the DOM iPod's tone)
 const TL = {
   rise: 1.3,
   ex0: 1.5, exS: 0.07, exD: 1.25,
@@ -55,7 +55,8 @@ function spline(keys) {
     if (t >= keys[n - 1][0]) return keys[n - 1][1];
     let i = 0;
     while (t > keys[i + 1][0]) i++;
-    const [t0, v0] = keys[i], [t1, v1] = keys[i + 1], h = t1 - t0, s = (t - t0) / h, s2 = s * s, s3 = s2 * s;
+    const t0 = keys[i][0], v0 = keys[i][1], t1 = keys[i + 1][0], v1 = keys[i + 1][1];
+    const h = t1 - t0, s = (t - t0) / h, s2 = s * s, s3 = s2 * s;
     return (2 * s3 - 3 * s2 + 1) * v0 + (s3 - 2 * s2 + s) * h * m[i] + (-2 * s3 + 3 * s2) * v1 + (s3 - s2) * h * m[i + 1];
   };
 }
@@ -63,7 +64,7 @@ function spline(keys) {
 // sideways, portrait looks down on it so the layers spread vertically.
 const ORBIT = {
   land: {
-    yaw: spline([[0, 198], [0.95, 112], [1.95, 30], [3.0, 40], [4.45, 64], [5.6, 33], [D, 0]]),
+    yaw: spline([[0, 198], [0.95, 112], [1.95, 28], [3.0, 36], [4.45, 66], [5.6, 33], [D, 0]]),
     pitch: spline([[0, 12], [1.95, 7], [3.0, 12], [4.45, 19], [5.6, 8], [D, 0]]),
   },
   port: {
@@ -315,7 +316,6 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
       scene.environmentRotation.set(0, ENV_END, 0);
       glass.envMapRotation.set(0, GLASS_END, 0); panel.envMapRotation.copy(glass.envMapRotation);
       face.emissiveIntensity = FACE_GLOW;
-      scene.environmentIntensity = ENV_K;
       applyCamera(1, 0);
       camera.position.z = HALF_D + (camera.position.z - HALF_D) * (1 + 0.04 * (1 - p3out(u)));
       camera.updateProjectionMatrix();
@@ -344,7 +344,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
       const tau = t - (rs + TL.reD);
       if (tau > 0 && tau < 0.6) {
         const k = Math.exp(-tau / 0.055) * Math.sin(tau * 52);
-        const w = i === 0 ? 1.4 : i === N - 1 ? 1.1 : 0.45; // heavier parts, bigger click
+        const w = i === 0 ? 2.2 : i === N - 1 ? 1.4 : 0.5; // heavier parts, bigger click
         nudge += -Math.sign(L.dz[i]) * w * 0.55 * k;
         wob += (i === 0 ? 0.6 : 0.15) * k;
       }
@@ -352,8 +352,9 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     chassis.position.set(0, 0, HALF_D + nudge);
     chassis.rotation.set(wob * DEG, 0, 0);
     placeScrews(t);
-    const closed = SHELL.every((i) => E[i] < 1e-4);
-    INTERNAL.forEach((i) => { parts[i].group.visible = !closed; });
+    let closed = true;
+    for (const i of SHELL) if (E[i] >= 1e-4) closed = false;
+    for (const i of INTERNAL) parts[i].group.visible = !closed;
     ipod.screws.visible = !closed;
 
     // reflections: slow drift + a soft-box sweep across the face as it turns home
@@ -366,7 +367,6 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     const dHero = lerp(L.dAsm * (1 + 0.12 * (1 - p3out(clamp01(t / 1.9)))), L.dHero, env);
     applyCamera(b, dHero * tHero);
     face.emissiveIntensity = FACE_GLOW * b * b;
-    scene.environmentIntensity = lerp(1, ENV_K, b * b);
 
     shadow.visible = b < 1;
     shadow.position.set(0, -IPOD.height / 2 - 9 - 7 * env + rise, -12);
@@ -418,6 +418,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
   pose(2.9); // everything visible once → compile all programs up front
   INTERNAL.forEach((i) => { parts[i].group.visible = true; });
   renderer.compile(scene, camera);
+  ipod.textures.forEach((x) => renderer.initTexture(x)); // upload now, not mid-explosion
   render();
 
   /** Test hook: projected front-face bbox vs the target rect at the current t (viewport px). */
