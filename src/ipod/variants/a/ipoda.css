@@ -1,0 +1,628 @@
+/* iPod Classic (6th/7th gen, silver), variant A: pixel fidelity first.
+   Hardware: every size is calc(var(--ipoda-u) * <mm>), where --ipoda-u = var(--ipod-h) / 103.5
+   and the mm values are copied from IPOD (ipodSpec.js) into --ipoda-mm-* by index.js.
+   Screen UI: drawn at a logical 320×240 px and scaled to the LCD with a transform. */
+
+.ipoda {
+  --ipoda-px-h: var(--ipod-h, 560px);
+  --ipoda-u: calc(var(--ipoda-px-h) / var(--ipoda-mm-h, 103.5));
+  --ipoda-font: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", "Nimbus Sans", sans-serif;
+  position: relative;
+  flex: none;
+  box-sizing: border-box;
+  display: block;
+  margin: 0;
+  height: var(--ipoda-px-h);
+  width: calc(var(--ipoda-px-h) * var(--ipoda-mm-w) / var(--ipoda-mm-h));
+  border-radius: calc(var(--ipoda-u) * var(--ipoda-mm-r));
+  visibility: hidden;
+  isolation: isolate;
+  outline: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  font-family: var(--ipoda-font);
+  /* anodised aluminium: soft vertical light falloff + slight cylindrical shading at the sides */
+  background:
+    linear-gradient(180deg,
+      rgba(255, 255, 255, .42) 0%,
+      rgba(255, 255, 255, .16) 22%,
+      rgba(255, 255, 255, 0) 48%,
+      rgba(0, 0, 0, .03) 78%,
+      rgba(0, 0, 0, .09) 100%),
+    linear-gradient(90deg,
+      rgba(0, 0, 0, .07) 0%,
+      rgba(255, 255, 255, .10) 9%,
+      rgba(255, 255, 255, 0) 30%,
+      rgba(255, 255, 255, 0) 70%,
+      rgba(255, 255, 255, .08) 91%,
+      rgba(0, 0, 0, .08) 100%),
+    var(--ipoda-c-aluminium);
+  box-shadow:
+    /* polished steel rim peeking around the front plate */
+    inset 0 0 0 calc(var(--ipoda-u) * .16) rgba(78, 82, 88, .55),
+    inset 0 0 0 calc(var(--ipoda-u) * .38) rgba(255, 255, 255, .55),
+    inset 0 calc(var(--ipoda-u) * .5) calc(var(--ipoda-u) * .6) calc(var(--ipoda-u) * -.1) rgba(255, 255, 255, .55),
+    inset 0 calc(var(--ipoda-u) * -.5) calc(var(--ipoda-u) * .8) calc(var(--ipoda-u) * -.1) rgba(0, 0, 0, .10),
+    0 calc(var(--ipoda-u) * .6) calc(var(--ipoda-u) * 1.6) rgba(0, 0, 0, .22),
+    0 calc(var(--ipoda-u) * 2.2) calc(var(--ipoda-u) * 6) rgba(0, 0, 0, .16);
+}
+.ipoda.is-revealed { visibility: visible; }
+.ipoda:focus-visible {
+  outline: 3px solid #5d9cec;
+  outline-offset: 4px;
+}
+
+/* fine brushed grain (procedural SVG noise, set from JS) */
+.ipoda::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-image: var(--ipoda-noise);
+  background-size: calc(var(--ipoda-u) * 60) calc(var(--ipoda-u) * 60);
+  mix-blend-mode: soft-light;
+  opacity: .2;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.ipoda-sr {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ───────────── display window ───────────── */
+.ipoda-window {
+  position: absolute;
+  left: calc(var(--ipoda-u) * var(--ipoda-mm-win-x));
+  top: calc(var(--ipoda-u) * var(--ipoda-mm-win-y));
+  width: calc(var(--ipoda-u) * var(--ipoda-mm-win-w));
+  height: calc(var(--ipoda-u) * var(--ipoda-mm-win-h));
+  border-radius: calc(var(--ipoda-u) * var(--ipoda-mm-win-r));
+  background: var(--ipoda-c-screenWindow);
+  overflow: hidden;
+  box-shadow:
+    0 0 0 calc(var(--ipoda-u) * .14) rgba(70, 74, 80, .55),
+    0 calc(var(--ipoda-u) * .16) 0 calc(var(--ipoda-u) * .14) rgba(255, 255, 255, .45),
+    inset 0 calc(var(--ipoda-u) * .25) calc(var(--ipoda-u) * .4) rgba(0, 0, 0, .9);
+}
+.ipoda-lcd {
+  position: absolute;
+  left: calc(var(--ipoda-u) * var(--ipoda-mm-lcd-x));
+  top: calc(var(--ipoda-u) * var(--ipoda-mm-lcd-y));
+  width: calc(var(--ipoda-u) * var(--ipoda-mm-lcd-w));
+  height: calc(var(--ipoda-u) * var(--ipoda-mm-lcd-h));
+  background: var(--ipoda-c-lcdOff);
+  overflow: hidden;
+}
+/* faint diagonal reflection on the acrylic window */
+.ipoda-glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(122deg,
+      rgba(255, 255, 255, .13) 0%,
+      rgba(255, 255, 255, .07) 30%,
+      rgba(255, 255, 255, .045) 47%,
+      rgba(255, 255, 255, 0) 47.3%),
+    linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, 0) 12%);
+  z-index: 3;
+}
+
+/* ───────────── logical 320×240 UI ───────────── */
+.ipoda-ui {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 320px;
+  height: 240px;
+  transform-origin: 0 0;
+  transform: scale(var(--ipoda-s, 1));
+  overflow: hidden;
+  background: var(--ipoda-c-uiBackground);
+  color: var(--ipoda-c-uiText);
+  font-family: var(--ipoda-font);
+  font-size: 13px;
+  line-height: 1.2;
+  opacity: 0;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+.ipoda-ui.is-on { opacity: 1; }
+
+/* title bar */
+.ipoda-bar {
+  position: absolute;
+  left: 0; top: 0; right: 0;
+  height: 22px;
+  background: linear-gradient(180deg, #fdfdfd 0%, #eceef0 40%, #d9dcdf 60%, #c8ccd1 100%);
+  border-bottom: 1px solid #7d8187;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, .12);
+  z-index: 5;
+}
+.ipoda-bar-title {
+  position: absolute;
+  left: 40px; right: 40px; top: 0;
+  height: 22px;
+  font: 700 14px/22px var(--ipoda-font);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #000;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .85);
+  letter-spacing: -.01em;
+}
+.ipoda-bar-play {
+  position: absolute;
+  left: 8px; top: 6px;
+  width: 10px; height: 10px;
+  display: none;
+}
+.ipoda-bar-play svg { display: block; width: 10px; height: 10px; overflow: visible; }
+.ipoda-bar-play.is-on { display: block; }
+.ipoda-bar-play .ipoda-pause-g { display: none; }
+.ipoda-bar-play.is-paused .ipoda-pause-g { display: inline; }
+.ipoda-bar-play.is-paused .ipoda-play-g { display: none; }
+
+.ipoda-batt {
+  position: absolute;
+  right: 7px; top: 6px;
+  width: 23px; height: 11px;
+}
+.ipoda-batt svg { display: block; width: 23px; height: 11px; overflow: visible; }
+
+/* stage holding the sliding screens */
+.ipoda-stage {
+  position: absolute;
+  left: 0; right: 0; top: 23px; bottom: 0;
+  overflow: hidden;
+  background: #fff;
+}
+.ipoda-screen {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  overflow: hidden;
+}
+
+/* list viewport */
+.ipoda-view {
+  position: absolute;
+  left: 0; top: 0; bottom: 0; right: 0;
+  overflow: hidden;
+}
+.ipoda-screen--split .ipoda-view { right: 50%; }
+.ipoda-view.has-sb { right: 9px; }
+
+.ipoda-list { margin: 0; padding: 0; outline: none; }
+.ipoda-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 27px;
+  padding: 0 8px 0 7px;
+  color: #000;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-user-drag: none;
+}
+.ipoda-row-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 700 15.5px/27px var(--ipoda-font);
+  letter-spacing: -.012em;
+}
+.ipoda-row-detail {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 58%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 400 13px/27px var(--ipoda-font);
+  color: #828589;
+  text-align: right;
+}
+.ipoda-row-chev {
+  flex: none;
+  width: 7px; height: 12px;
+  margin-right: 1px;
+  visibility: hidden;
+}
+.ipoda-row.is-sel {
+  color: #fff;
+  background:
+    linear-gradient(180deg,
+      var(--ipoda-c-uiHighlightTop) 0%,
+      color-mix(in srgb, var(--ipoda-c-uiHighlightTop) 45%, var(--ipoda-c-uiHighlightBottom)) 50%,
+      var(--ipoda-c-uiHighlightBottom) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28), inset 0 -1px 0 rgba(0, 0, 0, .18);
+}
+.ipoda-row.is-sel .ipoda-row-label { text-shadow: 0 -1px 0 rgba(0, 30, 90, .35); }
+.ipoda-row.is-sel .ipoda-row-detail { color: rgba(255, 255, 255, .92); }
+.ipoda-row.is-sel .ipoda-row-chev { visibility: visible; }
+
+/* scrollbar (only when the list overflows) */
+.ipoda-sb {
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 9px;
+  display: none;
+  background: linear-gradient(90deg, #c9cbce 0%, #f4f5f6 45%, #e2e4e6 100%);
+  border-left: 1px solid #8b8f94;
+}
+.ipoda-sb.is-on { display: block; }
+.ipoda-sb-thumb {
+  position: absolute;
+  left: 0; right: 0;
+  top: 0;
+  height: 30px;
+  background: linear-gradient(90deg, #3f6fb3 0%, #8fb8ea 45%, #5f92d6 60%, #2d61ad 100%);
+  border-top: 1px solid #284f8c;
+  border-bottom: 1px solid #284f8c;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35);
+}
+
+/* split-screen preview pane (main menu) */
+.ipoda-preview {
+  position: absolute;
+  top: 0; bottom: 0; right: 0;
+  left: 50%;
+  overflow: hidden;
+  background: #e9ebee;
+}
+.ipoda-preview::after {
+  /* shadow cast by the list half onto the preview */
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 9px;
+  background: linear-gradient(90deg, rgba(0, 0, 0, .38), rgba(0, 0, 0, .12) 35%, rgba(0, 0, 0, 0));
+  pointer-events: none;
+  z-index: 3;
+}
+.ipoda-pv {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity .45s ease;
+  overflow: hidden;
+}
+.ipoda-pv.is-on { opacity: 1; }
+.ipoda-pv--icon {
+  background:
+    radial-gradient(120% 70% at 50% 28%, #ffffff 0%, #f3f4f6 45%, rgba(243, 244, 246, 0) 70%),
+    linear-gradient(180deg, #fbfbfc 0%, #eceef1 58%, #d8dce1 58.4%, #e6e9ed 100%);
+}
+.ipoda-pv-float {
+  position: absolute;
+  left: 50%; top: 28px;
+  width: 92px; height: 92px;
+  margin-left: -46px;
+}
+.ipoda-pv-float svg { display: block; width: 92px; height: 92px; }
+.ipoda-pv-refl {
+  position: absolute;
+  left: 50%; top: 121px;
+  width: 92px; height: 92px;
+  margin-left: -46px;
+  transform: scaleY(-1);
+  opacity: .32;
+  -webkit-mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, .35) 30%, transparent 55%);
+  mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, .35) 30%, transparent 55%);
+}
+.ipoda-pv-refl svg { display: block; width: 92px; height: 92px; }
+.ipoda-pv.is-on .ipoda-pv-float,
+.ipoda-pv.is-on .ipoda-pv-refl-in { animation: ipoda-float 7s ease-in-out infinite alternate; }
+.ipoda-pv--art { background: #000; }
+.ipoda-pv--art .ipoda-art {
+  position: absolute;
+  left: -20%; top: -20%;
+  width: 140%; height: 140%;
+}
+.ipoda-pv.is-on.ipoda-pv--art .ipoda-art { animation: ipoda-kenburns 18s ease-in-out infinite alternate; }
+.ipoda-pv-caption {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: 18px 10px 7px 14px;
+  font: 700 11px/1.25 var(--ipoda-font);
+  color: #fff;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, .62));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ipoda-pv-caption span { display: block; font-weight: 400; opacity: .82; overflow: hidden; text-overflow: ellipsis; }
+
+@keyframes ipoda-float {
+  from { transform: translateY(1px) scale(1); }
+  to   { transform: translateY(-2px) scale(1.035); }
+}
+@keyframes ipoda-kenburns {
+  0%   { transform: scale(1) translate(-5%, -4%); }
+  100% { transform: scale(1.12) translate(5%, 4%); }
+}
+
+/* cover art (image over a procedural fallback) */
+.ipoda-art {
+  position: relative;
+  overflow: hidden;
+  background: #222;
+}
+.ipoda-art-fb {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0) 0 30%, rgba(255, 255, 255, .07) 30.5% 31%, rgba(255, 255, 255, 0) 31.5% 44%, rgba(255, 255, 255, .06) 44.5% 45%, rgba(255, 255, 255, 0) 45.5%),
+    radial-gradient(120% 90% at 20% 10%, #ff9a4a 0%, rgba(255, 154, 74, 0) 55%),
+    linear-gradient(145deg, #2a2d6e 0%, #7a2f86 52%, #e0583b 100%);
+  container-type: size;
+}
+.ipoda-art-fb b {
+  font: 800 34cqw/1 var(--ipoda-font);
+  color: rgba(255, 255, 255, .95);
+  letter-spacing: -.04em;
+  text-shadow: 0 .6cqw 2cqw rgba(0, 0, 0, .35);
+}
+.ipoda-art img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* text page */
+.ipoda-text {
+  margin: 0;
+  padding: 8px 10px 9px 9px;
+  font: 400 13.5px/17px var(--ipoda-font);
+  color: #000;
+  white-space: normal;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+.ipoda-text + .ipoda-list { border-top: 1px solid #d3d5d8; }
+.ipoda-text + .ipoda-list:empty { border-top: 0; }
+
+/* Now Playing */
+.ipoda-np-art {
+  position: absolute;
+  left: 11px; top: 11px;
+  width: 102px; height: 102px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .25);
+}
+.ipoda-np-refl {
+  position: absolute;
+  left: 11px; top: 114px;
+  width: 102px; height: 102px;
+  transform: scaleY(-1);
+  opacity: .38;
+  -webkit-mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, .25) 18%, transparent 30%);
+  mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, .25) 18%, transparent 30%);
+  pointer-events: none;
+}
+.ipoda-np-info {
+  position: absolute;
+  left: 124px; right: 9px; top: 20px;
+}
+.ipoda-np-info div {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ipoda-np-title  { font: 700 14.5px/19px var(--ipoda-font); color: #000; }
+.ipoda-np-artist { font: 700 13px/18px var(--ipoda-font); color: #000; }
+.ipoda-np-album  { font: 400 13px/18px var(--ipoda-font); color: #000; }
+.ipoda-np-count  { margin-top: 10px; font: 400 12px/15px var(--ipoda-font); color: #6f7378; }
+
+.ipoda-np-prog, .ipoda-np-vol {
+  position: absolute;
+  left: 11px; right: 11px; top: 143px;
+  height: 36px;
+  transition: opacity .18s ease;
+}
+.ipoda-np-vol { opacity: 0; }
+.ipoda-np.is-vol .ipoda-np-vol { opacity: 1; }
+.ipoda-np.is-vol .ipoda-np-prog { opacity: 0; }
+
+.ipoda-meter {
+  position: relative;
+  height: 9px;
+  border: 1px solid #6e7379;
+  border-radius: 1px;
+  background: linear-gradient(180deg, #d4d7da 0%, #fbfbfb 45%, #e6e8ea 55%, #f6f7f8 100%);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, .12);
+  overflow: hidden;
+}
+.ipoda-meter-fill {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 0;
+  background: linear-gradient(180deg, #a8d0f7 0%, var(--ipoda-c-uiHighlightTop) 40%, #4e8fe0 55%, var(--ipoda-c-uiHighlightBottom) 100%);
+  box-shadow: 1px 0 0 rgba(0, 40, 110, .45);
+}
+.ipoda-np-times {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font: 700 12px/14px var(--ipoda-font);
+  color: #000;
+  font-variant-numeric: tabular-nums;
+}
+.ipoda-np-vol { display: flex; align-items: flex-start; gap: 6px; padding-top: 0; }
+.ipoda-np-vol .ipoda-meter { flex: 1; margin-top: 0; }
+.ipoda-np-vol svg { flex: none; width: 13px; height: 11px; margin-top: -1px; }
+.ipoda-np .ipoda-view { top: auto; height: 27px; bottom: 0; border-top: 1px solid #d3d5d8; }
+
+/* toast */
+.ipoda-toast {
+  position: absolute;
+  left: 50%; top: 50%;
+  min-width: 176px;
+  padding: 12px 18px 11px;
+  transform: translate(-50%, -38%) scale(.96);
+  border-radius: 9px;
+  background: linear-gradient(180deg, rgba(58, 60, 64, .92), rgba(22, 23, 25, .94));
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .18) inset, 0 4px 14px rgba(0, 0, 0, .35);
+  color: #fff;
+  text-align: center;
+  font: 700 14px/18px var(--ipoda-font);
+  opacity: 0;
+  transition: opacity .18s ease, transform .18s ease;
+  pointer-events: none;
+  z-index: 8;
+}
+.ipoda-toast svg { display: block; width: 26px; height: 26px; margin: 0 auto 6px; }
+.ipoda-toast.is-on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+/* boot */
+.ipoda-boot {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  display: grid;
+  place-items: center;
+  z-index: 9;
+  opacity: 1;
+  transition: opacity .28s ease;
+}
+.ipoda-boot.is-hidden { display: none; }
+.ipoda-boot.is-out { opacity: 0; }
+.ipoda-boot-logo {
+  font: 700 78px/1 var(--ipoda-font);
+  letter-spacing: -.05em;
+  color: transparent;
+  background: linear-gradient(180deg, #ffffff 0%, #f1f2f4 48%, #c9ccd1 52%, #eef0f2 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  opacity: 0;
+  transform: scale(.985);
+  transition: opacity .32s ease, transform 1.2s ease-out;
+  padding: 0 .06em;
+}
+.ipoda-boot.show-logo .ipoda-boot-logo { opacity: 1; transform: scale(1); }
+
+/* ───────────── click wheel ───────────── */
+.ipoda-wheel {
+  position: absolute;
+  left: calc(var(--ipoda-u) * var(--ipoda-mm-wh-x));
+  top: calc(var(--ipoda-u) * var(--ipoda-mm-wh-y));
+  width: calc(var(--ipoda-u) * var(--ipoda-mm-wh-d));
+  height: calc(var(--ipoda-u) * var(--ipoda-mm-wh-d));
+  border-radius: 50%;
+  touch-action: none;
+  cursor: pointer;
+  background:
+    radial-gradient(130% 110% at 50% 18%, #f1f2f3 0%, var(--ipoda-c-wheel) 52%, #d7d9dc 100%);
+  box-shadow:
+    0 0 0 calc(var(--ipoda-u) * .14) rgba(110, 114, 120, .32),
+    0 calc(var(--ipoda-u) * .18) 0 calc(var(--ipoda-u) * .12) rgba(255, 255, 255, .55),
+    inset 0 calc(var(--ipoda-u) * .22) calc(var(--ipoda-u) * .45) rgba(0, 0, 0, .13),
+    inset 0 calc(var(--ipoda-u) * -.15) calc(var(--ipoda-u) * .3) rgba(255, 255, 255, .7);
+}
+.ipoda-wheel.is-dragging { cursor: grabbing; }
+.ipoda-quad {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  border-radius: 50%;
+}
+.ipoda-quad path {
+  fill: #000;
+  opacity: 0;
+  transition: opacity .16s ease;
+}
+.ipoda-quad path.is-pressed { opacity: .075; transition-duration: .03s; }
+
+.ipoda-wbtn {
+  position: absolute;
+  left: 50%; top: 50%;
+  margin: 0;
+  padding: calc(var(--ipoda-u) * 1.4);
+  border: 0;
+  background: none;
+  color: var(--ipoda-c-wheelLabel);
+  font: 700 calc(var(--ipoda-u) * 2.45)/1 var(--ipoda-font);
+  letter-spacing: .07em;
+  cursor: inherit;
+  transform: translate(-50%, -50%) translate(var(--ipoda-dx, 0px), var(--ipoda-dy, 0px));
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+  pointer-events: none;
+}
+.ipoda-wbtn svg {
+  display: block;
+  width: calc(var(--ipoda-u) * 4.6);
+  height: calc(var(--ipoda-u) * 2.1);
+  fill: currentColor;
+}
+.ipoda-wbtn--menu { --ipoda-dy: calc(var(--ipoda-u) * var(--ipoda-mm-lab-r) * -1); padding-left: calc(var(--ipoda-u) * 1.55); }
+.ipoda-wbtn--play { --ipoda-dy: calc(var(--ipoda-u) * var(--ipoda-mm-lab-r)); }
+.ipoda-wbtn--next { --ipoda-dx: calc(var(--ipoda-u) * var(--ipoda-mm-lab-r)); }
+.ipoda-wbtn--prev { --ipoda-dx: calc(var(--ipoda-u) * var(--ipoda-mm-lab-r) * -1); }
+
+.ipoda-center {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: calc(var(--ipoda-u) * var(--ipoda-mm-cb-d));
+  height: calc(var(--ipoda-u) * var(--ipoda-mm-cb-d));
+  margin: calc(var(--ipoda-u) * var(--ipoda-mm-cb-d) / -2) 0 0 calc(var(--ipoda-u) * var(--ipoda-mm-cb-d) / -2);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, .12) 0%, rgba(0, 0, 0, .03) 38%, rgba(255, 255, 255, .10) 72%, rgba(255, 255, 255, .28) 100%),
+    var(--ipoda-c-centerButton);
+  box-shadow:
+    0 0 0 calc(var(--ipoda-u) * .16) rgba(104, 108, 114, .5),
+    0 calc(var(--ipoda-u) * .2) 0 calc(var(--ipoda-u) * .14) rgba(255, 255, 255, .65),
+    inset 0 calc(var(--ipoda-u) * .35) calc(var(--ipoda-u) * .7) rgba(0, 0, 0, .16),
+    inset 0 calc(var(--ipoda-u) * -.25) calc(var(--ipoda-u) * .45) rgba(255, 255, 255, .55);
+  transition: filter .12s ease, box-shadow .12s ease;
+  overflow: hidden;
+}
+.ipoda-center::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background-image: var(--ipoda-noise);
+  background-size: calc(var(--ipoda-u) * 30) calc(var(--ipoda-u) * 30);
+  mix-blend-mode: soft-light;
+  opacity: .5;
+}
+.ipoda-center.is-pressed {
+  filter: brightness(.93);
+  transition-duration: .03s;
+  box-shadow:
+    0 0 0 calc(var(--ipoda-u) * .16) rgba(104, 108, 114, .5),
+    0 calc(var(--ipoda-u) * .2) 0 calc(var(--ipoda-u) * .14) rgba(255, 255, 255, .65),
+    inset 0 calc(var(--ipoda-u) * .55) calc(var(--ipoda-u) * 1) rgba(0, 0, 0, .24),
+    inset 0 calc(var(--ipoda-u) * -.2) calc(var(--ipoda-u) * .4) rgba(255, 255, 255, .45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ipoda *, .ipoda *::before, .ipoda *::after {
+    animation: none !important;
+  }
+  .ipoda-pv { transition-duration: .01s; }
+  .ipoda-boot-logo { transform: none; transition: opacity .2s ease; }
+}
