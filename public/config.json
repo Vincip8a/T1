@@ -1,0 +1,72 @@
+{
+  "_comment": "Alle Inhalte des Linktrees. Platzhalter ersetzen – kein Code-Change nötig.",
+  "brand": {
+    "name": "Dein Name",
+    "monogram": "DN",
+    "tagline": "Design · Creative Direction · Musik",
+    "windowTitle": "iPod – Dein Name",
+    "email": "hallo@example.com"
+  },
+  "menu": [
+    {
+      "id": "contact",
+      "label": "Kontakt",
+      "type": "list",
+      "title": "Kontakt",
+      "items": [
+        { "label": "E-Mail", "detail": "hallo@example.com", "href": "mailto:hallo@example.com" },
+        { "label": "Instagram", "detail": "@deinname", "href": "https://instagram.com/" },
+        { "label": "LinkedIn", "detail": "Dein Name", "href": "https://www.linkedin.com/" },
+        { "label": "TikTok", "detail": "@deinname", "href": "https://www.tiktok.com/" }
+      ]
+    },
+    {
+      "id": "work",
+      "label": "Work Together",
+      "type": "page",
+      "title": "Work Together",
+      "body": "Du planst ein Projekt? Branding, Websites, Content – lass uns sprechen. Antwort meist innerhalb von 48 Stunden.",
+      "actions": [
+        { "label": "Anfrage senden", "href": "mailto:hallo@example.com?subject=Projektanfrage" },
+        { "label": "Call buchen", "href": "https://cal.com/" }
+      ]
+    },
+    {
+      "id": "playlist",
+      "label": "Playlist",
+      "type": "nowplaying",
+      "title": "Meine Playlist",
+      "artist": "Kuratiert von Dein Name",
+      "cover": "assets/playlist-cover.svg",
+      "spotifyUrl": "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M",
+      "tracks": [
+        { "title": "Track Eins", "artist": "Artist A", "duration": "3:24" },
+        { "title": "Track Zwei", "artist": "Artist B", "duration": "4:02" },
+        { "title": "Track Drei", "artist": "Artist C", "duration": "2:51" }
+      ]
+    },
+    {
+      "id": "downloads",
+      "label": "Downloads",
+      "type": "downloads",
+      "title": "Gratis Downloads",
+      "items": [
+        { "label": "Portfolio 2026", "file": "downloads/portfolio-2026.pdf", "format": "PDF", "size": "–" },
+        { "label": "Case Study: Projekt X", "file": "downloads/case-study-projekt-x.pdf", "format": "PDF", "size": "–" },
+        { "label": "Media Kit", "file": "downloads/media-kit.pdf", "format": "PDF", "size": "–" }
+      ]
+    },
+    {
+      "id": "about",
+      "label": "Über mich",
+      "type": "page",
+      "title": "Über mich",
+      "body": "Kurzer Text über dich: wer du bist, was du machst und woran du gerade arbeitest.",
+      "actions": []
+    }
+  ],
+  "settings": {
+    "clickSound": true,
+    "intro": "always"
+  }
+}

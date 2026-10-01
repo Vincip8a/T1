@@ -1,0 +1,9 @@
+<!doctype html><html><body style="margin:0;background:#345"><script type="module">
+import * as THREE from 'three';
+const r = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+r.setSize(400, 300); document.body.append(r.domElement);
+const s = new THREE.Scene(); const c = new THREE.PerspectiveCamera(40, 4/3, 0.1, 100); c.position.set(2,2,4); c.lookAt(0,0,0);
+s.add(new THREE.Mesh(new THREE.BoxGeometry(1,1.6,0.2), new THREE.MeshStandardMaterial({ color: 0xc8cbcf, metalness: .8, roughness: .3 })));
+s.add(new THREE.HemisphereLight(0xffffff, 0x334455, 2)); const d = new THREE.DirectionalLight(0xffffff, 2); d.position.set(3,4,5); s.add(d);
+r.render(s, c); document.title = 'rendered:' + r.getContext().getParameter(r.getContext().VERSION);
+</script></body></html>
