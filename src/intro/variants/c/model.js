@@ -45,13 +45,15 @@ function ext(shape, depth, b = 0, segs = 3, curveSegments = 14) {
   g.translate(0, 0, -(depth - Math.max(bt, 0)));
   const out = toCreasedNormals(g, PI / 5);
   g.dispose();
-  const n = out.attributes.normal, pos = out.attributes.position;
+  const n = out.attributes.normal, pos = out.attributes.position, uv = out.attributes.uv;
   for (let i = 0; i < pos.count; i += 3) {
     const z = pos.getZ(i);
     if (Math.abs(z - pos.getZ(i + 1)) < 1e-5 && Math.abs(z - pos.getZ(i + 2)) < 1e-5) {
       const nz = Math.sign(n.getZ(i) + n.getZ(i + 1) + n.getZ(i + 2)) || 1;
       for (let k = 0; k < 3; k++) n.setXYZ(i + k, 0, 0, nz);
-    }
+    } else for (let k = 0; k < 3; k++) uv.setXY(i + k, pos.getX(i + k), pos.getY(i + k));
+    // ^ walls/bevels: planar uv like the caps (the default wall uv flips between x and y at
+    //   45° and drags printed glyphs onto the wheel rim as dark ticks at the diagonals)
   }
   return out;
 }
@@ -134,7 +136,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     const map = T.capFit(tx(T.wheelCanvas(wh.diameter, IPOD.wheelLabels.radiusFactor)), wh.diameter, wh.diameter);
     mats.wheel = phys({ color: '#ffffff', map, roughness: 0.42, metalness: 0, clearcoat: 0.3, clearcoatRoughness: 0.3, emissive: '#ffffff', emissiveMap: map, emissiveIntensity: 0 });
     add(p, ext(s, 1.3, bw, 3, SEG), mats.wheel, whc[0], whc[1], 0);
-    mats.centre = phys({ color: '#d9dcdf', emissive: COLORS.centerButton, emissiveIntensity: 0, metalness: 0.3, roughness: 0.4, roughnessMap: brush, anisotropy: 0.4, clearcoat: 0.3, clearcoatRoughness: 0.3 });
+    mats.centre = phys({ color: '#e1e4e7', emissive: COLORS.centerButton, emissiveIntensity: 0, metalness: 0.3, roughness: 0.4, roughnessMap: brush, anisotropy: 0.4, clearcoat: 0.3, clearcoatRoughness: 0.3 });
     add(p, ext(circle(CB - 0.2), 1.2, 0.2, 3, 14), mats.centre, whc[0], whc[1], -0.08);
     // sensor base behind the wheel: mid grey like the gap shade, and wide enough to cover the
     // annulus while the front plate seats, so no board colour flashes through it

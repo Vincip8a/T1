@@ -104,14 +104,7 @@ export function mountIpod(container, { config } = {}) {
 
   // ── click wheel: pointer surface only (keyboard covers every button), hidden from AT
   const wheel = h('div', 'ipodc-wheel', hidden);
-  const inner = (IPOD.centerButton.diameter / IPOD.wheel.diameter) * 50 + 0.4;
-  const pt = (r, a) => `${(r * Math.cos(a)).toFixed(2)} ${(r * Math.sin(a)).toFixed(2)}`;
-  const sector = (q, a0) => {
-    const [s, e] = [a0, a0 + 90].map((a) => (a * Math.PI) / 180);
-    return `<path data-q="${q}" fill="url(#${P}qg)" d="M${pt(50, s)}A50 50 0 0 1 ${pt(50, e)}L${pt(inner, e)}A${inner} ${inner} 0 0 0 ${pt(inner, s)}Z"/>`;
-  };
-  wheel.innerHTML = `<svg class="ipodc-quad" viewBox="-50 -50 100 100"><radialGradient id="${P}qg" cx="0" cy="0" r="50" gradientUnits="userSpaceOnUse"><stop offset="${(inner / 50).toFixed(3)}" stop-opacity=".05"/><stop offset="1" stop-opacity=".13"/></radialGradient>${sector('menu', -135)}${sector('next', -45)}${sector('play', 45)}${sector('prev', 135)}</svg>`
-    + `<span class="ipodc-wbtn ipodc-wbtn--menu">${IPOD.wheelLabels.menu ?? 'MENU'}</span>`
+  wheel.innerHTML = `<span class="ipodc-wbtn ipodc-wbtn--menu">${IPOD.wheelLabels.menu ?? 'MENU'}</span>`
     + ['next', 'prev', 'play'].map((n) => `<span class="ipodc-wbtn ipodc-wbtn--${n}">${GLYPH[n]}</span>`).join('');
   const centerBtn = h('div', 'ipodc-center');
   wheel.append(centerBtn);

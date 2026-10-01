@@ -604,18 +604,22 @@
 .ipodc-wheel[data-press="play"] { transform: perspective(calc(var(--ipodc-u) * 140)) rotateX(-1.4deg); }
 .ipodc-wheel[data-press="next"] { transform: perspective(calc(var(--ipodc-u) * 140)) rotateY(1.4deg); }
 .ipodc-wheel[data-press="prev"] { transform: perspective(calc(var(--ipodc-u) * 140)) rotateY(-1.4deg); }
-.ipodc-quad {
+/* pressed quadrant: a soft shade masked to the 90° sector under the finger (below labels and centre) */
+.ipodc-wheel::before {
+  content: "";
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
+  border-radius: 50%;
+  opacity: 0;
   pointer-events: none;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, .05) 40%, rgba(0, 0, 0, .13));
+  -webkit-mask: conic-gradient(from calc(var(--ipodc-q, 0deg) - 45deg), #000 0 90deg, transparent 0);
+  mask: conic-gradient(from calc(var(--ipodc-q, 0deg) - 45deg), #000 0 90deg, transparent 0);
 }
-.ipodc-quad path { opacity: 0; }
-.ipodc-wheel[data-press="menu"] [data-q="menu"],
-.ipodc-wheel[data-press="next"] [data-q="next"],
-.ipodc-wheel[data-press="prev"] [data-q="prev"],
-.ipodc-wheel[data-press="play"] [data-q="play"] { opacity: 1; }
+.ipodc-wheel[data-press]::before { opacity: 1; }
+.ipodc-wheel[data-press="next"] { --ipodc-q: 90deg; }
+.ipodc-wheel[data-press="play"] { --ipodc-q: 180deg; }
+.ipodc-wheel[data-press="prev"] { --ipodc-q: 270deg; }
 
 .ipodc-wbtn {
   position: absolute;
@@ -684,8 +688,8 @@
   .ipodc-boot.show-mono .ipodc-boot-mono { transform: scale(1); }
   .ipodc-wheel { transition: transform .14s ease; }
   .ipodc-wheel[data-press] { transition-duration: .04s; }
-  .ipodc-quad path { transition: opacity .16s ease; }
-  .ipodc-wheel[data-press] [data-q] { transition-duration: .03s; }
+  .ipodc-wheel::before { transition: opacity .16s ease; }
+  .ipodc-wheel[data-press]::before { transition-duration: .03s; }
   .ipodc-center { transition: filter .12s ease, box-shadow .12s ease, transform .12s ease; }
   .ipodc-center.is-pressed { transition-duration: .03s; }
 }

@@ -17,8 +17,8 @@ const FOV_HERO = 26, FOV_END = 20;
 const D = 6.5;
 const ENV_END = 0.25; // final room rotation (fixes the hand-off look)
 const GLASS_FROM = 2.75, GLASS_END = 2.27, GLASS_Z = Math.PI / 4; // diagonal glint on the display glass
-const FACE_GLOW = 0, WHEEL_GLOW = 0.1, FACE_END_ENV = 0.84; // hand-off fill (matches the DOM iPod's tone)
-const END_EXPOSURE = 0.94;
+const FACE_GLOW = 0, WHEEL_GLOW = 0.21, FACE_END_ENV = 0.7; // hand-off fill (matches the DOM iPod's tone)
+const END_EXPOSURE = 0.9, KEY_END = 0.9;
 const TL = {
   rise: 1.0,
   ex0: 1.2, exS: 0.07, exD: 1.25,
@@ -320,7 +320,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
       glass.envMapRotation.set(0, GLASS_END, GLASS_Z); panel.envMapRotation.copy(glass.envMapRotation);
       face.envMapIntensity = FACE_END_ENV;
       face.emissiveIntensity = FACE_GLOW; wheel.emissiveIntensity = centre.emissiveIntensity = WHEEL_GLOW;
-      renderer.toneMappingExposure = END_EXPOSURE;
+      renderer.toneMappingExposure = END_EXPOSURE; key.intensity = KEY_END;
       applyCamera(1, 0);
       camera.position.z = HALF_D + (camera.position.z - HALF_D) * (1 + 0.04 * (1 - p3out(u)));
       camera.updateProjectionMatrix();
@@ -391,6 +391,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     face.emissiveIntensity = FACE_GLOW * b * b;
     wheel.emissiveIntensity = centre.emissiveIntensity = WHEEL_GLOW * b * b;
     renderer.toneMappingExposure = lerp(1, END_EXPOSURE, b * b);
+    key.intensity = lerp(1.6, KEY_END, b * b);
 
     shadow.visible = b < 1;
     shadow.position.set(0, -IPOD.height / 2 - 9 - 7 * env + rise, -12);
