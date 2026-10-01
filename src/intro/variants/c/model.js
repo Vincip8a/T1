@@ -122,9 +122,9 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     const s = circle(R - bw);
     s.holes.push(circle(CB + 0.1 + bw, true));
     const map = T.capFit(tx(T.wheelCanvas(wh.diameter, IPOD.wheelLabels.radiusFactor)), wh.diameter, wh.diameter);
-    mats.wheel = phys({ color: '#ffffff', map, roughness: 0.42, metalness: 0, clearcoat: 0.3, clearcoatRoughness: 0.3, sheen: 0.25, sheenColor: '#ffffff' });
+    mats.wheel = phys({ color: '#e4e4e4', map, roughness: 0.42, metalness: 0, clearcoat: 0.3, clearcoatRoughness: 0.3, sheen: 0.25, sheenColor: '#ffffff' });
     add(p, ext(s, 1.3, bw, 3, 24), mats.wheel, whc[0], whc[1], 0);
-    mats.centre = phys({ color: COLORS.centerButton, metalness: 0.7, roughness: 0.34, roughnessMap: brush, anisotropy: 0.4, clearcoat: 0.3, clearcoatRoughness: 0.3 });
+    mats.centre = phys({ color: COLORS.centerButton, metalness: 0.45, roughness: 0.4, roughnessMap: brush, anisotropy: 0.4, clearcoat: 0.3, clearcoatRoughness: 0.3 });
     add(p, ext(circle(CB - 0.2), 1.2, 0.2, 3, 14), mats.centre, whc[0], whc[1], -0.08);
     const ws = circle(R + 0.5); ws.holes.push(circle(CB - 2, true));
     add(p, ext(ws, 0.2, 0, 1, 12), std({ color: '#3a3c40', roughness: 0.8 }), whc[0], whc[1], -1.35);

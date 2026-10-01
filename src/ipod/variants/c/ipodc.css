@@ -57,7 +57,7 @@
     0 calc(var(--ipodc-u) * .5) calc(var(--ipodc-u) * 1.4) rgba(0, 0, 0, .2),
     0 calc(var(--ipodc-u) * 2.2) calc(var(--ipodc-u) * 6) rgba(0, 0, 0, .15);
 }
-.ipodc.is-revealed { visibility: visible; }
+.ipodc.is-revealed { visibility: inherit; }
 .ipodc:focus-visible {
   outline: 3px solid #0b4fc4; /* ≥ 4.5:1 on the light window and the desktop */
   outline-offset: 4px;
@@ -80,6 +80,41 @@
 .ipodc-sr {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ───────────── top edge: hold switch + headphone jack hints ─────────────
+   The front plate meets the steel rim at the top; both openings just break that line, which is
+   enough to read the 3/4 silhouette of the real device. Everything stays inside the body rect. */
+.ipodc-edge {
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: calc(var(--ipodc-u) * 1.2);
+  pointer-events: none;
+}
+.ipodc-hold, .ipodc-jack { position: absolute; top: 0; box-sizing: border-box; }
+.ipodc-hold {
+  /* recessed slot with the aluminium slider sitting in its left half (hold off) */
+  left: calc(var(--ipodc-u) * var(--ipodc-mm-hold-x));
+  width: calc(var(--ipodc-u) * var(--ipodc-mm-hold-w));
+  height: calc(var(--ipodc-u) * .62);
+  border-radius: 0 0 calc(var(--ipodc-u) * .35) calc(var(--ipodc-u) * .35);
+  background:
+    linear-gradient(180deg, #e9ebee 0%, #b4b8bd 55%, #8f9399 100%) left / 52% 78% no-repeat,
+    linear-gradient(180deg, #17181a 0%, #2c2e31 70%, #45484c 100%);
+  box-shadow:
+    0 calc(var(--ipodc-u) * .1) 0 rgba(255, 255, 255, .55),
+    inset 0 0 0 calc(var(--ipodc-u) * .06) rgba(0, 0, 0, .45);
+}
+.ipodc-jack {
+  /* round port seen at a grazing angle: a dark half-ellipse with a bright lip */
+  left: calc(var(--ipodc-u) * (var(--ipodc-mm-jack-x) - var(--ipodc-mm-jack-d) / 2));
+  width: calc(var(--ipodc-u) * var(--ipodc-mm-jack-d));
+  height: calc(var(--ipodc-u) * .7);
+  border-radius: 0 0 50% 50% / 0 0 100% 100%;
+  background: radial-gradient(70% 120% at 50% 0%, #050506 0%, #1b1c1e 55%, #3c3f43 100%);
+  box-shadow:
+    0 calc(var(--ipodc-u) * .1) 0 rgba(255, 255, 255, .6),
+    inset 0 0 0 calc(var(--ipodc-u) * .07) rgba(120, 124, 130, .7);
 }
 
 /* ───────────── display window ───────────── */
@@ -276,7 +311,7 @@
 .ipodc-row.is-sel { color: #fff; }
 .ipodc-row.is-sel .ipodc-row-label { text-shadow: 0 calc(var(--ipodc-p) * -1) 0 rgba(0, 30, 90, .32); }
 .ipodc-row.is-sel .ipodc-row-detail { color: rgba(255, 255, 255, .92); }
-.ipodc-row.is-sel .ipodc-chev { visibility: visible; }
+.ipodc-row.is-sel .ipodc-chev { visibility: inherit; }
 .ipodc-row:focus { outline: none; }
 
 /* scrollbar (only when the content overflows) */
@@ -447,8 +482,46 @@
 }
 .ipodc-np-info {
   position: absolute;
-  left: calc(var(--ipodc-p) * 122); right: calc(var(--ipodc-p) * 10); top: calc(var(--ipodc-p) * 38);
+  left: calc(var(--ipodc-p) * 122); right: calc(var(--ipodc-p) * 10); top: calc(var(--ipodc-p) * 27);
 }
+.ipodc-screen.no-tracks .ipodc-np-info { top: calc(var(--ipodc-p) * 38); }
+
+/* compact track list beside the cover (3 visible rows, follows the playing track) */
+.ipodc-np-tracks {
+  position: absolute;
+  left: calc(var(--ipodc-p) * 118); right: calc(var(--ipodc-p) * 8); top: calc(var(--ipodc-p) * 87);
+  height: calc(var(--ipodc-p) * 54);
+  overflow: hidden;
+  border-top: calc(var(--ipodc-p) * 1) solid #dcdee1;
+}
+.ipodc-np-tracks-in {
+  transform: translate3d(0, calc(var(--ipodc-p) * -18 * var(--ipodc-tt, 0)), 0);
+  transition: transform .2s ease;
+}
+.ipodc-trk {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--ipodc-p) * 4);
+  height: calc(var(--ipodc-p) * 18);
+  padding: 0 calc(var(--ipodc-p) * 2) 0 calc(var(--ipodc-p) * 4);
+  box-sizing: border-box;
+  border-bottom: calc(var(--ipodc-p) * 1) solid #eceef0;
+  font: 400 calc(var(--ipodc-p) * 12)/calc(var(--ipodc-p) * 17) var(--ipodc-font);
+  color: #4a4e54;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ipodc-trk-ico {
+  flex: none;
+  width: calc(var(--ipodc-p) * 11); height: calc(var(--ipodc-p) * 9);
+  fill: currentColor;
+  color: var(--ipodc-c-uiHighlightBottom);
+  visibility: hidden;
+}
+.ipodc-trk-t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ipodc-trk-d { flex: none; color: #8a8e93; font-size: calc(var(--ipodc-p) * 11); font-variant-numeric: tabular-nums; }
+.ipodc-trk.is-cur { color: #000; font-weight: 700; }
+.ipodc-trk.is-cur .ipodc-trk-ico { visibility: inherit; }
 .ipodc-np-info div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ipodc-np-title  { font: 700 calc(var(--ipodc-p) * 14.5)/calc(var(--ipodc-p) * 19) var(--ipodc-font); color: #000; }
 .ipodc-np-artist { font: 700 calc(var(--ipodc-p) * 13)/calc(var(--ipodc-p) * 18) var(--ipodc-font); color: #000; }
@@ -463,22 +536,28 @@
 .ipodc-screen.is-vol .ipodc-np-vol { opacity: 1; }
 .ipodc-screen.is-vol .ipodc-np-prog { opacity: 0; }
 .ipodc-np-vol .ipodc-meter { flex: 1; }
+.ipodc-np-vol .ipodc-meter-fill { width: calc(100% * var(--ipodc-f, 0)); } /* 0 % volume really is empty */
 .ipodc-np-vol svg { flex: none; width: calc(var(--ipodc-p) * 13); height: calc(var(--ipodc-p) * 11); margin-top: calc(var(--ipodc-p) * -1); }
 .ipodc-meter {
+  /* 6G capsule bar: light hairline, softly rounded ends, glossy recessed track */
   position: relative;
   height: calc(var(--ipodc-p) * 9);
   box-sizing: border-box;
-  border: calc(var(--ipodc-p) * 1) solid #6e7379;
-  background: linear-gradient(180deg, #d4d7da 0%, #fbfbfb 45%, #e6e8ea 55%, #f6f7f8 100%);
+  border: calc(var(--ipodc-p) * 1) solid #9a9ea4;
+  border-radius: calc(var(--ipodc-p) * 2.5);
+  background: linear-gradient(180deg, #dfe1e4 0%, #fdfdfd 48%, #eceef0 52%, #f8f9fa 100%);
+  box-shadow: inset 0 calc(var(--ipodc-p) * 1) calc(var(--ipodc-p) * 1) rgba(0, 0, 0, .1);
   overflow: hidden;
 }
 .ipodc-meter-fill {
   position: absolute;
-  inset: 0;
-  transform-origin: 0 50%;
-  transform: scaleX(var(--ipodc-f, 0));
-  transition: transform .25s linear;
-  background: linear-gradient(180deg, #a8d0f7 0%, var(--ipodc-c-uiHighlightTop) 40%, #4e8fe0 55%, var(--ipodc-c-uiHighlightBottom) 100%);
+  left: 0; top: 0; bottom: 0;
+  /* a small minimum so playback reads at once, even at 0:01 */
+  width: max(calc(var(--ipodc-p) * 4), calc(100% * var(--ipodc-f, 0)));
+  transition: width .25s linear;
+  border-radius: calc(var(--ipodc-p) * 1.5) 0 0 calc(var(--ipodc-p) * 1.5);
+  background: linear-gradient(180deg, #b9dafa 0%, var(--ipodc-c-uiHighlightTop) 38%, #4e8fe0 54%, var(--ipodc-c-uiHighlightBottom) 100%);
+  box-shadow: calc(var(--ipodc-p) * 1) 0 0 rgba(0, 40, 110, .4), inset 0 calc(var(--ipodc-p) * 1) 0 rgba(255, 255, 255, .35);
 }
 .ipodc-np-times {
   display: flex;
@@ -494,6 +573,17 @@
   box-shadow: 0 calc(var(--ipodc-p) * -1) 0 #d3d5d8;
 }
 .ipodc-screen--nowplaying.no-cta .ipodc-view { display: none; }
+/* while the wheel sets the volume, the CTA steps back so the volume bar is the only focal point */
+.ipodc-screen--nowplaying .ipodc-hl,
+.ipodc-screen--nowplaying .ipodc-row,
+.ipodc-screen--nowplaying .ipodc-chev { transition: background .2s ease, color .2s ease, opacity .2s ease, box-shadow .2s ease; }
+.ipodc-screen--nowplaying.is-vol .ipodc-hl {
+  background: linear-gradient(180deg, #f3f4f5 0%, #e7e9eb 100%);
+  box-shadow: none;
+}
+.ipodc-screen--nowplaying.is-vol .ipodc-row.is-sel { color: #5d6167; }
+.ipodc-screen--nowplaying.is-vol .ipodc-row.is-sel .ipodc-row-label { text-shadow: none; }
+.ipodc-screen--nowplaying.is-vol .ipodc-row.is-sel .ipodc-chev { color: #9a9ea4; }
 
 /* toast */
 .ipodc-toast {
@@ -653,16 +743,16 @@
     inset 0 calc(var(--ipodc-u) * -.2) calc(var(--ipodc-u) * .4) rgba(255, 255, 255, .42);
 }
 
-/* ───────────── reduced motion (OS setting, live) ───────────── */
-.ipodc--reduced *, .ipodc--reduced *::before, .ipodc--reduced *::after { animation: none !important; }
-.ipodc--reduced .ipodc-hl, .ipodc--reduced .ipodc-content, .ipodc--reduced .ipodc-sb-thumb,
-.ipodc--reduced .ipodc-wheel, .ipodc--reduced .ipodc-row, .ipodc--reduced .ipodc-meter-fill { transition: none; }
-.ipodc--reduced .ipodc-pv { transition-duration: .01s; }
-.ipodc--reduced .ipodc-boot-mono { transform: none; transition: opacity .2s ease; }
-@media (prefers-reduced-motion: reduce) {
-  .ipodc *, .ipodc *::before, .ipodc *::after { animation: none !important; }
-  .ipodc .ipodc-hl, .ipodc .ipodc-content, .ipodc .ipodc-wheel { transition: none; }
+/* ───────────── reduced motion ─────────────
+   One rule: .ipodc--reduced is kept in sync with the OS setting from JS (live, via matchMedia),
+   so no separate media query is needed. Nothing moves, scales or fades. */
+.ipodc--reduced, .ipodc--reduced *, .ipodc--reduced *::before, .ipodc--reduced *::after {
+  animation: none !important;
+  transition: none !important;
 }
+.ipodc--reduced .ipodc-boot-mono, .ipodc--reduced .ipodc-toast, .ipodc--reduced .ipodc-center.is-pressed { transform: none; }
+.ipodc--reduced .ipodc-toast { translate: -50% -50%; }
+.ipodc--reduced .ipodc-wheel[data-press] { transform: none; }
 
 /* ───────────── forced colours / high contrast ───────────── */
 @media (forced-colors: active) {

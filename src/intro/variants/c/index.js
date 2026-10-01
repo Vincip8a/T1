@@ -14,7 +14,7 @@ const HALF_D = IPOD.depth / 2;
 const FOV_HERO = 26, FOV_END = 20;
 const D = 7.0;
 const ENV_END = 0.25, GLASS_FROM = 0.5, GLASS_END = 0.0; // final environment rotations (fix the hand-off look)
-const FACE_GLOW = 0.35, ENV_K = 0.68; // hand-off fill on the front plate (matches the DOM iPod's tone)
+const FACE_GLOW = 0.12, ENV_K = 1; // hand-off fill on the front plate (matches the DOM iPod's tone)
 const TL = {
   rise: 1.3,
   ex0: 1.5, exS: 0.07, exD: 1.25,
@@ -85,7 +85,8 @@ function studio() {
     o.position.set(x, y, z); o.scale.set(sx, sy, sz);
     room.add(o);
   };
-  box(-1, 6, 13.8, 18, 9, 0.2, 1.5);      // front soft box, high
+  box(-5, 7, 13.8, 8, 7, 0.2, 1.6);       // front soft box, high left (hot)
+  box(3, 4, 13.85, 16, 10, 0.2, 0.55);     // broad dimmer front fill (gives the face a falloff)
   box(0, -2, 13.9, 26, 3, 0.2, 0.05);      // dark band below it (gives the face a gradient)
   box(-14.8, 4, 4, 0.2, 14, 1.4, 9);       // left strip
   box(14.6, 5, -3, 0.2, 14, 1.2, 7);       // right rim strip
@@ -212,15 +213,25 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     return dz.map((d) => d + (-HALF_D - centre));
   }
   /** Camera distance from the rig origin so all points fit inside ±mx/±my NDC. */
-  function fitDistance(points, yaw, pitch, fov, aspect, mx, my) {
+  function fitDistance(points, yaw, pitch, fov, aspect, mx, my, cx = 0, cy = 0) {
     const t = Math.tan((fov * DEG) / 2);
     tmpQ.setFromEuler(tmpE.set(-pitch * DEG, -yaw * DEG, 0, 'XYZ'));
     let d = 0;
     for (const p of points) {
       tmpV.copy(p); tmpV.z += HALF_D; tmpV.applyQuaternion(tmpQ);
-      d = Math.max(d, tmpV.z + Math.abs(tmpV.x) / (t * aspect * mx), tmpV.z + Math.abs(tmpV.y) / (t * my));
+      d = Math.max(d, tmpV.z + Math.abs(tmpV.x - cx) / (t * aspect * mx), tmpV.z + Math.abs(tmpV.y - cy) / (t * my));
     }
     return d;
+  }
+  /** Centre of the rotated point cloud (camera-aligned x/y), to keep the stack centred. */
+  function centreOf(points, yaw, pitch) {
+    tmpQ.setFromEuler(tmpE.set(-pitch * DEG, -yaw * DEG, 0, 'XYZ'));
+    const e = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const p of points) {
+      tmpV.copy(p); tmpV.z += HALF_D; tmpV.applyQuaternion(tmpQ);
+      e[0] = Math.min(e[0], tmpV.x); e[1] = Math.min(e[1], tmpV.y); e[2] = Math.max(e[2], tmpV.x); e[3] = Math.max(e[3], tmpV.y);
+    }
+    return [(e[0] + e[2]) / 2, (e[1] + e[3]) / 2];
   }
   const boxPoints = (box, dz, out) => {
     for (let i = 0; i < 8; i++) out.push(new THREE.Vector3(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, (i & 4 ? box.max.z : box.min.z) + dz));
@@ -241,7 +252,8 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     parts.forEach((p, i) => { boxPoints(p.box, L.dz[i], exploded); boxPoints(p.box, 0, assembled); });
     ipod.screwBase.forEach((b, j) => { const v = b.clone().add(L.screwOff[j]); v.z += L.dz[j < 4 ? iBoard : iFrame]; exploded.push(v); });
     const mx = L.portrait ? 0.9 : 0.84, my = L.portrait ? 0.78 : 0.86;
-    L.dHero = Math.max(...[2.9, 3.6, 4.45].map((t) => fitDistance(exploded, L.o.yaw(t), L.o.pitch(t), FOV_HERO, aspect, mx, my)));
+    [L.cx, L.cy] = centreOf(exploded, L.o.yaw(3.6), L.o.pitch(3.6));
+    L.dHero = Math.max(...[2.9, 3.6, 4.45].map((t) => fitDistance(exploded, L.o.yaw(t), L.o.pitch(t), FOV_HERO, aspect, mx, my, L.cx, L.cy)));
     L.dAsm = fitDistance(assembled, 30, 8, FOV_HERO, aspect, 0.6, 0.6);
     L.rise = L.dAsm * Math.tan((FOV_HERO * DEG) / 2) + IPOD.height * 0.62;
   }
@@ -313,7 +325,8 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     rig.rotation.set(-pitch * DEG, -yaw * DEG, 0, 'XYZ');
     const rise = -L.rise * (1 - p3out(clamp01(t / TL.rise)));
     const bob = 1.2 * Math.sin((t - 2.2) * 2.1) * smooth(2.2, 3.0, t) * (1 - smooth(4.0, 4.6, t));
-    rig.position.set(0, rise + bob, 0);
+    const env = smooth(1.45, 2.7, t) * (1 - smooth(4.3, 5.5, t));
+    rig.position.set(-L.cx * env, rise + bob - L.cy * env, 0);
 
     // parts: front-to-back cascade out, back-to-front back in; landing nudges on the chassis
     let nudge = 0, wob = 0;
@@ -350,7 +363,6 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     panel.envMapRotation.copy(glass.envMapRotation);
 
     const b = inOutCubic(clamp01((t - TL.cam0) / (D - TL.cam0)));
-    const env = smooth(1.45, 2.7, t) * (1 - smooth(4.3, 5.5, t));
     const dHero = lerp(L.dAsm * (1 + 0.12 * (1 - p3out(clamp01(t / 1.9)))), L.dHero, env);
     applyCamera(b, dHero * tHero);
     face.emissiveIntensity = FACE_GLOW * b * b;

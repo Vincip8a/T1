@@ -7,7 +7,7 @@
 import './ipodc.css';
 import { IPOD, COLORS } from '../../../shared/ipodSpec.js';
 import { prefersReducedMotion } from '../../../shared/config.js';
-import { NOISE_SVG, CHEVRON, GLYPH, playIndicator, battery, TOAST_ICON, SPEAKER_LO, SPEAKER_HI, previewIcon } from './art.js';
+import { NOISE_SVG, CHEVRON, GLYPH, playIndicator, battery, TOAST_ICON, SPEAKER_LO, SPEAKER_HI, SPEAKER_NOW, previewIcon } from './art.js';
 import { createSound } from './sound.js';
 
 const LW = IPOD.screen.pxWidth;          // 320 logical px
@@ -63,12 +63,40 @@ function safeHref(href) {
   return resolveAsset(s);
 }
 const fileName = (p) => String(p ?? '').split(/[?#]/)[0].split('/').pop() || '';
+/** Decode a URI component without ever throwing on malformed input (e.g. "mailto:a%@b.c"). */
+function safeDecode(s) {
+  try { return decodeURIComponent(s); } catch { return s; }
+}
+
+// UI strings (not content): overridable per site via config.ui, German defaults.
+const DEFAULT_UI = {
+  nowPlaying: 'Now Playing',
+  openSpotify: 'In Spotify öffnen',
+  of: 'von',
+  tracks: 'Titel',
+  select: 'Auswählen',
+  back: 'zurück',
+  next: 'Nächster Titel',
+  prev: 'Vorheriger Titel',
+  playPause: 'Wiedergabe / Pause',
+  playing: 'Wiedergabe',
+  paused: 'Pause',
+  volume: 'Lautstärke',
+  wheel: 'Click Wheel',
+  download: 'Download',
+  downloadStarted: 'Download gestartet',
+  mailOpening: 'E-Mail wird geöffnet',
+  linkOpening: 'Wird geöffnet …',
+  hint: 'Pfeiltasten oder Click Wheel zum Blättern, Enter wählt aus, Escape geht zurück, Leertaste startet oder pausiert die Wiedergabe.',
+};
 
 // ───────────────────────── mount ─────────────────────────
 export function mountIpod(container, { config } = {}) {
   config ??= {};
   const brand = config.brand ?? {};
   const menu = (Array.isArray(config.menu) ? config.menu : []).filter((m) => m && typeof m === 'object');
+  const L = { ...DEFAULT_UI };
+  for (const [k, v] of Object.entries(config.ui ?? {})) if (typeof v === 'string' && k in L) L[k] = v;
   const P = `ipodc${++instanceSeq}`;
   let uid = 0;
   const nid = (s) => `${P}-${s}${++uid}`;
@@ -99,6 +127,8 @@ export function mountIpod(container, { config } = {}) {
     'wh-x': IPOD.wheel.cx - IPOD.wheel.diameter / 2, 'wh-y': IPOD.wheel.cy - IPOD.wheel.diameter / 2,
     'wh-d': IPOD.wheel.diameter, 'cb-d': IPOD.centerButton.diameter,
     'lab-r': (IPOD.wheelLabels.radiusFactor * IPOD.wheel.diameter) / 2,
+    'hold-x': IPOD.holdSwitch.x, 'hold-w': IPOD.holdSwitch.width,
+    'jack-x': IPOD.headphoneJack.x, 'jack-d': IPOD.headphoneJack.diameter,
   };
   for (const [k, v] of Object.entries(mm)) el.style.setProperty(`--ipodc-mm-${k}`, String(+v.toFixed(4)));
   for (const [k, v] of Object.entries(COLORS)) el.style.setProperty(`--ipodc-c-${k}`, v);
@@ -142,7 +172,7 @@ export function mountIpod(container, { config } = {}) {
   win.append(lcd, h('div', 'ipodc-glare'));
 
   // ── click wheel
-  const wheel = h('div', 'ipodc-wheel', { role: 'group', 'aria-label': 'Click Wheel' });
+  const wheel = h('div', 'ipodc-wheel', { role: 'group', 'aria-label': L.wheel });
   const inner = (IPOD.centerButton.diameter / IPOD.wheel.diameter) * 50 + 0.4;
   const sector = (a0, a1) => {
     const p = (r, a) => `${(r * Math.cos(a)).toFixed(3)} ${(r * Math.sin(a)).toFixed(3)}`;
@@ -150,7 +180,7 @@ export function mountIpod(container, { config } = {}) {
     return `M${p(50, s)}A50 50 0 0 1 ${p(50, e)}L${p(inner, e)}A${inner} ${inner} 0 0 0 ${p(inner, s)}Z`;
   };
   const quad = h('div', 'ipodc-quad-wrap', { 'aria-hidden': 'true' });
-  quad.innerHTML = `<svg class="ipodc-quad" viewBox="-50 -50 100 100"><defs><radialGradient id="${P}qg" cx="0" cy="0" r="50" gradientUnits="userSpaceOnUse"><stop offset="${(inner / 50).toFixed(3)}" stop-color="#000" stop-opacity=".02"/><stop offset="1" stop-color="#000" stop-opacity=".11"/></radialGradient></defs>
+  quad.innerHTML = `<svg class="ipodc-quad" viewBox="-50 -50 100 100"><defs><radialGradient id="${P}qg" cx="0" cy="0" r="50" gradientUnits="userSpaceOnUse"><stop offset="${(inner / 50).toFixed(3)}" stop-color="#000" stop-opacity=".05"/><stop offset="1" stop-color="#000" stop-opacity=".13"/></radialGradient></defs>
     <path data-q="menu" d="${sector(-135, -45)}" fill="url(#${P}qg)"/><path data-q="next" d="${sector(-45, 45)}" fill="url(#${P}qg)"/>
     <path data-q="play" d="${sector(45, 135)}" fill="url(#${P}qg)"/><path data-q="prev" d="${sector(135, 225)}" fill="url(#${P}qg)"/></svg>`;
   const mkBtn = (name, label, content) => {
@@ -158,22 +188,22 @@ export function mountIpod(container, { config } = {}) {
     b.innerHTML = content;
     return b;
   };
-  const centerBtn = h('button', 'ipodc-center', { type: 'button', tabindex: -1, 'aria-label': 'Auswählen' });
+  const centerBtn = h('button', 'ipodc-center', { type: 'button', tabindex: -1, 'aria-label': L.select });
   const menuLabel = IPOD.wheelLabels.menu ?? 'MENU';
   wheel.append(
     quad,
-    mkBtn('menu', `${menuLabel} – zurück`, menuLabel),
-    mkBtn('next', 'Nächster Titel', GLYPH.next),
-    mkBtn('prev', 'Vorheriger Titel', GLYPH.prev),
-    mkBtn('play', 'Wiedergabe / Pause', GLYPH.play),
+    mkBtn('menu', `${menuLabel} – ${L.back}`, menuLabel),
+    mkBtn('next', L.next, GLYPH.next),
+    mkBtn('prev', L.prev, GLYPH.prev),
+    mkBtn('play', L.playPause, GLYPH.play),
     centerBtn,
   );
   const live = h('div', 'ipodc-sr', { 'aria-live': 'polite', 'aria-atomic': 'true' });
-  const hint = h('div', 'ipodc-sr', {
-    id: hintId,
-    text: 'Pfeiltasten oder Click Wheel zum Blättern, Enter wählt aus, Escape geht zurück, Leertaste startet oder pausiert die Wiedergabe.',
-  });
-  el.append(win, wheel, live, hint);
+  const hint = h('div', 'ipodc-sr', { id: hintId, text: L.hint });
+  // top edge: hold switch (x = left edge) and headphone jack (x = centre), seen just over the rim
+  const edge = h('div', 'ipodc-edge', { 'aria-hidden': 'true' });
+  edge.append(h('span', 'ipodc-hold'), h('span', 'ipodc-jack'));
+  el.append(edge, win, wheel, live, hint);
   container.append(el);
 
   /** Real px per logical px (only needed to measure wrapped text). */
@@ -363,6 +393,8 @@ export function mountIpod(container, { config } = {}) {
         if (ensure) s.ensureVisible(i);
         s.paint(instant);
         s.onIndex?.(i, changed, silent);
+        // Speak every highlight change (debounced) – aria-activedescendant alone is unreliable.
+        if (changed && !silent && isCurrent(s)) announce(s.currentLabel());
         return changed;
       },
       /** One wheel step. Returns true when something moved. */
@@ -400,8 +432,16 @@ export function mountIpod(container, { config } = {}) {
       activate() {
         const r = rows[s.index];
         if (!r) return false;
-        // Centre on an action that is scrolled out of view reveals it instead of firing blind.
-        if (!s.rowVisible(s.index)) { s.ensureVisible(s.index); s.paint(); return true; }
+        // Centre on an action that is scrolled out of view reveals it instead of firing blind:
+        // the text advances one step at a time (like turning the wheel), so nothing is skipped.
+        if (!s.rowVisible(s.index)) {
+          const t = s.rowTop(s.index);
+          if (t < s.off) s.off = t;
+          else s.off = Math.min(s.off + TEXT_STEP, t + ROW - s.viewH);
+          s.off = clamp(s.off, 0, s.maxOff());
+          s.paint();
+          return true;
+        }
         const spec = specs[s.index];
         if (spec.onActivate) { spec.onActivate(); return true; }
         if (r.tagName === 'A') { followLink(r, spec); return true; }
@@ -430,12 +470,12 @@ export function mountIpod(container, { config } = {}) {
   }
   function linkFeedback(row, spec) {
     const href = row.getAttribute('href') ?? '';
-    if (row.hasAttribute('download')) showToast('check', 'Download gestartet', spec?.label);
-    else if (/^mailto:/i.test(href)) showToast('mail', 'E-Mail wird geöffnet', decodeURIComponent(href.slice(7).split('?')[0]));
+    if (row.hasAttribute('download')) showToast('check', L.downloadStarted, spec?.label);
+    else if (/^mailto:/i.test(href)) showToast('mail', L.mailOpening, safeDecode(href.slice(7).split('?')[0]));
     else if (/^https?:/i.test(href)) {
       let host = '';
       try { host = new URL(href).hostname.replace(/^www\./, ''); } catch { /* ignore */ }
-      showToast('out', 'Wird geöffnet …', host);
+      showToast('out', L.linkOpening, host);
     }
   }
 
@@ -517,7 +557,7 @@ export function mountIpod(container, { config } = {}) {
             const detail = [it.format, size].filter(Boolean).join(' · ');
             return {
               label: it.label, detail, href: it.file, download: fileName(it.file),
-              ariaLabel: `${it.label ?? ''}${detail ? `, ${detail}` : ''}, Download`,
+              ariaLabel: `${it.label ?? ''}${detail ? `, ${detail}` : ''}, ${L.download}`,
             };
           }),
         });
@@ -537,8 +577,8 @@ export function mountIpod(container, { config } = {}) {
   function nowPlayingScreen(item) {
     const spot = safeHref(item.spotifyUrl);
     const s = listScreen({
-      kind: 'nowplaying', id: item.id ?? 'nowplaying', title: 'Now Playing',
-      rows: spot ? [{ label: 'In Spotify öffnen', href: spot, sub: true, spotify: true }] : [],
+      kind: 'nowplaying', id: item.id ?? 'nowplaying', title: L.nowPlaying,
+      rows: spot ? [{ label: L.openSpotify, href: spot, sub: true, spotify: true }] : [],
     });
     const node = s.node;
     const count = h('div', 'ipodc-np-count');
@@ -567,8 +607,25 @@ export function mountIpod(container, { config } = {}) {
     vol.insertAdjacentHTML('beforeend', SPEAKER_HI);
     const deco = h('div', 'ipodc-np-deco', { 'aria-hidden': 'true' });
     deco.append(count, art, refl, info, prog, vol);
+    // Compact track list beside the cover: every config track is a selectable option (tap / click,
+    // ⏮ ⏭ on the wheel); the playing one carries the blue speaker like the 6G song lists.
+    const realTracks = Array.isArray(item.tracks) && item.tracks.length > 0;
+    const tl = h('div', 'ipodc-np-tracks', { role: 'listbox', 'aria-label': L.tracks });
+    const tlIn = h('div', 'ipodc-np-tracks-in');
+    tl.append(tlIn);
+    const trkRows = realTracks ? tracks.map((t, i) => {
+      const r = h('div', 'ipodc-trk', { role: 'option', id: nid('t'), 'aria-selected': 'false', 'data-i': i });
+      r.insertAdjacentHTML('beforeend', SPEAKER_NOW);
+      r.append(h('span', 'ipodc-trk-t', { text: t.title ?? '' }));
+      if (t.duration) r.append(h('span', 'ipodc-trk-d', { text: t.duration }));
+      return r;
+    }) : [];
+    tlIn.append(...trkRows);
     node.prepend(deco);
+    if (trkRows.length) node.append(tl); else node.classList.add('no-tracks');
     if (!spot) node.classList.add('no-cta');
+    const TRK_VIS = 3;
+    let trkTop = 0;
 
     let volT = 0;
     const bindings = {
@@ -577,7 +634,20 @@ export function mountIpod(container, { config } = {}) {
         const dur = parseDuration(t.duration);
         if (tTitle.textContent !== (t.title ?? '')) tTitle.textContent = t.title ?? '';
         if (tArtist.textContent !== (t.artist ?? '')) tArtist.textContent = t.artist ?? '';
-        count.textContent = tracks.length ? `${player.track + 1} von ${tracks.length}` : '';
+        count.textContent = tracks.length ? `${player.track + 1} ${L.of} ${tracks.length}` : '';
+        trkRows.forEach((r, i) => {
+          const cur = i === player.track;
+          if (r.classList.contains('is-cur') !== cur) {
+            r.classList.toggle('is-cur', cur);
+            r.setAttribute('aria-selected', String(cur));
+          }
+        });
+        if (trkRows.length > TRK_VIS) {
+          // keep the playing track inside the 3-row window
+          if (player.track < trkTop) trkTop = player.track;
+          else if (player.track >= trkTop + TRK_VIS) trkTop = player.track - TRK_VIS + 1;
+          tlIn.style.setProperty('--ipodc-tt', String(trkTop));
+        }
         if (instant) node.classList.add('is-instant');
         fill.style.setProperty('--ipodc-f', clamp(player.elapsed / dur, 0, 1).toFixed(4));
         vFill.style.setProperty('--ipodc-f', player.volume.toFixed(4));
@@ -606,8 +676,18 @@ export function mountIpod(container, { config } = {}) {
       clearTimeout(volT);
       volT = setTimeout(() => node.classList.remove('is-vol'), 1600);
       bindings.update();
-      if (player.volume !== before) announce(`Lautstärke ${Math.round(player.volume * 100)} %`);
+      if (player.volume !== before) announce(`${L.volume} ${Math.round(player.volume * 100)} %`);
       return player.volume !== before;
+    };
+    s.pickTrack = (i) => {
+      if (!tracks[i]) return;
+      if (i === player.track && player.started) { setPlaying(!player.playing); return; }
+      player.track = i;
+      player.elapsed = 0;
+      setPlaying(true);
+      npView?.update(true);
+      const t = tracks[i];
+      announce(`${t.title ?? ''}${t.artist ? `, ${t.artist}` : ''}`);
     };
     const baseActivate = s.activate;
     s.activate = () => {
@@ -742,7 +822,7 @@ export function mountIpod(container, { config } = {}) {
       case 'play':
         if (!tracks.length) break;
         setPlaying(!player.playing);
-        announce(player.playing ? 'Wiedergabe' : 'Pause');
+        announce(player.playing ? L.playing : L.paused);
         break;
       case 'next':
       case 'prev':
@@ -872,10 +952,11 @@ export function mountIpod(container, { config } = {}) {
 
   // Momentum: a fast flick keeps coasting a few items with friction and stops at the list end.
   function momentum(v, acc, type) {
-    let last = performance.now();
+    let last = -1; // seeded from the first rAF timestamp: never mix clocks
     v = clamp(v, -1500, 1500);
     const loop = (now) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
+      if (last < 0) { last = now; momRaf = requestAnimationFrame(loop); return; }
+      const dt = clamp((now - last) / 1000, 0, 0.05);
       last = now;
       v *= Math.exp(-dt * 7);
       acc += v * dt;
@@ -922,6 +1003,7 @@ export function mountIpod(container, { config } = {}) {
   let suppressClick = false;
   on(stage, 'pointerdown', (e) => {
     if (phase !== 'ready' || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    focusRoot(); // mousedown is prevented below, so focus the iPod explicitly
     sound.ensure();
     stopMomentum();
     sp = { id: e.pointerId, y: e.clientY, x: e.clientX, acc: 0, drag: false, type: e.pointerType };
@@ -952,6 +1034,12 @@ export function mountIpod(container, { config } = {}) {
     if (programmatic) return; // our own activation of a real <a>: let the browser follow it
     const row = e.target.closest?.('.ipodc-row');
     if (suppressClick) { suppressClick = false; e.preventDefault(); return; }
+    const trk = e.target.closest?.('.ipodc-trk');
+    if (trk && phase === 'ready' && current()?.node.contains(trk) && e.detail < 2) {
+      sound.play('press');
+      current().pickTrack?.(Number(trk.dataset.i));
+      return;
+    }
     if (!row) return;
     const s = current();
     const settling = !isReduced() && performance.now() - (s?.enteredAt ?? 0) < SLIDE_MS * 0.75;
@@ -973,8 +1061,9 @@ export function mountIpod(container, { config } = {}) {
   let wAcc = 0;
   let wLast = 0;
   on(el, 'wheel', (e) => {
+    if (phase === 'off' || destroyed) return;
+    e.preventDefault(); // also during boot: the page behind must never scroll under the iPod
     if (phase !== 'ready') return;
-    e.preventDefault();
     stopMomentum();
     const now = performance.now();
     if (now - wLast > 220) wAcc = 0;
@@ -1005,10 +1094,21 @@ export function mountIpod(container, { config } = {}) {
     if (handled) e.preventDefault();
   }
   on(el, 'keydown', onKey);
-  // With nothing else focused (e.g. right after the intro), the iPod is the obvious keyboard target.
+  // With nothing else focused (e.g. right after the intro), the iPod is the obvious keyboard target,
+  // but only while it is really on screen and on top (not minimised, hidden or covered).
+  const onTop = () => {
+    if (!el.isConnected || phase !== 'ready') return false;
+    const r = centerBtn.getBoundingClientRect();
+    if (!r.width) return false;
+    const x = r.left + r.width / 2;
+    const y = r.top + r.height / 2;
+    if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) return false;
+    const hit = document.elementFromPoint(x, y);
+    return !!hit && el.contains(hit);
+  };
   on(document, 'keydown', (e) => {
     if (e.target !== document.body && e.target !== document.documentElement) return;
-    if (!el.isConnected || !el.getClientRects().length) return;
+    if (e.defaultPrevented || !onTop()) return;
     const se = document.scrollingElement;
     const pageScrolls = se && se.scrollHeight > se.clientHeight + 2;
     if (pageScrolls && /^(Arrow|Spacebar$| $)/.test(e.key)) return; // leave page scrolling alone

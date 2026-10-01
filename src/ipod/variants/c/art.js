@@ -38,6 +38,8 @@ export const TOAST_ICON = {
 };
 
 export const SPEAKER_LO = '<svg viewBox="0 0 13 11" aria-hidden="true"><path d="M1 3.5h2.5L7 .8v9.4L3.5 7.5H1z" fill="#55595f"/></svg>';
+// "now playing" marker in song lists (blue speaker, like the 6G)
+export const SPEAKER_NOW = '<svg class="ipodc-trk-ico" viewBox="0 0 13 11" aria-hidden="true"><path d="M0 3.5h2.5L6 .8v9.4L2.5 7.5H0z"/><path d="M8 3.2a3 3 0 0 1 0 4.6M9.8 1.6a5.4 5.4 0 0 1 0 7.8" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>';
 export const SPEAKER_HI = '<svg viewBox="0 0 13 11" aria-hidden="true"><path d="M0 3.5h2.5L6 .8v9.4L2.5 7.5H0z" fill="#55595f"/><path d="M8 3.2a3 3 0 0 1 0 4.6M9.8 1.6a5.4 5.4 0 0 1 0 7.8" fill="none" stroke="#55595f" stroke-width="1.1" stroke-linecap="round"/></svg>';
 
 // Large glossy preview icons for the split-screen pane (6th-gen style), 100×100 viewBox.

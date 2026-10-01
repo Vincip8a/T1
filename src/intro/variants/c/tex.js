@@ -308,16 +308,14 @@ export function flexCanvas() {
   return c;
 }
 
-/** Hand-off fill for the front plate (linear grey): soft top highlight falling off downwards,
- *  matching the DOM iPod's studio gradient once the camera is frontal. */
+/** Hand-off fill for the front plate (linear grey): a soft bounce from below, so the
+ *  frontal face falls off gently like the DOM iPod's studio gradient instead of going dark. */
 export function faceGlowCanvas() {
-  const [c, g] = canvas(8, 256);
-  const grd = g.createLinearGradient(0, 0, 0, 256);
-  grd.addColorStop(0, 'rgb(255,255,255)');
-  grd.addColorStop(0.22, 'rgb(120,120,120)');
-  grd.addColorStop(0.48, 'rgb(40,40,40)');
-  grd.addColorStop(0.8, 'rgb(10,10,10)');
-  grd.addColorStop(1, 'rgb(0,0,0)');
-  g.fillStyle = grd; g.fillRect(0, 0, 8, 256);
+  const [c, g] = canvas(4, 128);
+  const grd = g.createLinearGradient(0, 0, 0, 128);
+  grd.addColorStop(0, 'rgb(0,0,0)');
+  grd.addColorStop(0.4, 'rgb(70,70,70)');
+  grd.addColorStop(1, 'rgb(255,255,255)');
+  g.fillStyle = grd; g.fillRect(0, 0, 4, 128);
   return c;
 }
