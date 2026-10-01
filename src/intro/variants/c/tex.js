@@ -17,9 +17,11 @@ export function rng(seed = 1) {
 }
 
 const fill = (g, c, x, y, w, h) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
-export function canvas(w, h, bg) {
+// k < 1: same drawing in logical px, stored at k x the resolution (texture budget ~512 px)
+export function canvas(w, h, bg, k = 1) {
   const c = document.createElement('canvas'), g = c.getContext('2d');
-  c.width = round(w); c.height = round(h);
+  c.width = round(w * k); c.height = round(h * k);
+  g.scale(k, k);
   if (bg) fill(g, bg, 0, 0, w, h);
   return [c, g];
 }
@@ -70,9 +72,10 @@ function streaks(g, S, H, r, n, col, len, h = () => 1) {
   }
 }
 
-export function brushed(seed, base, spread, S = 512, h = [0.5, 0.9], n = S * 3) {
-  const [c, g] = canvas(S, S, grey(base)), r = rng(seed);
-  streaks(g, S, S, r, n, () => grey(round(base + (r() - 0.5) * spread * 2), 0.2 + r() * 0.45), () => 60 + r() * S * 0.8, () => h[0] + r() * h[1]);
+// horizontal streaks: kx < 1 halves the resolution along the grain only
+export function brushed(seed, base, spread, S = 512, h = [0.5, 0.9], n = S * 3, kx = 1) {
+  const W = S * kx, [c, g] = canvas(W, S, grey(base)), r = rng(seed);
+  streaks(g, W, S, r, n, () => grey(round(base + (r() - 0.5) * spread * 2), 0.2 + r() * 0.45), () => (60 + r() * S * 0.8) * kx, () => h[0] + r() * h[1]);
   return c;
 }
 
@@ -97,7 +100,7 @@ function inset(g, cx, cy, r, dy, blur, color) {
 }
 
 export function wheelCanvas(dMm, labelFactor, cbMm) {
-  const S = 1024, px = S / dMm, R = S / 2, lr = R * labelFactor;
+  const S = 512, px = S / dMm, R = S / 2, lr = R * labelFactor;
   const [c, g] = canvas(S, S);
   g.save(); g.translate(R, S * 0.16); g.scale(1.3, 1.1);
   fill(g, grad(g.createRadialGradient(0, 0, 0, 0, 0, S), [[0, '#f0f1f2'], [0.52, COLORS.wheel], [1, '#d9dbde']]), -S, -S, 3 * S, 3 * S);
@@ -135,7 +138,7 @@ export function faceToneCanvas(stops) {
 
 export function pcbCanvas(wMm, hMm, parts, holes) {
   const px = 12, W = wMm * px, H = hMm * px;
-  const [c, g] = canvas(W, H, COLORS.pcb), r = rng(7);
+  const [c, g] = canvas(W, H, COLORS.pcb, 0.75), r = rng(7);
   const X = (x) => (x + wMm / 2) * px, Y = (y) => (hMm / 2 - y) * px;
   for (let i = 0; i < 260; i++) dot(g, r() * W, r() * H, 10 + r() * 50, grey(r() > 0.5 ? 255 : 0, 0.02 + r() * 0.03));
   g.lineCap = g.lineJoin = 'round'; g.lineWidth = 2;
@@ -177,7 +180,7 @@ export function chipAtlas(list) {
 
 export function batteryCanvas(wMm, hMm) {
   const px = 16, W = wMm * px, H = hMm * px, m = 2 * px, ink = '#b8bcc2', dim = '#8a8e94';
-  const [c, g] = canvas(W, H, COLORS.battery), r = rng(11);
+  const [c, g] = canvas(W, H, COLORS.battery, 0.7), r = rng(11);
   for (let i = 0; i < 90; i++) fill(g, grey(255, r() * 0.03), 0, r() * H, W, 1 + r() * 3);
   text(g, 'Li-ion Polymer Battery', m, m + 1.6 * px, 1.9 * px, 700, ink);
   text(g, '3.7 V ⎓ 550 mAh   2.04 Wh', m, m + 4.2 * px, 1.4 * px, 500, ink);
@@ -193,7 +196,7 @@ export function batteryCanvas(wMm, hMm) {
 
 export function driveCanvas(wMm, hMm) {
   const px = 12, W = wMm * px, H = hMm * px;
-  const [c, g] = canvas(W, H, COLORS.drive), r = rng(5);
+  const [c, g] = canvas(W, H, COLORS.drive, 0.75), r = rng(5);
   streaks(g, W, H, r, 1300, () => { const v = 160 + floor(r() * 70); return `rgba(${v},${v},${v + 4},${0.15 + r() * 0.25})`; }, () => 40 + r() * 300);
   dot(g, W / 2, H * 0.3, 9 * px, grad(g.createRadialGradient(W / 2, H * 0.3, 6 * px, W / 2, H * 0.3, 9 * px), [[0, grey(255, 0)], [0.5, grey(255, 0.35)], [0.75, grey(0, 0.18)], [1, grey(0, 0)]]));
   const hole = (x, y, r, a, b) => { dot(g, x, y, r, a); dot(g, x, y, r / 2, b); };
@@ -216,7 +219,7 @@ export function driveCanvas(wMm, hMm) {
 export function backCanvases(wMm, hMm, { monogram = '', name = '', line = '' } = {}) {
   const px = 10, W = wMm * px, H = hMm * px;
   return [false, true].map((rough) => {
-    const [c, g] = canvas(W, H, rough ? grey(16) : '#fff');
+    const [c, g] = canvas(W, H, rough ? grey(16) : '#fff', 0.8);
     g.translate(round(W), 0); g.scale(-1, 1);
     const ink = rough ? grey(74) : '#dcdcdc';
     if (monogram) text(g, monogram, W / 2, H * 0.38, 15 * px, 300, ink, 'center', 0.6 * px);
@@ -270,6 +273,6 @@ export function flexCanvas() {
 export function shadowCanvas() {
   const [c, g] = canvas(256, 96);
   g.shadowColor = grey(0, 0.9); g.shadowBlur = 22; g.shadowOffsetX = 1000;
-  rrect(g, -962, 30, 180, 36, 18, '#000');
+  rrect(g, -962, 30, 180, 36, 10, '#000'); // footprint: rounded rect, not a pill
   return c;
 }

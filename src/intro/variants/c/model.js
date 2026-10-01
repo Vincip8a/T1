@@ -82,7 +82,7 @@ const chipGeo = (list, z0, back, c0) => merge(list.map(([x, y, w, h, d], i) => {
   return g;
 }));
 
-function ribbon(mat, from, a, ta, to, b, tb, w, N = 20) {
+function ribbon(mat, from, a, ta, to, b, tb, w, N = 28) {
   const pos = new Float32Array((N + 1) * 6), nrm = pos.slice(), uv = new Float32Array((N + 1) * 4), idx = [];
   for (let k = 0; k < 2 * N; k += 2) idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
   const g = new THREE.BufferGeometry().setIndex(idx);
@@ -123,7 +123,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
   const fit = (c, w, h = w, o) => T.capFit(tx(c, o), w, h);
   const brush = tx(T.brushed(3, 128, 16), { color: false, wrap: true });
   brush.repeat.set(1 / 40, 1 / 40);
-  const fine = tx(T.brushed(4, 190, 36, 1024, [0.3, 0.3], 9000), { color: false, wrap: true });
+  const fine = tx(T.brushed(4, 190, 36, 1024, [0.3, 0.3], 9000, 0.5), { color: false, wrap: true });
   fine.repeat.set(1 / 20, 1 / 20);
 
   const model = new THREE.Group(), parts = {}, mats = {};
@@ -297,7 +297,11 @@ export function buildIpod({ maxAniso = 8 } = {}) {
   ribbons.forEach((r) => model.add(r.mesh));
 
   function setBrand({ monogram = '', name = '', tagline = '' } = {}) {
-    T.backCanvases(back.bw, back.bh, { monogram, name, line: tagline }).forEach((c, i) => [back.cC, back.rC][i].getContext('2d').drawImage(c, 0, 0));
+    T.backCanvases(back.bw, back.bh, { monogram, name, line: tagline }).forEach((c, i) => {
+      const g = [back.cC, back.rC][i].getContext('2d');
+      g.setTransform(1, 0, 0, 1, 0, 0); // the canvas keeps its mirror/scale transform: copy 1:1
+      g.drawImage(c, 0, 0);
+    });
     back.cT.needsUpdate = back.rT.needsUpdate = true;
   }
 

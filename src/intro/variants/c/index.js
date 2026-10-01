@@ -10,11 +10,14 @@ import { stripCanvas, shadowCanvas } from './tex.js';
 const { PI, abs, cos, exp, max, min, sign, sin, sqrt, tan } = Math;
 const DEG = PI / 180, HALF_D = IPOD.depth / 2;
 const FOV_HERO = 26, FOV_END = 20, tHero = tan(13 * DEG);
-const D = 6.5, STILL = D - 0.18, FADE_MS = 220; // still from STILL
+const STILL = 6.32, D = STILL + 0.22, FADE_MS = 220; // static tail: aligned and still from STILL to D
 const ENV_END = 0.25, GLASS_FROM = 2.75, GLASS_END = 2.27, GLASS_Z = PI / 4;
 const WHEEL_GLOW = 0.24, CENTRE_GLOW = 0.3, END_EXPOSURE = 0.9, KEY_END = 0.9; // = DOM iPod tone
 const KEY_HOLD = 1.1, FACE_HOLD = 0.72; // hero: plate silver, not white
-const TL = { rise: 1.0, spin: 1.1, screw: 1.52, re0: 4.15, reS: 0.085, reD: 0.62, cam0: 4.6 };
+// opening: rise with the polished back drifting (YB at drift), Hermite turn to the 38 deg rest at spin,
+// a short closed rest, then the removal story from the shell pry at 1.4 (OUT) runs exactly as before
+const TL = { rise: 0.65, drift: 0.34, spin: 1.3, screw: 1.52, re0: 4.15, reS: 0.085, reD: 0.62, cam0: 4.6 };
+const YB = 160, VD = 20, Y0 = YB + VD * TL.drift, P0 = -7, PB = 19; // yaw/s drift, top-down pitch at the edge pass
 // removal story [start, duration]: shell, screws, plate, frame, stack
 const OUT = {
   backShell: [1.4, 1.15], faceplate: [1.62, 1], midframe: [1.72, 1], screenGlass: [1.79, 0.95], clickWheel: [1.82, 0.95],
@@ -32,6 +35,14 @@ const inOutCubic = (u) => (u < 0.5 ? 4 * u * u * u : 1 - (-2 * u + 2) ** 3 / 2);
 // seat: glide to 7 % above, hover, snap home (power2.in) into the click
 const seat = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u < 0.7 ? 0.93 * io2(u / 0.7) : u < 0.86 ? 0.93 + (0.005 * (u - 0.7)) / 0.16 : 1 - 0.065 * (1 - ((u - 0.86) / 0.14) ** 2));
 const smax = (a, b, w) => 0.5 * (a + b + sqrt((a - b) ** 2 + w * w));
+const ss = (u) => u * u * (3 - 2 * u);
+// declarative keyframe tracks, pure functions of t: seq = eased segments [t0, t1, v1, ease = smoothstep]
+// (non-overlapping, each starts from the previous value); spline = Hermite keys (orbit)
+const seq = (v0, ...segs) => (t) => {
+  let v = v0;
+  for (const [t0, t1, v1, f = ss] of segs) { if (t <= t0) break; v = t >= t1 ? v1 : v + (v1 - v) * f((t - t0) / (t1 - t0)); }
+  return v;
+};
 function spline(keys) {
   const n = keys.length;
   const m = keys.map((k, i) => {
@@ -48,15 +59,30 @@ function spline(keys) {
     return (2 * s3 - 3 * s2 + 1) * A[1] + (s3 - 2 * s2 + s) * h * m[i] + (-2 * s3 + 3 * s2) * B[1] + (s3 - s2) * h * m[i + 1];
   };
 }
-// yaw/pitch: one decelerating turn from the back (seen from above) to a still 3/4 rest
+// yaw/pitch opening, two beats: (1) back drifts Y0 -> YB at VD deg/s while rising; (2) cubic Hermite
+// (YB, -VD) -> (38, 0) over TL.spin - TL.drift (0.96 s, peak ~186 deg/s, HEAD's u^3 started at 305). The edge-on pass
+// dips the pitch (PB) so the top edge (hold switch, jack) carries it, then the still 3/4 rest.
+const opening = (t) => {
+  if (t <= TL.drift) return [Y0 - VD * t, P0];
+  const T = TL.spin - TL.drift, s = min(1, (t - TL.drift) / T), s2 = s * s, s3 = s2 * s;
+  const y = (2 * s3 - 3 * s2 + 1) * YB - (s3 - 2 * s2 + s) * T * VD + (3 * s2 - 2 * s3) * 38;
+  const x = clamp01((YB - y) / (YB - 38)) ** 1.19; // bump peaks at yaw 90
+  return [y, lerp(P0, -11, 3 * s2 - 2 * s3) - PB * sin(PI * x) ** 2];
+};
 const orbit = (yaw, pitch) => {
   const y = spline([[TL.spin, 38], ...yaw, [STILL, 0]]), p = spline([[TL.spin, -11], ...pitch, [STILL, 0]]);
-  const u = (t) => 1 - min(1, t / TL.spin);
-  return { yaw: (t) => (t < TL.spin ? 38 + 112 * u(t) ** 3 : y(t)), pitch: (t) => (t < TL.spin ? -11 - 15 * u(t) ** 1.5 : p(t)) };
+  return { yaw: (t) => (t < TL.spin ? opening(t)[0] : y(t)), pitch: (t) => (t < TL.spin ? opening(t)[1] : p(t)) };
 };
 const ORBIT = {
   land: orbit([[1.45, 38], [2.3, 27], [3.0, 40], [3.9, 64], [5.05, 33]], [[1.45, -11], [2.6, 12], [3.9, 19], [5.05, 8]]),
   port: orbit([[1.45, 38], [2.3, 20], [3.0, 18], [3.9, 26], [5.05, 12]], [[1.45, -11], [2.6, 44], [3.9, 54], [5.05, 18]]),
+};
+// scalar channels: rise from below, opening dolly, framing envelope while apart, hover bob, plate env dim,
+// final camera blend (b), env spin + sweep, shadow fade-in
+const TRK = {
+  rise: seq(-1, [0, TL.rise, 0, p3out]), dolly: seq(1.12, [0, 1.25, 1, p3out]),
+  env: seq(0, [1.35, 2.6, 1], [4.25, 5.3, 0]), bob: seq(0, [1.9, 2.7, 1], [3.9, 4.4, 0]), face: seq(1, [1.3, 2.4, 0]),
+  cam: seq(0, [TL.cam0, STILL, 1, inOutCubic]), spin: seq(0, [0, 5.1, 1]), sweep: seq(0, [5.0, STILL, 1]), shadow: seq(0, [0.4, 1.1, 1]),
 };
 
 function studios(stripTex) {
@@ -196,7 +222,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     L.cx = (e[0] + e[2]) / 2; L.cy = (e[1] + e[3]) / 2;
     L.dHero = max(...[2.6, 3.3, 3.9, 4.25].map((t) => fitDistance(ex, qOf(t), L.mx, L.my, -L.cx, -L.cy)));
     L.dAsm = fitDistance(L.corners, tmpQ.setFromEuler(tmpE.set(-8 * DEG, -30 * DEG, 0)), 0.6, 0.6);
-    L.rise = 1.25 * L.dAsm * tHero + IPOD.height * 0.75;
+    L.rise = 1.1 * L.dAsm * tHero + IPOD.height * 0.7;
   }
 
   function targetRect() {
@@ -245,9 +271,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
   }
   function poseAt(t) {
     rig.rotation.set(-L.o.pitch(t) * DEG, -L.o.yaw(t) * DEG, 0, 'XYZ');
-    const rise = -L.rise * (1 - p3out(clamp01(t / TL.rise)));
-    const bob = 1.2 * sin((t - 1.9) * 2.1) * smooth(1.9, 2.7, t) * (1 - smooth(3.9, 4.4, t));
-    const env = smooth(1.35, 2.6, t) * (1 - smooth(4.25, 5.3, t));
+    const rise = L.rise * TRK.rise(t), bob = 1.2 * sin((t - 1.9) * 2.1) * TRK.bob(t), env = TRK.env(t);
     const ox = -L.cx * env, oy = bob - L.cy * env;
     rig.position.set(ox, rise + oy, 0);
 
@@ -272,8 +296,8 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
       }
       parts[i].group.rotation.set(tilt, tilt * 0.45 * sgn, 0);
     }
-    const b = inOutCubic(clamp01((t - TL.cam0) / (STILL - TL.cam0))), b2 = b * b;
-    const fk = lerp(FACE_HOLD - (L.portrait ? 0.1 : 0), 1, max(b2, 1 - smooth(1.3, 2.4, t)));
+    const b = TRK.cam(t), b2 = b * b;
+    const fk = lerp(FACE_HOLD - (L.portrait ? 0.1 : 0), 1, max(b2, TRK.face(t)));
     for (let k = 0, g = 0; k < gM.length; k++, g = 0) {
       for (let n = 0; n < gIds[k].length; n++) g = max(g, G[gIds[k][n]]);
       gM[k].envMapIntensity = gB[k] * (1 + 0.3 * g) * (gF[k] ? fk : 1);
@@ -288,13 +312,13 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     ipod.screws.visible = !closed;
     for (k = 0; k < 3; k++) ipod.ribbons[k].update();
 
-    const sweep = smooth(5.0, STILL, t);
-    scene.environmentRotation.set(0, lerp(-0.7, ENV_END - 0.55, smooth(0, 5.1, t)) + 0.55 * sweep, 0);
+    const sweep = TRK.sweep(t);
+    scene.environmentRotation.set(0, lerp(-0.7, ENV_END - 0.55, TRK.spin(t)) + 0.55 * sweep, 0);
     for (k = 0; k < ROOM.length; k++) ROOM[k].envMapRotation.copy(scene.environmentRotation);
     glass.envMapRotation.set(0, lerp(GLASS_FROM, GLASS_END, sweep), GLASS_Z);
     panel.envMapRotation.copy(glass.envMapRotation);
 
-    const dHero = lerp(L.dAsm * (1 + 0.12 * (1 - p3out(clamp01(t / 1.25)))), L.dHero, env);
+    const dHero = lerp(L.dAsm * TRK.dolly(t), L.dHero, env);
     const dReq = fitDistance(L.corners, rig.quaternion, L.mx, L.my, ox, oy, true);
     applyCamera(b, smax(dHero * tHero, dReq * tHero, 0.04 * dHero * tHero));
     wheel.emissiveIntensity = WHEEL_GLOW * b2; centre.emissiveIntensity = CENTRE_GLOW * b2;
@@ -304,7 +328,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     shadow.visible = b < 1;
     shadow.position.set(0, -IPOD.height / 2 - 9 - 7 * env + rise, -12);
     shadow.scale.set(lerp(84, 175 * L.spread, env), lerp(13, 24, env), 1);
-    shadow.material.opacity = (0.55 - (L.portrait ? 0.45 : 0.17) * env) * smooth(0.4, 1.1, t) * (1 - b);
+    shadow.material.opacity = (0.55 - (L.portrait ? 0.45 : 0.17) * env) * TRK.shadow(t) * (1 - b);
     return 1;
   }
 
@@ -413,8 +437,15 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
         const px = (fv.x * 0.5 + 0.5) * L.vw, py = (0.5 - fv.y * 0.5) * L.vh;
         ext[0] = min(ext[0], px); ext[1] = min(ext[1], py); ext[2] = max(ext[2], px); ext[3] = max(ext[3], py);
       }
-      const r = targetRect(), target = [r.left, r.top, r.left + r.width, r.top + r.height];
-      return { t, ext, target, err: max(...ext.map((e, i) => abs(e - target[i]))) };
+      const r = targetRect(), target = [r.left, r.top, r.left + r.width, r.top + r.height], box = [1e9, 1e9, -1e9, -1e9];
+      for (const c of L.corners) { // assembled hull: in-frame test for the opening
+        fv.copy(c).applyMatrix4(ipod.model.matrixWorld).project(camera);
+        const px = (fv.x * 0.5 + 0.5) * L.vw, py = (0.5 - fv.y * 0.5) * L.vh;
+        box[0] = min(box[0], px); box[1] = min(box[1], py); box[2] = max(box[2], px); box[3] = max(box[3], py);
+      }
+      const yaw = L.o.yaw(t), inFrame = box[0] >= 0 && box[1] >= 0 && box[2] <= L.vw && box[3] <= L.vh;
+      const edges = ext.map((e, i) => e - target[i]); // projected - target: left, top, right, bottom (px)
+      return { t, ext, target, edges, err: max(...edges.map(abs)), yaw, pitch: L.o.pitch(t), face: abs(cos(yaw * DEG)), box, inFrame };
     },
     info: () => ({ ...renderer.info.memory, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }),
   };
