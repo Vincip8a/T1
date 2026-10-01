@@ -103,7 +103,7 @@ export function mountIpod(container, { config } = {}) {
 
   // ── player
   const npItem = menu.find((m) => m.type === 'nowplaying');
-  const tracks = !npItem ? [] : npItem.tracks?.length
+  const tracks = !npItem ? [] : Array.isArray(npItem.tracks) && npItem.tracks.length
     ? npItem.tracks.filter((t) => t && typeof t === 'object')
     : [{ title: npItem.title, artist: npItem.artist }];
   const player = createPlayer(tracks, (kind) => {
@@ -361,7 +361,7 @@ export function mountIpod(container, { config } = {}) {
     if (e.shiftKey && /^Arrow(Left|Right)$/.test(k)) a = a > 0 ? 'next' : 'prev';
     sound.ensure();
     if (k === 'Home' || k === 'End') jump(k === 'Home' ? -Infinity : Infinity);
-    else if (k === 'PageDown' || k === 'PageUp') jump(i + (k === 'PageDown' ? 7 : -7)); // one screen minus one row
+    else if (k === 'PageDown' || k === 'PageUp') jump(i + (k === 'PageDown' ? 4 : -4)); // half a screen
     else if (typeof a === 'number') step(a);
     else if (!a) return;
     else if (!e.repeat) tap(a);

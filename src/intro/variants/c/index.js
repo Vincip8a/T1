@@ -1,12 +1,13 @@
-// Intro C "studio teardown": the iPod rises showing its polished back, swings to 3/4 and bursts
-// apart front-to-back, holds at the widest orbit, seats back-to-front (click, glint, settle) and
-// lands frontal on getTargetRect(). Pure function of t.
+// Intro C "studio teardown": rises showing the polished back, swings to 3/4, bursts apart
+// front-to-back, seats back-to-front (click, glint, settle), lands frontal on getTargetRect().
+// Pure function of t.
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { IPOD } from '../../../shared/ipodSpec.js';
 import { loadConfig } from '../../../shared/config.js';
 import { buildIpod, FACE_BEVEL } from './model.js';
-import { stripCanvas } from './tex.js';
+import { stripCanvas, canvas as cnv } from './tex.js';
+import { measureFace } from './devMeasure.js';
 
 const DEG = Math.PI / 180;
 const HALF_D = IPOD.depth / 2;
@@ -53,8 +54,8 @@ function spline(keys) {
     return (2 * s3 - 3 * s2 + 1) * v0 + (s3 - 2 * s2 + s) * h * m[i] + (-2 * s3 + 3 * s2) * v1 + (s3 - s2) * h * m[i + 1];
   };
 }
-// Orbit yaw/pitch: edge-on passes early (t≈0.7, still rising); apex at 3.9 s, reassembly at 4.3 s.
-// Landscape spreads the stack sideways, portrait looks down on it.
+// Orbit yaw/pitch (deg). Edge-on early (t≈0.7, rising); apex 3.9 s; landscape spreads the stack
+// sideways, portrait looks down on it.
 const YAW_IN = [[0, 166], [0.5, 124], [0.8, 76], [1.35, 38]];
 const ORBIT = {
   land: {
@@ -67,41 +68,31 @@ const ORBIT = {
   },
 };
 
-/** room: RoomEnvironment + soft boxes, a dim camera-side wrap (face stays lit at oblique yaw),
- *  strips and flags. con: horizon bands for the mirror steel; its dark sector serves the glass
- *  and LCD via envMapRotation. One PMREM pass each. */
+/** room: RoomEnvironment + soft boxes, a dim camera-side wrap (face lit at oblique yaw), strips,
+ *  flags. con: horizon bands for the mirror steel; its dark sector serves glass + LCD. */
 function studios(stripTex) {
-  const geo = new THREE.BoxGeometry(), mats = [];
-  const box = (s, x, y, z, sx, sy, sz, v, map = null) => {
-    const m = new THREE.MeshBasicMaterial({ color: new THREE.Color(v, v, v), map, side: THREE.DoubleSide });
-    mats.push(m);
-    const o = new THREE.Mesh(geo, m);
+  const geo = new THREE.BoxGeometry();
+  const box = (s, x, y, z, sx, sy, sz, v, g = geo, map = null) => {
+    const o = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: new THREE.Color(v, v, v), map, side: THREE.DoubleSide }));
     o.position.set(x, y, z); o.scale.set(sx, sy, sz);
     s.add(o);
-    return o;
   };
-  const room = new RoomEnvironment();
-  box(room, -5, 7, 13.8, 8, 7, 0.2, 1.6);        // front soft box, high left (hot)
-  box(room, 3, 4, 13.85, 16, 10, 0.2, 0.55);      // broad dimmer front fill (face falloff)
-  box(room, 0, -2, 13.9, 26, 3, 0.2, 0.05);       // dark band below it (face gradient)
-  box(room, -14.85, 3, 7, 0.2, 18, 14, 0.85);     // camera-side wrap (left wall, front half)
-  box(room, 0, 4, 13.97, 30, 18, 0.2, 0.7);       // camera-side wrap (front wall)
-  box(room, -14.8, 4, 4, 0.2, 14, 1.4, 9);        // left strip
-  box(room, 14.6, 5, -3, 0.2, 14, 1.2, 7);        // right rim strip
-  box(room, 14.8, 2, 7, 0.2, 9, 8, 0.03);         // right flag
-  box(room, -14.8, 2, -8, 0.2, 9, 9, 0.03);       // left-back flag
-  const con = new THREE.Scene();
-  const cyl = new THREE.Mesh(new THREE.CylinderGeometry(12, 12, 26, 96, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.7, 1.7, 1.7), map: stripTex, side: THREE.DoubleSide }));
-  mats.push(cyl.material);
-  con.add(cyl);
-  box(con, 0, 12.5, 0, 26, 0.2, 26, 1.1);  // ceiling soft box
+  const room = new RoomEnvironment(), con = new THREE.Scene();
+  box(room, -5, 7, 13.8, 8, 7, 0.2, 1.6); // front soft box, high left (hot)
+  box(room, 3, 4, 13.85, 16, 10, 0.2, 0.55); // dimmer front fill (face falloff)
+  box(room, 0, -2, 13.9, 26, 3, 0.2, 0.05); // dark band below it
+  box(room, -14.85, 3, 7, 0.2, 18, 14, 0.85); // camera-side wrap: left wall, front half
+  box(room, 0, 4, 13.97, 30, 18, 0.2, 0.7); // camera-side wrap: front wall
+  box(room, -14.8, 4, 4, 0.2, 14, 1.4, 9); // left strip
+  box(room, 14.6, 5, -3, 0.2, 14, 1.2, 7); // right rim strip
+  box(room, 14.8, 2, 7, 0.2, 9, 8, 0.03); // right flag
+  box(room, -14.8, 2, -8, 0.2, 9, 9, 0.03); // left-back flag
+  box(con, 0, 0, 0, 1, 1, 1, 1.7, new THREE.CylinderGeometry(12, 12, 26, 96, 1, true), stripTex);
+  box(con, 0, 12.5, 0, 26, 0.2, 26, 1.1); // ceiling soft box
   box(con, 0, -12.5, 0, 26, 0.2, 26, 0.01); // black floor
-  return {
-    room, con,
-    dispose() { geo.dispose(); cyl.geometry.dispose(); mats.forEach((m) => m.dispose()); room.traverse((o) => { o.geometry?.dispose(); o.material?.dispose?.(); }); },
-  };
+  return { room, con, dispose: () => [room, con].forEach((s) => s.traverse((o) => { o.geometry?.dispose(); o.material?.dispose?.(); })) };
 }
-// [deg from +Z towards +X, value(, end value)]: the back's reflection sweeps ~20°→180°
+// [deg from +Z to +X, value(, end)]: the back's reflection sweeps ~20°→180°
 const BANDS = [
   [0, 12, 0.6, 0.4], [12, 14.5, 1], [14.5, 26, 0.5], [26, 32, 0.02], [32, 46, 0.75, 0.4], [46, 49, 1], [49, 60, 0.55],
   [60, 72, 0.7, 0.35], [72, 75, 1], [75, 86, 0.55], [86, 92, 0.02], [92, 104, 0.75, 0.4], [104, 107, 1], [107, 118, 0.6],
@@ -114,7 +105,7 @@ const NOOP = { duration: 0, done: Promise.resolve(), skip() {}, seek() {}, pause
 export function runIntro({ getTargetRect, reducedMotion = false, config = null } = {}) {
   const duration = reducedMotion ? 1.0 : D;
 
-  // renderer first: without WebGL, a finished no-op controller and nothing left in the DOM
+  // no WebGL → a finished no-op controller, nothing left in the DOM
   const canvas = document.createElement('canvas');
   let renderer;
   try {
@@ -158,9 +149,8 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
 
   // soft contact shadow
   const shadowTex = (() => {
-    const c = document.createElement('canvas'); c.width = c.height = 128;
-    const g = c.getContext('2d'), grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
-    grd.addColorStop(0, 'rgba(0,0,0,0.5)'); grd.addColorStop(0.5, 'rgba(0,0,0,0.2)'); grd.addColorStop(1, 'rgba(0,0,0,0)');
+    const [c, g] = cnv(128, 128), grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    [[0, 0.5], [0.5, 0.2], [1, 0]].forEach(([o, a]) => grd.addColorStop(o, `rgba(0,0,0,${a})`));
     g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
     return new THREE.CanvasTexture(c);
   })();
@@ -174,13 +164,10 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
   const INTERNAL = parts.map((_, i) => i).filter((i) => !SHELL.includes(i));
   const iBoard = iOf('logicBoard'), iFrame = iOf('midframe'), iWheel = iOf('clickWheel'), iFlex = iOf('wheelFlex');
   const E = new Float32Array(N), G = new Float32Array(N);
-  // contact glint: [material, base envMapIntensity, part indices]
+  // glint: material → [base envMapIntensity, parts using it]
   const glint = new Map();
-  parts.forEach((p, i) => p.group.traverse((o) => {
-    if (!o.material) return;
-    const g = glint.get(o.material) ?? [o.material, o.material.envMapIntensity ?? 1, []];
-    if (!g[2].includes(i)) g[2].push(i);
-    glint.set(o.material, g);
+  parts.forEach((p, i) => p.group.traverse(({ material: m }) => {
+    if (m) (glint.get(m) ?? glint.set(m, [m.envMapIntensity, new Set()]).get(m))[1].add(i);
   }));
 
   // layout (per viewport / DPR)
@@ -202,7 +189,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     const centre = (cursor + gap) / 2;
     return dz.map((d) => d + (-HALF_D - centre));
   }
-  /** Camera distance from the rig origin so all points (+ rig offset ox/oy) fit inside ±mx/±my NDC. */
+  /** Camera distance so all points (+ rig offset ox/oy) fit inside ±mx/±my NDC. */
   function fitDistance(points, q, fov, aspect, mx, my, ox = 0, oy = 0, dzOf = null) {
     const t = Math.tan((fov * DEG) / 2);
     let d = 0;
@@ -213,7 +200,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     return d;
   }
   const qOf = (yaw, pitch) => tmpQ.setFromEuler(tmpE.set(-pitch * DEG, -yaw * DEG, 0, 'XYZ'));
-  /** Centre of the rotated point cloud (camera-aligned x/y), to keep the stack centred. */
+  /** Camera-aligned centre of the rotated point cloud. */
   function centreOf(points, q) {
     const e = [Infinity, Infinity, -Infinity, -Infinity];
     for (const p of points) {
@@ -238,30 +225,27 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     L.spread = L.portrait ? 0.95 : Math.max(0.7, Math.min(1, aspect / 1.45));
     L.dz = computeExplode(17 * L.spread);
     L.screwOff = ipod.screwBase.map((b, j) => new THREE.Vector3(Math.sign(b.x) * (5 + (j % 3)) * L.spread, b.y * 0.04, (7 + (j % 2) * 3) * L.spread));
-    const exploded = [], assembled = [];
+    const exploded = [];
     L.corners = [];
-    parts.forEach((p, i) => { boxPoints(p.box, L.dz[i], exploded); boxPoints(p.box, 0, assembled); boxPoints(p.box, 0, L.corners); });
+    parts.forEach((p, i) => { boxPoints(p.box, L.dz[i], exploded); boxPoints(p.box, 0, L.corners); });
     ipod.screwBase.forEach((b, j) => { const v = b.clone().add(L.screwOff[j]); v.z += L.dz[j < 4 ? iBoard : iFrame]; exploded.push(v); });
     L.mx = L.portrait ? 0.86 : 0.84; L.my = L.portrait ? 0.78 : 0.86;
     [L.cx, L.cy] = centreOf(exploded, qOf(L.o.yaw(3.3), L.o.pitch(3.3)));
     L.dHero = Math.max(...[2.6, 3.3, 3.9, 4.25].map((t) => fitDistance(exploded, qOf(L.o.yaw(t), L.o.pitch(t)), FOV_HERO, aspect, L.mx, L.my, -L.cx, -L.cy)));
-    L.dAsm = fitDistance(assembled, qOf(30, 8), FOV_HERO, aspect, 0.6, 0.6);
-    // start fully below the frame, even for the camera's pulled-back opening distance
+    L.dAsm = fitDistance(L.corners, qOf(30, 8), FOV_HERO, aspect, 0.6, 0.6);
+    // start fully below the frame (pulled-back opening camera)
     L.rise = 1.25 * L.dAsm * Math.tan((FOV_HERO * DEG) / 2) + IPOD.height * 0.75;
   }
 
   function targetRect() {
-    let r;
-    try { r = getTargetRect?.(); } catch { r = null; }
-    if (!r || !(r.height > 4)) {
-      const h = Math.min(L.vh * 0.74, 600), w = (h * IPOD.width) / IPOD.height;
-      return { left: (L.vw - w) / 2, top: (L.vh - h) / 2, width: w, height: h };
-    }
-    return r;
+    let r = null;
+    try { r = getTargetRect?.(); } catch {}
+    if (r?.height > 4) return r;
+    const h = Math.min(L.vh * 0.74, 600), w = (h * IPOD.width) / IPOD.height;
+    return { left: (L.vw - w) / 2, top: (L.vh - h) / 2, width: w, height: h };
   }
 
-  /** Blend b from the hero framing (half-height k at the rig origin) to the final one where the
-   *  front-face silhouette covers the target rect. */
+  /** Blend b from the hero framing (half-height k at the rig origin) to the face covering the rect. */
   function applyCamera(b, kHero) {
     const rect = targetRect();
     const tanE = Math.tan((FOV_END * DEG) / 2);
@@ -297,24 +281,16 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     ipod.screws.instanceMatrix.needsUpdate = true;
   }
 
+  /** Reduced motion: the final frame (closed, frontal) with a 4 % dolly-in under the fade. */
   function pose(t) {
     layout();
-    if (reducedMotion) {
-      const u = clamp01(t / duration);
-      rig.rotation.set(0, 0, 0); rig.position.set(0, 0, 0); chassis.position.set(0, 0, HALF_D); chassis.rotation.set(0, 0, 0);
-      parts.forEach((p) => { p.group.position.set(0, 0, p.z0); p.group.rotation.set(0, 0, 0); });
-      INTERNAL.forEach((i) => { parts[i].group.visible = false; });
-      ipod.screws.visible = false;
-      shadow.visible = false;
-      scene.environmentRotation.set(0, ENV_END, 0);
-      glass.envMapRotation.set(0, GLASS_END, GLASS_Z); panel.envMapRotation.copy(glass.envMapRotation);
-      wheel.emissiveIntensity = WHEEL_GLOW; centre.emissiveIntensity = CENTRE_GLOW;
-      renderer.toneMappingExposure = END_EXPOSURE; key.intensity = KEY_END;
-      applyCamera(1, 0);
-      camera.position.z = HALF_D + (camera.position.z - HALF_D) * (1 + 0.04 * (1 - p3out(u)));
-      camera.updateProjectionMatrix();
-      return smooth(0, 0.7, u);
-    }
+    if (!reducedMotion) return poseAt(t);
+    const u = clamp01(t / duration);
+    poseAt(D);
+    camera.position.z = HALF_D + (camera.position.z - HALF_D) * (1 + 0.04 * (1 - p3out(u)));
+    return smooth(0, 0.7, u);
+  }
+  function poseAt(t) {
     const yaw = L.o.yaw(t), pitch = L.o.pitch(t);
     rig.rotation.set(-pitch * DEG, -yaw * DEG, 0, 'XYZ');
     const rise = -L.rise * (1 - p3out(clamp01(t / TL.rise)));
@@ -323,8 +299,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     const ox = -L.cx * env, oy = bob - L.cy * env;
     rig.position.set(ox, rise + oy, 0);
 
-    // parts: front-to-back cascade out, back-to-front back in; landing nudges on the chassis,
-    // a per-part settle (front plate + wheel, back shell) and a small specular contact glint
+    // cascade out front-to-back, back in back-to-front; chassis nudge, per-part settle + glint
     let nudge = 0, wob = 0;
     for (let i = 0; i < N; i++) {
       const p = parts[i];
@@ -336,7 +311,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
       p.group.position.set(0, 0, p.z0 + L.dz[i] * e);
       const j = i === iWheel ? 0 : i; // the wheel rides home with the front plate: same tilt
       const sgn = j % 2 ? -1 : 1, amp = (1.8 + (j % 3) * 0.8) * DEG;
-      // the plate levels out over its last quarter, so it never seats skewed over the wheel
+      // the plate levels out over its last quarter (never seats skewed over the wheel)
       let tilt = amp * (Math.sin(Math.PI * out) * (1 - back) * 0.7 + sgn * Math.sin(Math.PI * back) * 0.8 * (j ? 1 : 1 - smooth(0.7, 0.95, back)));
       const tau = t - (rs + TL.reD);
       G[i] = tau > -0.3 && tau < 0.3 ? Math.exp(-((tau / 0.09) ** 2)) : 0;
@@ -352,7 +327,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
       p.group.rotation.set(tilt, tilt * 0.45 * sgn, 0);
     }
     const b = inOutCubic(clamp01((t - TL.cam0) / (D - TL.cam0)));
-    for (const [m, base, ids] of glint.values()) {
+    for (const [m, [base, ids]] of glint) {
       let g = 0;
       for (const i of ids) g = Math.max(g, G[i]);
       m.envMapIntensity = base * (1 + 0.3 * g);
@@ -362,8 +337,8 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     placeScrews(t);
     let closed = true;
     for (const i of SHELL) if (E[i] >= 1e-4) closed = false;
-    // once the plate is nearly home the wheel annulus is the only window onto the flex/board
-    const veiled = t > reStart(0) && E[0] < (L.portrait ? 0.42 : 0.08); // portrait looks down past the LCD
+    // plate nearly home: hide flex/board (seen only via the wheel annulus, or past the LCD in portrait)
+    const veiled = t > reStart(0) && E[0] < (L.portrait ? 0.42 : 0.08);
     for (const i of INTERNAL) parts[i].group.visible = !closed && !(veiled && (i === iFlex || i === iBoard));
     ipod.screws.visible = !closed;
 
@@ -374,7 +349,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     panel.envMapRotation.copy(glass.envMapRotation);
 
     const dHero = lerp(L.dAsm * (1 + 0.12 * (1 - p3out(clamp01(t / 1.6)))), L.dHero, env);
-    // framing guard: the live pose (partly exploded, close camera) must stay inside the margins
+    // framing guard: the live pose must stay inside the margins
     const dReq = fitDistance(L.corners, rig.quaternion, FOV_HERO, L.vw / L.vh, L.mx, L.my, ox, oy, dzLive);
     applyCamera(b, smax(dHero * tHero, dReq * tHero, 0.04 * dHero * tHero));
     wheel.emissiveIntensity = WHEEL_GLOW * b * b; centre.emissiveIntensity = CENTRE_GLOW * b * b;
@@ -398,8 +373,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
 
   let resolveDone;
   const done = new Promise((r) => { resolveDone = r; });
-  /** Draw the final aligned frame synchronously (programs are pre-warmed), resolve `done`,
-   *  then cross-fade 220 ms into the DOM iPod. */
+  /** Final aligned frame drawn synchronously, `done` resolved, then a 220 ms cross-fade. */
   function finish() {
     if (finished || disposed) return;
     finished = true; playing = false;
@@ -423,7 +397,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
   }
   const onResize = () => { if (!playing) render(); };
   window.addEventListener('resize', onResize);
-  // DPR changes (window dragged to another display) without a resize event
+  // DPR changes without a resize event (window moved to another display)
   let mq = null;
   const onDpr = () => { watchDpr(); onResize(); };
   const watchDpr = () => {
@@ -432,7 +406,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     mq?.addEventListener?.('change', onDpr);
   };
   watchDpr();
-  const onLost = () => finish(); // GPU reset / context loss: go straight to the DOM iPod
+  const onLost = () => finish(); // context loss: straight to the DOM iPod
   canvas.addEventListener('webglcontextlost', onLost);
 
   const brand = (cfg) => { if (!disposed && cfg?.brand) { ipod.setBrand(cfg.brand); if (!playing) render(); } };
@@ -486,16 +460,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
   if (import.meta.env.DEV) {
     controller._measure = () => {
       pose(t);
-      scene.updateMatrixWorld(true);
-      camera.updateMatrixWorld();
-      const ext = [Infinity, Infinity, -Infinity, -Infinity];
-      for (const [x, y] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-        tmpV.set((x * IPOD.width) / 2, (y * IPOD.height) / 2, -FACE_BEVEL).applyMatrix4(ipod.model.matrixWorld).project(camera);
-        const px = (tmpV.x * 0.5 + 0.5) * L.vw, py = (0.5 - tmpV.y * 0.5) * L.vh;
-        ext[0] = Math.min(ext[0], px); ext[1] = Math.min(ext[1], py); ext[2] = Math.max(ext[2], px); ext[3] = Math.max(ext[3], py);
-      }
-      const r = targetRect(), tg = [r.left, r.top, r.left + r.width, r.top + r.height];
-      return { ext, target: tg, err: Math.max(...ext.map((v, i) => Math.abs(v - tg[i]))) };
+      return measureFace({ object: ipod.model, camera, width: IPOD.width, height: IPOD.height, z: -FACE_BEVEL, rect: targetRect(), vw: L.vw, vh: L.vh });
     };
     controller._three = { scene, renderer, ipod, key, rim };
   }

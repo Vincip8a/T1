@@ -51,7 +51,7 @@ function ext(shape, depth, b = 0, segs = 3, curveSegments = 14) {
       const nz = Math.sign(n.getZ(i) + n.getZ(i + 1) + n.getZ(i + 2)) || 1;
       for (let k = 0; k < 3; k++) n.setXYZ(i + k, 0, 0, nz);
     } else for (let k = 0; k < 3; k++) uv.setXY(i + k, pos.getX(i + k), pos.getY(i + k));
-    // ^ walls: planar uv (default wall uv flips x/y at 45° → glyph ticks on the wheel rim)
+    // ^ walls: planar uv (the default flips x/y at 45°)
   }
   return out;
 }
@@ -60,34 +60,26 @@ function ext(shape, depth, b = 0, segs = 3, curveSegments = 14) {
 const FACE_TONE = [0.973, 0.965, 0.951, 0.950, 0.959, 0.968, 0.975, 0.980, 0.990, 0.998, 1, 0.994, 0.993];
 const FACE_COLOR = '#e1e4e7';
 
-/** Flat ring R-0.03…R+0.7 over the wheel well. Vertex colours replay the DOM wheel's outer
- *  box-shadows (12 % dark seam ×2, one nudged up; 60 % white lip nudged down) with ~0.1 mm AA. */
+/** Flat ring R-0.03…R+0.7 over the wheel well; vertex colours replay the DOM wheel's box-shadows
+ *  (11 % dark seam ×2, one nudged up; 60 % white lip nudged down), ~0.1 mm AA. */
 function recessLip(R, [cx, cy]) {
-  const radii = [-0.03, 0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.36, 0.42, 0.5, 0.7], n = 256;
-  const pos = [], uv = [], col = [], idx = [], f = 200;
-  const cov = (x, y, oy, rho) => clamp((rho - Math.hypot(x, y - oy)) / 0.1 + 0.5);
-  for (const dr of radii) for (let i = 0; i <= n; i++) {
-    const a = (i / n) * 2 * PI, x = (R + dr) * Math.cos(a), y = (R + dr) * Math.sin(a);
-    let v = f;
-    v += (255 - v) * 0.6 * cov(x, y, -0.22, R + 0.2);
-    v *= 1 - 0.11 * cov(x, y, 0, R + 0.2);
-    v *= 1 - 0.11 * cov(x, y, 0.06, R + 0.2);
-    const k = (v / f) ** 2.2;
-    pos.push(x + cx, y + cy, 0); uv.push(x + cx, y + cy); col.push(k, k, k);
-  }
-  for (let j = 0; j < radii.length - 1; j++) for (let i = 0; i < n; i++) {
-    const a = j * (n + 1) + i, b = a + n + 1;
-    idx.push(a, b, a + 1, a + 1, b, b + 1);
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  g.setAttribute('normal', new THREE.Float32BufferAttribute(pos.map((_, i) => (i % 3 === 2 ? 1 : 0)), 3));
-  g.setIndex(idx);
+  const n = 256, pos = [], col = [], idx = [];
+  const cov = (x, y, oy) => Math.min(1, Math.max(0, (R + 0.2 - Math.hypot(x, y - oy)) / 0.1 + 0.5));
+  [-0.03, 0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.36, 0.42, 0.5, 0.7].forEach((dr, j) => {
+    for (let i = 0; i <= n; i++) {
+      const a = (i / n) * 2 * PI, x = (R + dr) * Math.cos(a), y = (R + dr) * Math.sin(a);
+      const k = ((1 + 0.165 * cov(x, y, -0.22)) * (1 - 0.11 * cov(x, y, 0)) * (1 - 0.11 * cov(x, y, 0.06))) ** 2.2;
+      pos.push(x + cx, y + cy, 0); col.push(k, k, k);
+      const v = (j - 1) * (n + 1) + i, w = v + n + 1;
+      if (j && i < n) idx.push(v, w, v + 1, v + 1, w, w + 1);
+    }
+  });
+  const g = new THREE.BufferGeometry().setIndex(idx);
+  const at = (k, a, d) => g.setAttribute(k, new THREE.Float32BufferAttribute(a, d));
+  at('position', pos, 3); at('color', col, 3); at('uv', pos.filter((_, i) => i % 3 < 2), 2);
+  g.computeVertexNormals();
   return g;
 }
-const clamp = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
 
 export function buildIpod({ maxAniso = 8 } = {}) {
   const textures = [];
@@ -130,14 +122,14 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     const s = rr(W, H, IPOD.cornerRadius, b);
     s.holes.push(rrHole(sw.width, sw.height, sw.radius, b, ...swc));
     s.holes.push(circle(R + 0.12 + b, true, ...whc));
-    // satin anodising keeps a diffuse floor; the tone map carries the DOM plate's light falloff
+    // satin anodising (diffuse floor); the tone map carries the DOM plate's light falloff
     const tone = T.capFit(tx(T.faceToneCanvas(FACE_TONE)), W, H);
     mats.face = phys({
       color: FACE_COLOR, map: tone, metalness: 0.62, roughness: 0.44, roughnessMap: fine,
       anisotropy: 0.3, clearcoat: 0.25, clearcoatRoughness: 0.28,
     });
     add(p, ext(s, 0.8, b, 3, SEG), mats.face);
-    // flat lip over the hole bevel, shaded like the DOM wheel recess (seam + white lower lip)
+    // flat lip over the hole bevel, shaded like the DOM wheel recess
     const lipMat = mats.face.clone();
     lipMat.vertexColors = true;
     add(p, recessLip(R, whc), lipMat, 0, 0, 0.002);

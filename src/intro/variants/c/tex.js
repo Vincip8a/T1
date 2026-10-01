@@ -38,8 +38,10 @@ export function capFit(t, w, h) {
 }
 
 export function roundRect(g, x, y, w, h, r) { g.beginPath(); g.roundRect(x, y, w, h, r); }
+const dot = (g, x, y, r, c) => { if (c) g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); };
 
-export function text(g, s, x, y, size, { weight = 600, color = '#000', align = 'left', spacing = 0 } = {}) {
+/** Text: weight, colour, alignment, letter spacing (px). */
+export function text(g, s, x, y, size, weight = 600, color = '#000', align = 'left', spacing = 0) {
   g.font = `${weight} ${size}px ${FONT}`;
   g.fillStyle = color;
   g.textAlign = align;
@@ -125,22 +127,16 @@ export function wheelCanvas(dMm, labelFactor, cbMm) {
   band(g, R, R + 0.19 * u, 0, cb + 0.13 * u, 'rgba(255,255,255,.65)');
   band(g, R, R, 0, cb + 0.15 * u, 'rgba(100,104,110,.5)');
   const col = COLORS.wheelLabel;
-  text(g, 'MENU', R, R - lr, 2.35 * px, { weight: 700, color: col, align: 'center', spacing: 0.25 * px });
-  g.fillStyle = col;
-  const tri = (x, y, s, d) => {
-    g.beginPath();
-    g.moveTo(x - s * d * 0.5, y - s * 0.55); g.lineTo(x + s * d * 0.5, y); g.lineTo(x - s * d * 0.5, y + s * 0.55);
-    g.closePath(); g.fill();
-  };
-  const s = 1.75 * px, bar = 0.42 * px;
-  let x = R + lr;
-  tri(x - s * 0.62, R, s, 1); tri(x + s * 0.18, R, s, 1); g.fillRect(x + s * 0.68, R - s * 0.55, bar, s * 1.1);
-  x = R - lr;
-  tri(x + s * 0.62, R, s, -1); tri(x - s * 0.18, R, s, -1); g.fillRect(x - s * 0.68 - bar, R - s * 0.55, bar, s * 1.1);
-  const y = R + lr;
-  tri(R - s * 0.55, y, s, 1);
-  g.fillRect(R + s * 0.32, y - s * 0.55, bar, s * 1.1);
-  g.fillRect(R + s * 0.32 + bar * 2, y - s * 0.55, bar, s * 1.1);
+  // = DOM label (0.05em tracking), doubled ±0.04 mm to keep its weight through mip filtering
+  for (const d of [-0.04, 0.04]) text(g, 'MENU', R + (0.0525 + d) * px, R - lr, 2.1 * px, 700, col, 'center', 0.105 * px);
+  // ⏭ ⏮ ⏯ as the DOM's 20×9 glyphs, 2.1 mm tall, centred on the label radius
+  const k = (2.1 / 9) * px;
+  [['M0 0l7.2 4.5L0 9zM7.2 0l7.2 4.5L7.2 9zM15.4 0h2.4v9h-2.4z', R + lr, R], ['M20 0l-7.2 4.5L20 9zM12.8 0L5.6 4.5l7.2 4.5zM4.6 0H2.2v9h2.4z', R - lr, R],
+    ['M1 0l7.4 4.5L1 9zM11.4 0h2.6v9h-2.6zM16.2 0h2.6v9h-2.6z', R, R + lr]].forEach(([d, x, y]) => {
+    g.setTransform(k, 0, 0, k, x - 10 * k, y - 4.5 * k);
+    g.fill(new Path2D(d));
+  });
+  g.setTransform(1, 0, 0, 1, 0, 0);
   return c;
 }
 
@@ -176,7 +172,7 @@ export function pcbCanvas(wMm, hMm, parts, holes, seed = 7) {
   g.fillRect(0, 0, W, H);
   for (let i = 0; i < 260; i++) {
     g.fillStyle = `rgba(${r() > 0.5 ? '255,255,255' : '0,0,0'},${0.02 + r() * 0.03})`;
-    g.beginPath(); g.arc(r() * W, r() * H, 10 + r() * 50, 0, 7); g.fill();
+    dot(g, r() * W, r() * H, 10 + r() * 50);
   }
   g.lineCap = 'round'; g.lineJoin = 'round';
   // parallel buses: run, 45° jog, run
@@ -196,8 +192,8 @@ export function pcbCanvas(wMm, hMm, parts, holes, seed = 7) {
   // vias
   for (let i = 0; i < 220; i++) {
     const x = r() * W, y = r() * H;
-    g.fillStyle = '#c9a85a'; g.beginPath(); g.arc(x, y, 3.2, 0, 7); g.fill();
-    g.fillStyle = '#0f3322'; g.beginPath(); g.arc(x, y, 1.4, 0, 7); g.fill();
+    dot(g, x, y, 3.2, '#c9a85a');
+    dot(g, x, y, 1.4, '#0f3322');
   }
   // footprints: pad rows + silkscreen outline + designator
   parts.forEach((ch) => {
@@ -206,14 +202,14 @@ export function pcbCanvas(wMm, hMm, parts, holes, seed = 7) {
     for (let p = 0; p < w; p += 0.65 * px) { g.fillRect(x + p, y - pad, 0.35 * px, pad * 0.8); g.fillRect(x + p, y + h + pad * 0.2, 0.35 * px, pad * 0.8); }
     g.strokeStyle = 'rgba(240,240,230,0.85)'; g.lineWidth = 2;
     g.strokeRect(x - pad * 1.4, y - pad * 1.4, w + pad * 2.8, h + pad * 2.8);
-    text(g, ch.ref, x - pad * 1.4, y - pad * 2.6, 1.4 * px, { color: 'rgba(240,240,230,0.9)', weight: 500 });
+    text(g, ch.ref, x - pad * 1.4, y - pad * 2.6, 1.4 * px, 500, 'rgba(240,240,230,0.9)');
   });
   holes.forEach(([mx, my]) => {
-    g.fillStyle = '#e1c068'; g.beginPath(); g.arc(X(mx), Y(my), 2.2 * px, 0, 7); g.fill();
-    g.fillStyle = '#26292a'; g.beginPath(); g.arc(X(mx), Y(my), 1.2 * px, 0, 7); g.fill();
+    dot(g, X(mx), Y(my), 2.2 * px, '#e1c068');
+    dot(g, X(mx), Y(my), 1.2 * px, '#26292a');
   });
-  text(g, '820-2263-A', X(-26), Y(-45), 1.6 * px, { color: 'rgba(240,240,230,0.85)', weight: 500 });
-  text(g, 'REV 05   94V-0', X(8), Y(-45), 1.4 * px, { color: 'rgba(240,240,230,0.75)', weight: 500 });
+  text(g, '820-2263-A', X(-26), Y(-45), 1.6 * px, 500, 'rgba(240,240,230,0.85)');
+  text(g, 'REV 05   94V-0', X(8), Y(-45), 1.4 * px, 500, 'rgba(240,240,230,0.75)');
   return c;
 }
 
@@ -223,8 +219,8 @@ export function chipCanvas(lines, seed) {
   const r = rng(seed);
   g.fillStyle = '#1b1c1e'; g.fillRect(0, 0, 192, 192);
   for (let i = 0; i < 500; i++) { g.fillStyle = `rgba(255,255,255,${r() * 0.04})`; g.fillRect(r() * 192, r() * 192, 2, 2); }
-  lines.forEach((l, i) => text(g, l, 96, 70 + i * 28, i ? 20 : 26, { color: '#8d9095', align: 'center', weight: 500 }));
-  g.fillStyle = '#4a4c50'; g.beginPath(); g.arc(22, 22, 8, 0, 7); g.fill();
+  lines.forEach((l, i) => text(g, l, 96, 70 + i * 28, i ? 20 : 26, 500, '#8d9095', 'center'));
+  dot(g, 22, 22, 8, '#4a4c50');
   return c;
 }
 
@@ -236,22 +232,22 @@ export function batteryCanvas(wMm, hMm) {
   g.fillStyle = COLORS.battery; g.fillRect(0, 0, W, H);
   for (let i = 0; i < 90; i++) { g.fillStyle = `rgba(255,255,255,${r() * 0.03})`; g.fillRect(0, r() * H, W, 1 + r() * 3); }
   const ink = '#b8bcc2', m = 2 * px;
-  text(g, 'Li-ion Polymer Battery', m, m + 1.6 * px, 1.9 * px, { weight: 700, color: ink });
-  text(g, '3.7 V ⎓ 550 mAh   2.04 Wh', m, m + 4.2 * px, 1.4 * px, { weight: 500, color: ink });
-  text(g, 'Do not puncture, crush or heat above 60 °C', m, m + 6.4 * px, 1.0 * px, { weight: 400, color: '#8a8e94' });
-  text(g, 'LP-616-0550  ·  Lot 26K14', m, H - m - 0.6 * px, 1.0 * px, { weight: 400, color: '#8a8e94' });
+  text(g, 'Li-ion Polymer Battery', m, m + 1.6 * px, 1.9 * px, 700, ink);
+  text(g, '3.7 V ⎓ 550 mAh   2.04 Wh', m, m + 4.2 * px, 1.4 * px, 500, ink);
+  text(g, 'Do not puncture, crush or heat above 60 °C', m, m + 6.4 * px, 1.0 * px, 400, '#8a8e94');
+  text(g, 'LP-616-0550  ·  Lot 26K14', m, H - m - 0.6 * px, 1.0 * px, 400, '#8a8e94');
   const lx = W - m - 16 * px, ly = m - 0.4 * px, lw = 16 * px, lh = H - 2 * m + 0.8 * px;
   roundRect(g, lx, ly, lw, lh, 0.6 * px); g.fillStyle = '#e8e9eb'; g.fill();
   barcode(g, lx + 1.2 * px, ly + 1.2 * px, lw - 2.4 * px, 4.4 * px, r);
-  text(g, '7 26450 1 18', lx + lw / 2, ly + 7.2 * px, 1.05 * px, { color: '#222', align: 'center', weight: 500 });
+  text(g, '7 26450 1 18', lx + lw / 2, ly + 7.2 * px, 1.05 * px, 500, '#222', 'center');
   const tx = lx + 3.6 * px, ty = ly + lh - 4 * px, ts = 2.6 * px;
   g.strokeStyle = '#141518'; g.lineWidth = 0.22 * px;
   g.beginPath(); g.moveTo(tx, ty - ts * 0.55); g.lineTo(tx + ts * 0.6, ty + ts * 0.5); g.lineTo(tx - ts * 0.6, ty + ts * 0.5); g.closePath(); g.stroke();
-  text(g, '!', tx, ty + ts * 0.08, 1.6 * px, { weight: 800, color: '#141518', align: 'center' });
+  text(g, '!', tx, ty + ts * 0.08, 1.6 * px, 800, '#141518', 'center');
   const bx = tx + 5 * px;
   g.strokeRect(bx - ts * 0.35, ty - ts * 0.4, ts * 0.7, ts * 0.9);
   g.beginPath(); g.moveTo(bx - ts * 0.6, ty - ts * 0.6); g.lineTo(bx + ts * 0.6, ty + ts * 0.65); g.moveTo(bx + ts * 0.6, ty - ts * 0.6); g.lineTo(bx - ts * 0.6, ty + ts * 0.65); g.stroke();
-  text(g, 'CE', bx + 4.4 * px, ty, 1.7 * px, { weight: 500, color: '#141518', align: 'center' });
+  text(g, 'CE', bx + 4.4 * px, ty, 1.7 * px, 500, '#141518', 'center');
   return c;
 }
 
@@ -269,23 +265,23 @@ export function driveCanvas(wMm, hMm) {
   const sx = W * 0.5, sy = H * 0.3;
   const rg = g.createRadialGradient(sx, sy, 6 * px, sx, sy, 9 * px);
   rg.addColorStop(0, 'rgba(255,255,255,0)'); rg.addColorStop(0.5, 'rgba(255,255,255,0.35)'); rg.addColorStop(0.75, 'rgba(0,0,0,0.18)'); rg.addColorStop(1, 'rgba(0,0,0,0)');
-  g.fillStyle = rg; g.beginPath(); g.arc(sx, sy, 9 * px, 0, 7); g.fill();
+  dot(g, sx, sy, 9 * px, rg);
   [[3, 3], [wMm - 3, 3], [3, hMm - 3], [wMm - 3, hMm - 3], [wMm / 2, hMm * 0.3]].forEach(([x, y]) => {
-    g.fillStyle = '#5c6066'; g.beginPath(); g.arc(x * px, y * px, 1.3 * px, 0, 7); g.fill();
+    dot(g, x * px, y * px, 1.3 * px, '#5c6066');
     g.strokeStyle = '#2a2c30'; g.lineWidth = 2;
     g.beginPath(); g.moveTo(x * px - 0.6 * px, y * px); g.lineTo(x * px + 0.6 * px, y * px); g.moveTo(x * px, y * px - 0.6 * px); g.lineTo(x * px, y * px + 0.6 * px); g.stroke();
   });
   const lx = 3.5 * px, ly = hMm * 0.5 * px, lw = W - 7 * px, lh = hMm * 0.44 * px;
   roundRect(g, lx, ly, lw, lh, 0.8 * px); g.fillStyle = '#eef0f2'; g.fill();
   g.fillStyle = '#20242a'; g.fillRect(lx, ly, lw, 5.2 * px);
-  text(g, '1.8" HARD DISK DRIVE', lx + 1.8 * px, ly + 2.6 * px, 2.2 * px, { weight: 700, color: '#f2f3f5' });
-  text(g, '160 GB', lx + lw - 1.8 * px, ly + 2.6 * px, 2.6 * px, { weight: 800, color: '#f2f3f5', align: 'right' });
+  text(g, '1.8" HARD DISK DRIVE', lx + 1.8 * px, ly + 2.6 * px, 2.2 * px, 700, '#f2f3f5');
+  text(g, '160 GB', lx + lw - 1.8 * px, ly + 2.6 * px, 2.6 * px, 800, '#f2f3f5', 'right');
   ['MODEL  HD1816-ZK', 'P/N  HDA-160-LIF', '4200 RPM   5 V ⎓ 0.33 A', 'S/N  X7Q2K91M04A', 'Firmware  ZK101B']
-    .forEach((s, i) => text(g, s, lx + 1.8 * px, ly + 7.6 * px + i * 2.4 * px, 1.55 * px, { weight: 500, color: '#25282d' }));
+    .forEach((s, i) => text(g, s, lx + 1.8 * px, ly + 7.6 * px + i * 2.4 * px, 1.55 * px, 500, '#25282d'));
   barcode(g, lx + 1.8 * px, ly + lh - 7.2 * px, lw * 0.55, 3.6 * px, r);
   const qx = lx + lw - 9.5 * px, qy = ly + lh - 9.8 * px, qs = 0.5 * px;
   for (let i = 0; i < 15; i++) for (let j = 0; j < 15; j++) if (r() > 0.5 || i < 1 || j < 1) { g.fillStyle = '#111'; g.fillRect(qx + i * qs, qy + j * qs, qs, qs); }
-  text(g, 'DO NOT PRESS  ·  ESD SENSITIVE', lx + 1.8 * px, ly + lh - 1.6 * px, 1.2 * px, { weight: 600, color: '#5b2020' });
+  text(g, 'DO NOT PRESS  ·  ESD SENSITIVE', lx + 1.8 * px, ly + lh - 1.6 * px, 1.2 * px, 600, '#5b2020');
   return c;
 }
 
@@ -299,10 +295,10 @@ export function backCanvases(wMm, hMm, { monogram = '', name = '', line = '' } =
     g.fillRect(0, 0, W, H);
     g.save(); g.translate(Math.round(W), 0); g.scale(-1, 1);
     const ink = rough ? 'rgb(74,74,74)' : '#dcdcdc'; // frosted laser etch: rougher, ~13% darker, neutral
-    if (monogram) text(g, monogram, W / 2, H * 0.38, 15 * px, { weight: 300, color: ink, align: 'center', spacing: 0.6 * px });
-    if (name) text(g, name, W / 2, H * 0.76, 2.4 * px, { weight: 500, color: ink, align: 'center', spacing: 0.1 * px });
-    if (line) text(g, line, W / 2, H * 0.8, 1.35 * px, { weight: 400, color: ink, align: 'center' });
-    text(g, 'Designed with care  ·  Assembled by hand  ·  160 GB', W / 2, H * 0.86, 1.2 * px, { weight: 400, color: ink, align: 'center' });
+    if (monogram) text(g, monogram, W / 2, H * 0.38, 15 * px, 300, ink, 'center', 0.6 * px);
+    if (name) text(g, name, W / 2, H * 0.76, 2.4 * px, 500, ink, 'center', 0.1 * px);
+    if (line) text(g, line, W / 2, H * 0.8, 1.35 * px, 400, ink, 'center');
+    text(g, 'Designed with care  ·  Assembled by hand  ·  160 GB', W / 2, H * 0.86, 1.2 * px, 400, ink, 'center');
     g.restore();
     return c;
   });
@@ -319,7 +315,7 @@ export function shellInnerCanvas(wMm, hMm) {
   g.fillStyle = '#3a3d42';
   [[10, 14], [W / px - 22, 14], [10, 50], [W / px - 22, 50]].forEach(([x, y]) => { roundRect(g, x * px, y * px, 12 * px, 7 * px, px); g.fill(); });
   roundRect(g, 8 * px, H * 0.76, 16 * px, 8 * px, 0.6 * px); g.fillStyle = '#e9e6dc'; g.fill();
-  text(g, 'QC  PASS', 9 * px, H * 0.76 + 2.6 * px, 1.6 * px, { weight: 700, color: '#2a2c30' });
+  text(g, 'QC  PASS', 9 * px, H * 0.76 + 2.6 * px, 1.6 * px, 700, '#2a2c30');
   barcode(g, 9 * px, H * 0.76 + 4.4 * px, 12 * px, 2.6 * px, r);
   return c;
 }

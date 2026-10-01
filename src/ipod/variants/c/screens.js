@@ -278,7 +278,7 @@ export function createScreens(ctx) {
     deco.append(coverArt(item, 'ipodc-np-art'), coverArt(item, 'ipodc-np-refl'), info, prog, vol);
     // compact track list under the meta: tap a title to play it; the playing one carries the blue speaker
     const tlIn = h('div', 'ipodc-np-tracks-in');
-    const trkRows = item.tracks?.length ? tracks.map((t, i) => {
+    const trkRows = Array.isArray(item.tracks) && item.tracks.length ? tracks.map((t, i) => {
       const r = h('div', 'ipodc-trk', { 'data-i': i });
       r.innerHTML = SPEAKER_NOW;
       r.append(h('span', 'ipodc-trk-t', { text: t.title ?? '' }), h('span', 'ipodc-trk-d', { text: t.duration ?? '' }));
