@@ -14,10 +14,26 @@
       "type": "list",
       "title": "Kontakt",
       "items": [
-        { "label": "E-Mail", "detail": "hallo@example.com", "href": "mailto:hallo@example.com" },
-        { "label": "Instagram", "detail": "@deinname", "href": "https://instagram.com/" },
-        { "label": "LinkedIn", "detail": "Dein Name", "href": "https://www.linkedin.com/" },
-        { "label": "TikTok", "detail": "@deinname", "href": "https://www.tiktok.com/" }
+        {
+          "label": "E-Mail",
+          "detail": "hallo@example.com",
+          "href": "mailto:hallo@example.com"
+        },
+        {
+          "label": "Instagram",
+          "detail": "@deinname",
+          "href": "https://instagram.com/"
+        },
+        {
+          "label": "LinkedIn",
+          "detail": "Dein Name",
+          "href": "https://www.linkedin.com/"
+        },
+        {
+          "label": "TikTok",
+          "detail": "@deinname",
+          "href": "https://www.tiktok.com/"
+        }
       ]
     },
     {
@@ -27,8 +43,14 @@
       "title": "Work Together",
       "body": "Du planst ein Projekt? Branding, Websites, Content – lass uns sprechen. Antwort meist innerhalb von 48 Stunden.",
       "actions": [
-        { "label": "Anfrage senden", "href": "mailto:hallo@example.com?subject=Projektanfrage" },
-        { "label": "Call buchen", "href": "https://cal.com/" }
+        {
+          "label": "Anfrage senden",
+          "href": "mailto:hallo@example.com?subject=Projektanfrage"
+        },
+        {
+          "label": "Call buchen",
+          "href": "https://cal.com/"
+        }
       ]
     },
     {
@@ -40,9 +62,21 @@
       "cover": "assets/playlist-cover.svg",
       "spotifyUrl": "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M",
       "tracks": [
-        { "title": "Track Eins", "artist": "Artist A", "duration": "3:24" },
-        { "title": "Track Zwei", "artist": "Artist B", "duration": "4:02" },
-        { "title": "Track Drei", "artist": "Artist C", "duration": "2:51" }
+        {
+          "title": "Track Eins",
+          "artist": "Artist A",
+          "duration": "3:24"
+        },
+        {
+          "title": "Track Zwei",
+          "artist": "Artist B",
+          "duration": "4:02"
+        },
+        {
+          "title": "Track Drei",
+          "artist": "Artist C",
+          "duration": "2:51"
+        }
       ]
     },
     {
@@ -51,9 +85,24 @@
       "type": "downloads",
       "title": "Gratis Downloads",
       "items": [
-        { "label": "Portfolio 2026", "file": "downloads/portfolio-2026.pdf", "format": "PDF", "size": "–" },
-        { "label": "Case Study: Projekt X", "file": "downloads/case-study-projekt-x.pdf", "format": "PDF", "size": "–" },
-        { "label": "Media Kit", "file": "downloads/media-kit.pdf", "format": "PDF", "size": "–" }
+        {
+          "label": "Portfolio 2026",
+          "file": "downloads/portfolio-2026.pdf",
+          "format": "PDF",
+          "size": "430 KB"
+        },
+        {
+          "label": "Case Study: Projekt X",
+          "file": "downloads/case-study-projekt-x.pdf",
+          "format": "PDF",
+          "size": "378 KB"
+        },
+        {
+          "label": "Media Kit",
+          "file": "downloads/media-kit.pdf",
+          "format": "PDF",
+          "size": "378 KB"
+        }
       ]
     },
     {
