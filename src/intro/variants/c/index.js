@@ -15,7 +15,7 @@ const D = 6.5, STILL = D - 0.18, FADE_MS = 220; // every channel is final at STI
 const ENV_END = 0.25; // final room rotation
 const GLASS_FROM = 2.75, GLASS_END = 2.27, GLASS_Z = Math.PI / 4; // dark sector + diagonal glint
 const WHEEL_GLOW = 0.24, CENTRE_GLOW = 0.3, END_EXPOSURE = 0.9, KEY_END = 0.9; // hand-off tone = DOM iPod (±4 levels)
-const KEY_HOLD = 1.1, FACE_HOLD = 0.7; // hero/hold: key + the plate's soft-box reflection, kept off white
+const KEY_HOLD = 1.1, FACE_HOLD = 0.72; // hero/hold: key + the plate's soft-box reflection, kept off white
 const TL = { rise: 1.0, spin: 1.1, screw: 1.52, re0: 4.15, reS: 0.085, reD: 0.62, cam0: 4.6 };
 // removal story [start, duration]: pry the shell, screws out, front plate pops, frame lifts, stack opens
 const OUT = {
@@ -61,12 +61,12 @@ function spline(keys) {
 // stack sideways, portrait looks along it.
 const ease = (t) => (1 - Math.min(1, t / TL.spin)) ** 2;
 const orbit = (yaw, pitch) => {
-  const y = spline([[TL.spin, 38], ...yaw, [STILL, 0]]), p = spline([[TL.spin, -8], ...pitch, [STILL, 0]]);
-  return { yaw: (t) => (t < TL.spin ? 38 + 110 * ease(t) : y(t)), pitch: (t) => (t < TL.spin ? -8 - 8 * ease(t) : p(t)) };
+  const y = spline([[TL.spin, 38], ...yaw, [STILL, 0]]), p = spline([[TL.spin, -11], ...pitch, [STILL, 0]]);
+  return { yaw: (t) => (t < TL.spin ? 38 + 110 * ease(t) : y(t)), pitch: (t) => (t < TL.spin ? -11 - 15 * Math.sqrt(ease(t)) : p(t)) };
 };
 const ORBIT = {
-  land: orbit([[1.45, 38], [2.3, 27], [3.0, 40], [3.9, 64], [5.05, 33]], [[1.45, -8], [2.6, 12], [3.9, 19], [5.05, 8]]),
-  port: orbit([[1.45, 38], [2.3, 20], [3.0, 18], [3.9, 26], [5.05, 12]], [[1.45, -8], [2.6, 44], [3.9, 54], [5.05, 18]]),
+  land: orbit([[1.45, 38], [2.3, 27], [3.0, 40], [3.9, 64], [5.05, 33]], [[1.45, -11], [2.6, 12], [3.9, 19], [5.05, 8]]),
+  port: orbit([[1.45, 38], [2.3, 20], [3.0, 18], [3.9, 26], [5.05, 12]], [[1.45, -11], [2.6, 44], [3.9, 54], [5.05, 18]]),
 };
 
 /** room: RoomEnvironment + soft boxes, a dim camera-side wrap (face lit at oblique yaw), strips,
@@ -337,7 +337,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
       p.group.rotation.set(tilt, tilt * 0.45 * sgn, 0);
     }
     const b = inOutCubic(clamp01((t - TL.cam0) / (STILL - TL.cam0))), b2 = b * b;
-    const fk = lerp(FACE_HOLD, 1, b2);
+    const fk = lerp(FACE_HOLD, 1, Math.max(b2, 1 - smooth(1.3, 2.4, t)));
     for (let k = 0; k < gM.length; k++) {
       let g = 0;
       const ids = gIds[k];
