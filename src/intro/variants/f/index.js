@@ -74,9 +74,9 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null, 
   scene.environment = envRT.texture;
   scene.environmentIntensity = 0.85;
 
-  const key = new THREE.DirectionalLight(0xfff3e4, 1.7);
+  const key = new THREE.DirectionalLight(0xfff3e4, 1.35);
   key.position.set(60, 90, 210);
-  const rim = new THREE.DirectionalLight(0xd4e6ff, 1.6);
+  const rim = new THREE.DirectionalLight(0xd4e6ff, 1.3);
   rim.position.set(-120, 60, -90);
   const edge = new THREE.DirectionalLight(0xffffff, 0.9); // low-left edge light so the rim reads on silver
   edge.position.set(-80, -120, 60);
@@ -103,7 +103,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null, 
   if (reducedMotion) {
     tr.opacity = seq(0).to(0, 0.5, 1, 'power2.out');
     for (const n of ['az', 'el', 'lookZ', 'lookY', 'screws', 'clips']) tr[n] = seq(0);
-    tr.dist = seq(1); tr.fov = seq(FOV_END); tr.shadow = seq(1);
+    tr.dist = seq(1); tr.fov = seq(FOV_END); tr.shadow = seq(1); tr.spread = seq(0);
     for (const p of model.parts) tr[p.id] = seq(0);
   } else {
     const OUT = 'back.out(1.7)';
@@ -129,11 +129,12 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null, 
     // view while the parts seat (size already final), then glide the last few degrees to frontal.
     tr.az = seq(-10).to(0, 1.2, -34, 'sine.inOut').to(1.2, 2.9, -50, 'sine.inOut').to(2.9, 5.2, -16, 'sine.inOut').to(5.2, 5.75, -6, 'sine.inOut').to(6.0, 6.55, 0, 'sine.inOut');
     tr.el = seq(5).to(0, 1.2, 12, 'sine.inOut').to(1.2, 2.9, 19, 'sine.inOut').to(2.9, 5.2, 5, 'sine.inOut').to(5.2, 5.75, 2.5, 'sine.inOut').to(6.0, 6.55, 0, 'sine.inOut');
-    tr.dist = seq(1.12).to(0, 1.0, 1.06, 'power2.out').to(1.0, 2.9, 1.32, 'power2.inOut').to(4.1, 5.7, 1, 'power2.inOut');
-    tr.fov = seq(30).to(4.1, 5.7, FOV_END, 'power2.inOut');
-    tr.lookZ = seq(0).to(1.0, 2.9, -14, 'power2.inOut').to(4.1, 5.7, 0, 'power2.inOut');
-    tr.lookY = seq(0).to(1.0, 2.9, 2, 'sine.inOut').to(4.1, 5.7, 0, 'sine.inOut');
+    tr.dist = seq(1.12).to(0, 0.7, 1.06, 'power2.out').to(0.7, 2.2, 1.34, 'power2.inOut').to(4.5, 5.75, 1, 'power2.inOut');
+    tr.fov = seq(30).to(4.5, 5.75, FOV_END, 'power2.inOut');
+    tr.lookZ = seq(0).to(0.7, 2.4, -14, 'power2.inOut').to(4.5, 5.75, 0, 'power2.inOut');
+    tr.lookY = seq(0).to(0.7, 2.4, 2, 'sine.inOut').to(4.5, 5.75, 0, 'sine.inOut');
     tr.shadow = seq(1).to(0.55, 0.85, 0, 'sine.inOut').to(5.98, 6.4, 1, 'sine.inOut');
+    tr.spread = seq(0).to(0.65, 1.5, 1, 'power2.out').to(5.0, 5.95, 0, 'power2.inOut'); // phones: extra dolly-out while the cluster is apart
   }
   /** Sum of damped impulses from the landings: 0 before each seat, zero again ≤ 0.7 s later. */
   function nudge(time) {
@@ -146,7 +147,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null, 
   }
 
   /* ---------- rendering ---------- */
-  let t = 0, raf = 0, last = 0;
+  let t = 0, raf = 0, last = 0, fadeTimer = 0;
 
   function render(time) {
     if (disposed) return;
@@ -156,7 +157,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null, 
     // Narrow viewports (the target nearly fills the width): shrink the depth spread and the
     // orbit, fan the stack vertically instead, and back the camera off further during the hold.
     const m = clamp((rw / vw - 0.35) / 0.4, 0, 1);
-    const k = 1 - 0.38 * m, yk = 0.6 * m, aS = 1 - 0.5 * m;
+    const k = 1 - 0.38 * m, yk = 0.55 * m, aS = 1 - 0.5 * m;
 
     for (const p of model.parts) p.e = tr[p.id].at(time);
     model.apply(k, yk, tr.screws.at(time), tr.clips.at(time), time);
@@ -175,9 +176,9 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null, 
     camera.far = dEnd * 5 + 600;
     camera.setViewOffset(fullW, fullH, fullW / 2 - cx, fullH / 2 - cy, vw, vh);
     camera.updateProjectionMatrix();
-    const D = dEnd * (1 + (tr.dist.at(time) - 1) * (1 + 2.6 * m));
+    const D = dEnd * (tr.dist.at(time) + 0.8 * m * tr.spread.at(time));
     const az = tr.az.at(time) * aS * PI / 180, el = tr.el.at(time) * aS * PI / 180;
-    look.set(0, tr.lookY.at(time) * k, tr.lookZ.at(time) * k);
+    look.set(0, tr.lookY.at(time) * k + 7 * m * tr.spread.at(time), tr.lookZ.at(time) * k);
     camera.position.set(look.x + D * sin(az) * cos(el), look.y + D * sin(el), look.z + D * cos(az) * cos(el));
     camera.lookAt(look);
     camera.updateMatrixWorld();
@@ -195,14 +196,20 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null, 
     t = duration;
     render(t);
     finished = true;
-    // Cross-fade into the DOM iPod; keep re-rendering the aligned frame while the fade runs so
-    // a layout shift during the boot cannot leave a misaligned ghost.
-    canvas.style.transition = `opacity ${FADE_MS}ms ease-out`;
-    void canvas.offsetWidth;
-    canvas.style.opacity = '0';
+    // Cross-fade into the DOM iPod (driven from JS so it never depends on a CSS transition
+    // getting its first compositor frame, nor on rAF); re-render the aligned frame only if the target
+    // moves during the fade, so a layout shift during the boot cannot leave a misaligned ghost.
     const t0 = performance.now();
-    const tick = () => { if (disposed || performance.now() - t0 > FADE_MS + 80) return; render(duration); raf = requestAnimationFrame(tick); };
-    raf = requestAnimationFrame(tick);
+    let r0 = getTargetRect();
+    const tick = () => {
+      if (disposed) return;
+      const u = Math.min(1, (performance.now() - t0) / FADE_MS);
+      canvas.style.opacity = ((1 - u) * (1 - u)).toFixed(3);
+      const r = getTargetRect();
+      if (r.left !== r0.left || r.top !== r0.top || r.width !== r0.width || r.height !== r0.height) { r0 = r; render(duration); }
+      if (u < 1) fadeTimer = setTimeout(tick, 16); // timers, not rAF: rAF can stall behind a GPU backlog
+    };
+    tick();
     resolveDone();
   }
   function frame(now) {
@@ -248,6 +255,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null, 
       disposed = true;
       playing = false;
       cancelAnimationFrame(raf);
+      clearTimeout(fadeTimer);
       window.removeEventListener('resize', resize);
       canvas.removeEventListener('webglcontextlost', onLost);
       canvas.removeEventListener('webglcontextrestored', onRestored);
@@ -258,6 +266,8 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null, 
       renderer.forceContextLoss?.();
       canvas.remove();
     },
+    /** Test hook: GPU resource counters (should be 0 after dispose). */
+    info() { return { ...renderer.info.memory }; },
     /** Test hook: projected front-face rect (viewport px) vs. the target rect at the current t. */
     measure() {
       const rect = getTargetRect();

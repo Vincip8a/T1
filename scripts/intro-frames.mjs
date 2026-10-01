@@ -20,8 +20,10 @@ const page = await browser.newPage({
   hasTouch: mobile,
 });
 const errors = collectErrors(page);
-await page.goto(url, { waitUntil: 'load' });
-await page.waitForFunction(() => window.__intro && typeof window.__intro.seek === 'function', null, { timeout: 15000 });
+try {
+await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+// Interval polling: rAF-based polling stalls when software WebGL saturates the CPU.
+await page.waitForFunction(() => window.__intro && typeof window.__intro.seek === 'function', null, { timeout: 60000, polling: 250 });
 await page.evaluate(() => window.__intro.pause());
 const duration = await page.evaluate(() => window.__intro.duration);
 const times = opts.times
@@ -32,9 +34,11 @@ for (const t of times) {
   await page.evaluate((tt) => window.__intro.seek(tt), t);
   await page.waitForTimeout(250);
   const file = join(outDir, `t${String(t.toFixed(2)).padStart(5, '0')}.png`);
-  await page.screenshot({ path: file });
+  await page.screenshot({ path: file, timeout: 90000 });
   console.log(`saved ${file}`);
 }
 console.log(`duration=${duration}s`);
-await browser.close();
+} finally {
+  await browser.close(); // always close, so crashed runs don't leave Chromium burning CPU
+}
 if (errors.length) console.log(errors.join('\n'));

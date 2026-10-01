@@ -70,12 +70,16 @@ function aluminium(aniso) {
     ctx.fillStyle = COLORS.aluminium;
     ctx.fillRect(0, 0, w, h);
     grain(ctx, w, h, r, 7);
+    const g = ctx.createLinearGradient(0, 0, 0, h); // the DOM plate's top-light / bottom-dark gradient
+    g.addColorStop(0, 'rgba(255,255,255,0.16)'); g.addColorStop(0.45, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(0,0,0,0.12)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
   }, { aniso });
   const r2 = rng(12);
   const rough = make(256, 256, (ctx, w, h) => {
     ctx.fillStyle = '#c0c0c0';
     ctx.fillRect(0, 0, w, h);
-    grain(ctx, w, h, r2, 36, 40, true, 0.05);
+    grain(ctx, w, h, r2, 36);
   }, { data: true, aniso });
   return { map, rough };
 }

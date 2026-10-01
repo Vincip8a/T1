@@ -23,14 +23,17 @@ const page = await browser.newPage({
   hasTouch: mobile,
 });
 const errors = collectErrors(page);
-await page.goto(url, { waitUntil: 'load' });
+try {
+await page.goto(url, { waitUntil: 'load', timeout: 60000 });
 await page.waitForTimeout(Number(opts.wait ?? 1500));
 if (opts.eval) {
   await page.evaluate(opts.eval);
   await page.waitForTimeout(300);
 }
 mkdirSync(dirname(out), { recursive: true });
-await page.screenshot({ path: out });
-await browser.close();
+await page.screenshot({ path: out, timeout: 90000 });
+} finally {
+  await browser.close(); // always close, so crashed runs don't leave Chromium burning CPU
+}
 console.log(`saved ${out}`);
 if (errors.length) console.log(errors.join('\n'));

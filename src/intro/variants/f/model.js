@@ -52,13 +52,13 @@ export function buildModel(tex) {
   const M = {}; // materials, for disposal
 
   M.alu = phys({ color: 0x9a9ea2, map: fit(tex.alu, W, H), roughnessMap: tex.aluRough, metalness: 0.55, roughness: 0.6, anisotropy: 0.3, anisotropyRotation: PI / 2, envMapIntensity: 0.45 });
-  M.aluSide = phys({ color: COLORS.aluminiumDark, metalness: 0.75, roughness: 0.5, envMapIntensity: 0.35 });
+  M.aluSide = phys({ color: 0x6e7278, metalness: 0.6, roughness: 0.55, envMapIntensity: 0.35 });
   M.steel = phys({ color: COLORS.steel, map: fit(tex.steel, W - 1.2, H - 1.2), metalness: 0.2, roughness: 0.7, transparent: true, depthWrite: false });
-  M.steelSide = phys({ color: COLORS.steel, metalness: 1, roughness: 0.28, envMapIntensity: 0.75 });
+  M.steelSide = phys({ color: 0xaeb2b7, metalness: 1, roughness: 0.32, envMapIntensity: 0.3 });
   M.wheel = phys({ color: 0xd8d8d8, map: fit(tex.wheel, IPOD.wheel.diameter, IPOD.wheel.diameter), metalness: 0, roughness: 0.5, clearcoat: 0.25, clearcoatRoughness: 0.3 });
   M.wheelSide = phys({ color: COLORS.wheel, metalness: 0, roughness: 0.55 });
-  M.button = phys({ color: 0xd8d8d8, map: fit(tex.button, IPOD.centerButton.diameter, IPOD.centerButton.diameter), metalness: 0, roughness: 0.5, clearcoat: 0.15, clearcoatRoughness: 0.35 });
-  M.glass = phys({ color: COLORS.screenWindow, metalness: 0, roughness: 0.32, clearcoat: 0.5, clearcoatRoughness: 0.42, envMapIntensity: 0.3 });
+  M.button = phys({ color: 0xc6c6c6, map: fit(tex.button, IPOD.centerButton.diameter, IPOD.centerButton.diameter), metalness: 0, roughness: 0.5, clearcoat: 0.15, clearcoatRoughness: 0.35 });
+  M.glass = phys({ color: COLORS.screenWindow, metalness: 0, roughness: 0.22, envMapIntensity: 0.05, specularIntensity: 0.35 });
   M.lcdFrame = phys({ color: 0xaeb2b7, metalness: 0.9, roughness: 0.55 });
   M.lcd = phys({ color: COLORS.lcdOff, metalness: 0.1, roughness: 0.3, clearcoat: 0.5, clearcoatRoughness: 0.15 });
   M.pcb = phys({ color: 0xffffff, map: fit(tex.pcb, 55, 93), metalness: 0.15, roughness: 0.55 });
@@ -306,7 +306,7 @@ export function buildModel(tex) {
       const x = p.ex, drift = ec * ec * Math.sin(time * 1.9 + i * 1.3) * 0.7;
       p.obj.position.set(
         p.rest.x + e * (x.x || 0) * k,
-        p.rest.y + e * ((x.y || 0) - (x.z || 0) * yk) * k + drift,
+        p.rest.y + e * ((x.y || 0) - Math.max(-60, Math.min(60, x.z || 0)) * yk) * k + drift,
         p.rest.z + e * (x.z || 0) * k);
       p.obj.rotation.set(s * (x.rx || 0), s * (x.ry || 0) + e * (x.flip || 0), s * (x.rz || 0));
     });
