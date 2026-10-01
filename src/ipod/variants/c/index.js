@@ -106,13 +106,18 @@ export function mountIpod(container, { config } = {}) {
   el.style.setProperty('--ipodc-noise', `url("data:image/svg+xml,${encodeURIComponent(NOISE_SVG)}")`);
 
   // Live reduced-motion: follows OS changes mid-session (CSS + JS).
+  // `isReduced()` reads the media query at the moment of use, so it is right even before the
+  // change event has been delivered; the listener keeps the CSS class in sync.
   const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)') ?? null;
-  let reduced = prefersReducedMotion();
-  el.classList.toggle('ipodc--reduced', reduced);
+  const isReduced = () => {
+    const r = mq ? mq.matches : prefersReducedMotion();
+    if (el.classList.contains('ipodc--reduced') !== r) el.classList.toggle('ipodc--reduced', r);
+    return r;
+  };
+  isReduced();
   if (mq?.addEventListener) {
-    const onMq = () => { reduced = mq.matches; el.classList.toggle('ipodc--reduced', reduced); };
-    mq.addEventListener('change', onMq);
-    cleanups.push(() => mq.removeEventListener('change', onMq));
+    mq.addEventListener('change', isReduced);
+    cleanups.push(() => mq.removeEventListener('change', isReduced));
   }
 
   // ── screen
@@ -386,7 +391,7 @@ export function mountIpod(container, { config } = {}) {
       },
       bump(d) {
         const now = performance.now();
-        if (reduced || now - bumpAt < 260) return;
+        if (isReduced() || now - bumpAt < 260) return;
         bumpAt = now;
         view.classList.remove('bump-up', 'bump-down');
         void view.offsetWidth;
@@ -633,7 +638,7 @@ export function mountIpod(container, { config } = {}) {
   }
   const EASE = 'cubic-bezier(.32,.08,.24,1)';
   function slide(outNode, inNode, dir) {
-    if (reduced || !outNode || typeof inNode.animate !== 'function') return Promise.resolve();
+    if (isReduced() || !outNode || typeof inNode.animate !== 'function') return Promise.resolve();
     const o = { duration: SLIDE_MS, easing: EASE };
     return Promise.all([
       animate(outNode, [{ transform: 'translateX(0)' }, { transform: `translateX(${-dir * 100}%)` }], o),
@@ -648,7 +653,7 @@ export function mountIpod(container, { config } = {}) {
     const nu = h('span', 'ipodc-title', { text });
     titles.append(nu);
     titleEl = nu;
-    if (!dir || reduced || !old.textContent || typeof nu.animate !== 'function') { old.remove(); return; }
+    if (!dir || isReduced() || !old.textContent || typeof nu.animate !== 'function') { old.remove(); return; }
     const o = { duration: SLIDE_MS, easing: EASE };
     animate(old, [
       { opacity: 1, transform: 'translateX(0)' },
@@ -682,7 +687,7 @@ export function mountIpod(container, { config } = {}) {
     show(s);
     setTitle(s.title, 1);
     slide(prev?.node, s.node, 1).then(() => { if (prev && !isCurrent(prev)) prev.node.remove(); });
-    if (reduced && prev) prev.node.remove();
+    if (isReduced() && prev) prev.node.remove();
     const lbl = s.currentLabel();
     announce(`${s.title}${lbl ? `, ${lbl}` : ''}`);
   }
@@ -697,7 +702,7 @@ export function mountIpod(container, { config } = {}) {
     show(prev);
     setTitle(prev.title, -1);
     slide(top.node, prev.node, -1).then(() => top.node.remove());
-    if (reduced) top.node.remove();
+    if (isReduced()) top.node.remove();
     announce(`${prev.title}, ${prev.currentLabel()}`);
     return true;
   }
@@ -857,7 +862,7 @@ export function mountIpod(container, { config } = {}) {
     delete wheel.dataset.press;
     const v0 = velocity(p);
     const lastS = p.samples[p.samples.length - 1];
-    if (!reduced && Math.abs(v0) > 520 && e.timeStamp - lastS.t < 60) momentum(v0, p.acc, p.type);
+    if (!isReduced() && Math.abs(v0) > 520 && e.timeStamp - lastS.t < 60) momentum(v0, p.acc, p.type);
   };
   on(wheel, 'pointerup', endWheel);
   on(wheel, 'pointercancel', endWheel);
@@ -949,7 +954,7 @@ export function mountIpod(container, { config } = {}) {
     if (suppressClick) { suppressClick = false; e.preventDefault(); return; }
     if (!row) return;
     const s = current();
-    const settling = !reduced && performance.now() - (s?.enteredAt ?? 0) < SLIDE_MS * 0.75;
+    const settling = !isReduced() && performance.now() - (s?.enteredAt ?? 0) < SLIDE_MS * 0.75;
     // Only rows of the screen that is actually in place, and never the 2nd click of a double-click.
     if (phase !== 'ready' || !s || !s.node.contains(row) || e.detail > 1 || settling) { e.preventDefault(); return; }
     const i = s.rows.indexOf(row);
@@ -1041,11 +1046,11 @@ export function mountIpod(container, { config } = {}) {
       menuScr.layout();
       if (doBoot) {
         phase = 'boot';
-        await wait(reduced ? 40 : 220);
+        await wait(isReduced() ? 40 : 220);
         boot.classList.add('show-mono');
-        await wait(reduced ? 450 : 950);
+        await wait(isReduced() ? 450 : 950);
         boot.classList.add('is-out');
-        await wait(reduced ? 80 : 340);
+        await wait(isReduced() ? 80 : 340);
       }
       if (destroyed) return;
       boot.hidden = true;

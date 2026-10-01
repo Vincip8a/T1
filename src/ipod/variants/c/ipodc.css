@@ -656,7 +656,7 @@
 /* ───────────── reduced motion (OS setting, live) ───────────── */
 .ipodc--reduced *, .ipodc--reduced *::before, .ipodc--reduced *::after { animation: none !important; }
 .ipodc--reduced .ipodc-hl, .ipodc--reduced .ipodc-content, .ipodc--reduced .ipodc-sb-thumb,
-.ipodc--reduced .ipodc-wheel, .ipodc--reduced .ipodc-row { transition: none; }
+.ipodc--reduced .ipodc-wheel, .ipodc--reduced .ipodc-row, .ipodc--reduced .ipodc-meter-fill { transition: none; }
 .ipodc--reduced .ipodc-pv { transition-duration: .01s; }
 .ipodc--reduced .ipodc-boot-mono { transform: none; transition: opacity .2s ease; }
 @media (prefers-reduced-motion: reduce) {
