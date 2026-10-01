@@ -189,8 +189,8 @@ export function mountIpod(container, { config }) {
     syncActive();
     announce(`${next.type === 'nowplaying' ? STR.nowPlaying : next.el.querySelector('.ipodf-title')?.textContent ?? ''}. ${next.currentLabel()}`);
     const finish = () => { if (dir > 0) prevEl.remove(); else prev.destroy(); };
-    if (reduced()) { finish(); return; }
     const nextEl = next.el;
+    if (reduced()) { nextEl.classList.remove('is-anim'); nextEl.style.transform = ''; finish(); return; }
     nextEl.classList.remove('is-anim');
     prevEl.classList.remove('is-anim');
     nextEl.style.transform = `translateX(${dir * 100}%)`;

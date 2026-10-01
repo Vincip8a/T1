@@ -72,7 +72,7 @@ export function runIntro({ getTargetRect, reducedMotion = false }) {
   pmrem.dispose();
 
   const key = new THREE.DirectionalLight(0xfff3e4, 1.7);
-  key.position.set(90, 140, 190);
+  key.position.set(60, 90, 210);
   key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024);
   key.shadow.radius = 9;
@@ -92,7 +92,7 @@ export function runIntro({ getTargetRect, reducedMotion = false }) {
   scene.add(model.root);
 
   const shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), new THREE.ShadowMaterial({ color: 0x0a1428, opacity: 0, transparent: true, depthWrite: false }));
-  shadowPlane.position.z = -70;
+  shadowPlane.position.z = -95;
   shadowPlane.receiveShadow = true;
   scene.add(shadowPlane);
 
@@ -133,11 +133,11 @@ export function runIntro({ getTargetRect, reducedMotion = false }) {
     tr.opacity = seq(0).to(0, 0.45, 1, 'power2.out');
     tr.az = seq(-14).to(0, 1.2, -34, 'sine.inOut').to(1.2, 2.8, -52, 'sine.inOut').to(2.8, 5.3, -20, 'sine.inOut').to(5.3, 6.05, -11, 'sine.inOut').to(6.05, 6.8, 0, 'power3.inOut');
     tr.el = seq(6).to(0, 1.2, 12, 'sine.inOut').to(1.2, 2.8, 20, 'sine.inOut').to(2.8, 5.3, 4, 'sine.inOut').to(5.3, 6.05, 3, 'sine.inOut').to(6.05, 6.8, 0, 'power3.inOut');
-    tr.dist = seq(1.16).to(0, 1.0, 1.07, 'power2.out').to(1.0, 2.9, 1.55, 'power2.inOut').to(4.2, 6.05, 1.12, 'power2.inOut').to(6.05, 6.8, 1, 'power3.inOut');
+    tr.dist = seq(1.16).to(0, 1.0, 1.07, 'power2.out').to(1.0, 2.9, 1.42, 'power2.inOut').to(4.2, 6.05, 1.12, 'power2.inOut').to(6.05, 6.8, 1, 'power3.inOut');
     tr.fov = seq(30).to(6.05, 6.8, FOV_END, 'power3.inOut');
     tr.lookZ = seq(0).to(1.0, 2.9, -12, 'power2.inOut').to(4.2, 6.05, -2, 'power2.inOut').to(6.05, 6.8, 0, 'power3.inOut');
     tr.lookY = seq(0).to(1.0, 2.9, 1.5, 'sine.inOut').to(4.2, 6.8, 0, 'sine.inOut');
-    tr.shadow = seq(0).to(1.0, 2.0, 1, 'sine.inOut').to(5.5, 6.25, 0, 'sine.inOut');
+    tr.shadow = seq(0).to(1.0, 2.0, 1, 'sine.inOut').to(4.6, 5.4, 0, 'sine.inOut');
     tr.jolt = seq(0).to(6.15, 6.16, 1).to(6.16, 6.6, 0, 'elastic.out(1,0.4)');
   }
 
@@ -176,7 +176,7 @@ export function runIntro({ getTargetRect, reducedMotion = false }) {
     camera.lookAt(look);
     camera.updateMatrixWorld();
 
-    shadowPlane.material.opacity = 0.3 * tr.shadow.at(time);
+    shadowPlane.material.opacity = 0.18 * tr.shadow.at(time);
     canvas.style.opacity = tr.opacity.at(time).toFixed(3);
     renderer.render(scene, camera);
   }

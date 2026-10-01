@@ -20,14 +20,18 @@ export function createWheel(ring, {
   const norm = (d) => ((d + 540) % 360) - 180;
 
   const feed = (delta) => {
+    // a clear reversal responds immediately instead of first unwinding the old remainder
+    if (Math.abs(delta) > 2.5 && acc * delta < 0) acc = 0;
     acc += delta;
     let guard = 0;
     while (acc >= stepDeg && guard++ < 6) { acc -= stepDeg; onStep(1); }
     while (acc <= -stepDeg && guard++ < 6) { acc += stepDeg; onStep(-1); }
   };
 
-  const stopMomentum = () => { if (raf) cancelAnimationFrame(raf); raf = 0; };
+  const stopMomentum = () => { if (raf) clearTimeout(raf); raf = 0; };
 
+  // Flick momentum emits discrete steps, so a timer (not rAF) is fine and keeps working
+  // when the page isn't painting.
   const startMomentum = (v0) => {
     let v = Math.max(-2.2, Math.min(2.2, v0)); // deg per ms
     let last = performance.now();
@@ -38,9 +42,9 @@ export function createWheel(ring, {
       last = now;
       feed(v * dt);
       v *= Math.exp(-dt / tau);
-      raf = Math.abs(v) > 0.05 ? requestAnimationFrame(loop) : 0;
+      raf = Math.abs(v) > 0.05 ? setTimeout(loop, 16) : 0;
     };
-    raf = requestAnimationFrame(loop);
+    raf = setTimeout(loop, 16);
   };
 
   const down = (e) => {

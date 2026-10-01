@@ -312,9 +312,12 @@ export class NowPlayingScreen {
   renderTime() {
     const p = this.player;
     const d = p.duration;
-    this.$.tl.textContent = fmt(p.elapsed);
-    this.$.tr.textContent = `-${fmt(d - p.elapsed)}`;
-    this.$.fill.style.width = `${Math.min(100, (p.elapsed / d) * 100)}%`;
+    const tl = fmt(p.elapsed);
+    const tr = `-${fmt(d - p.elapsed)}`;
+    const w = `${(Math.min(100, (p.elapsed / d) * 100)).toFixed(1)}%`;
+    if (this.$.tl.textContent !== tl) this.$.tl.textContent = tl;
+    if (this.$.tr.textContent !== tr) this.$.tr.textContent = tr;
+    if (this.$.fill.style.width !== w) this.$.fill.style.width = w;
   }
   activate() {
     this.off?.();

@@ -51,14 +51,14 @@ export function buildModel(tex) {
   const parts = [];
   const M = {}; // materials, for disposal
 
-  M.alu = phys({ color: 0xffffff, map: fit(tex.alu, W, H), roughnessMap: tex.aluRough, metalness: 0.85, roughness: 0.5, anisotropy: 0.4, anisotropyRotation: PI / 2, envMapIntensity: 0.62 });
-  M.aluSide = phys({ color: COLORS.aluminium, metalness: 0.85, roughness: 0.35, envMapIntensity: 0.7 });
-  M.steel = phys({ color: 0xffffff, map: fit(tex.steel, W, H), metalness: 1, roughness: 0.1, envMapIntensity: 1.25 });
-  M.steelSide = phys({ color: COLORS.steel, metalness: 1, roughness: 0.12, envMapIntensity: 1.25 });
-  M.wheel = phys({ color: 0xffffff, map: fit(tex.wheel, 38.4, 38.4), metalness: 0, roughness: 0.5, clearcoat: 0.25, clearcoatRoughness: 0.3 });
+  M.alu = phys({ color: 0x9a9ea2, map: fit(tex.alu, W, H), roughnessMap: tex.aluRough, metalness: 0.55, roughness: 0.6, anisotropy: 0.4, anisotropyRotation: PI / 2, envMapIntensity: 0.45 });
+  M.aluSide = phys({ color: COLORS.aluminium, metalness: 0.6, roughness: 0.45, envMapIntensity: 0.5 });
+  M.steel = phys({ color: 0xd9dde2, map: fit(tex.steel, W - 1.2, H - 1.2), metalness: 0.2, roughness: 0.7, transparent: true, depthWrite: false });
+  M.steelSide = phys({ color: COLORS.steel, metalness: 1, roughness: 0.2, envMapIntensity: 1.1 });
+  M.wheel = phys({ color: 0xd6d6d6, map: fit(tex.wheel, 38.4, 38.4), metalness: 0, roughness: 0.5, clearcoat: 0.25, clearcoatRoughness: 0.3 });
   M.wheelSide = phys({ color: COLORS.wheel, metalness: 0, roughness: 0.55 });
-  M.button = phys({ color: COLORS.centerButton, metalness: 0, roughness: 0.42, clearcoat: 0.3, clearcoatRoughness: 0.25 });
-  M.glass = phys({ color: COLORS.screenWindow, metalness: 0, roughness: 0.04, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.3, specularIntensity: 1 });
+  M.button = phys({ color: 0x7e8288, metalness: 0, roughness: 0.42, clearcoat: 0.3, clearcoatRoughness: 0.25 });
+  M.glass = phys({ color: 0x15171a, metalness: 0, roughness: 0.06, clearcoat: 1, clearcoatRoughness: 0.04, envMapIntensity: 1.6, specularIntensity: 1 });
   M.lcdFrame = phys({ color: 0xaeb2b7, metalness: 0.9, roughness: 0.55 });
   M.lcd = phys({ color: COLORS.lcdOff, metalness: 0.1, roughness: 0.3, clearcoat: 0.5, clearcoatRoughness: 0.15 });
   M.pcb = phys({ color: 0xffffff, map: fit(tex.pcb, 55, 93), metalness: 0.15, roughness: 0.55 });
@@ -223,8 +223,12 @@ export function buildModel(tex) {
   // 10. Back shell: polished stainless tray (plate + side walls) with the edge openings.
   {
     const g = new THREE.Group();
-    const plate = new THREE.Mesh(extrude(rr(W, H, IPOD.cornerRadius), PZ.backShell.thickness + 0.4, 0.55, 4, 18), [M.steel, M.steelSide]);
+    const plate = new THREE.Mesh(extrude(rr(W, H, IPOD.cornerRadius), PZ.backShell.thickness + 0.4, 0.55, 4, 18), M.steelSide);
     plate.position.z = -PZ.backShell.z + 0.4;
+    const engraving = new THREE.Mesh(new THREE.ShapeGeometry(rr(W - 1.2, H - 1.2, IPOD.cornerRadius - 0.6), 18), M.steel);
+    engraving.rotation.y = PI; // faces -Z; the rotation mirrors x so the text reads correctly from behind
+    engraving.position.z = -IPOD.depth - 0.03;
+    g.add(engraving);
     plate.castShadow = true; plate.receiveShadow = true;
     const ws = rr(W, H, IPOD.cornerRadius);
     ws.holes.push(rr(W - 1.2, H - 1.2, IPOD.cornerRadius - 0.6, 0, 0, THREE.Path));
@@ -243,7 +247,7 @@ export function buildModel(tex) {
     const dockSlot = new THREE.Mesh(new THREE.ShapeGeometry(rr(IPOD.dockConnector.width, IPOD.dockConnector.height, 0.8)), M.dark);
     dockSlot.rotation.x = PI / 2; dockSlot.position.set(0, -H / 2 - 0.02, zc);
     g.add(jackHole, holdSlot, slider, dockSlot);
-    add('backShell', g, { z: -76, y: -4, rx: 0.2 }, { x: 0, y: 0, z: 0 });
+    add('backShell', g, { z: -74, x: -24, y: -12, rx: 0.12, flip: PI }, { x: 0, y: 0, z: 0 });
   }
   // 11. Screws (instanced): heads on the back of the mid-frame ring.
   const screws = (() => {
@@ -300,7 +304,7 @@ export function buildModel(tex) {
       const e = p.e, ec = Math.min(1, Math.max(0, e)), s = Math.sin(PI * ec);
       const x = p.ex, drift = ec * ec * Math.sin(time * 1.9 + i * 1.3) * 0.7;
       p.obj.position.set(p.rest.x + e * (x.x || 0) * k, p.rest.y + e * (x.y || 0) * k + drift, p.rest.z + e * (x.z || 0) * k);
-      p.obj.rotation.set(s * (x.rx || 0), s * (x.ry || 0), s * (x.rz || 0));
+      p.obj.rotation.set(s * (x.rx || 0), s * (x.ry || 0) + e * (x.flip || 0), s * (x.rz || 0));
     });
     screws.pos.forEach((v, i) => {
       const e = screwE, ec = Math.min(1, Math.max(0, e));
@@ -322,16 +326,16 @@ export function buildModel(tex) {
     // Ribbon: cubic Bézier from the flex disc's lower edge to the board connector, both
     // tangents pointing down (-y) so the ribbon lies flat at both ends and bends in between.
     const fl = byId.wheelFlex.obj, lb = byId.logicBoard.obj;
-    A.set(8, -(R - 2.0), -0.15).applyEuler(fl.rotation).add(fl.position);
-    B.set(8, -40, 1.0).applyEuler(lb.rotation).add(lb.position);
+    A.set(-(R - 1.6), -3, -0.15).applyEuler(fl.rotation).add(fl.position);
+    B.set(-25.5, -26, 1.0).applyEuler(lb.rotation).add(lb.position);
     const L = A.distanceTo(B);
-    P1.copy(A).add(T.set(0, -0.45 * L, 0).applyEuler(fl.rotation));
-    P2.copy(B).add(T.set(0, 0.45 * L, 0).applyEuler(lb.rotation));
-    const half = 3.0;
+    P1.copy(A).add(T.set(-0.42 * L, 0, 0).applyEuler(fl.rotation));
+    P2.copy(B).add(T.set(-0.42 * L, 0, 0).applyEuler(lb.rotation));
+    const half = 3.2;
     for (let i = 0; i <= RIB_N; i++) {
       const u = i / RIB_N, u1 = 1 - u;
       C.set(0, 0, 0).addScaledVector(A, u1 * u1 * u1).addScaledVector(P1, 3 * u1 * u1 * u).addScaledVector(P2, 3 * u1 * u * u).addScaledVector(B, u * u * u);
-      ribPos.set([C.x - half, C.y, C.z, C.x + half, C.y, C.z], i * 6);
+      ribPos.set([C.x, C.y - half, C.z, C.x, C.y + half, C.z], i * 6);
     }
     ribGeo.attributes.position.needsUpdate = true;
     ribGeo.computeVertexNormals();

@@ -68,13 +68,13 @@ function aluminium(aniso) {
   const map = make(512, 512, (ctx, w, h) => {
     ctx.fillStyle = COLORS.aluminium;
     ctx.fillRect(0, 0, w, h);
-    grain(ctx, w, h, r, 10, 24, true);
+    grain(ctx, w, h, r, 8, 10, true);
   }, { aniso });
   const r2 = rng(12);
   const rough = make(256, 256, (ctx, w, h) => {
     ctx.fillStyle = '#c4c4c4';
     ctx.fillRect(0, 0, w, h);
-    grain(ctx, w, h, r2, 50, 70, true);
+    grain(ctx, w, h, r2, 40, 26, true);
   }, { data: true, aniso });
   return { map, rough };
 }
@@ -82,22 +82,16 @@ function aluminium(aniso) {
 // Mirror-polished stainless back shell with the engraved monogram and small text.
 // Drawn mirrored in x: ExtrudeGeometry cap UVs are shape coordinates, and this cap faces -Z.
 function steel(brand, aniso) {
-  const r = rng(21);
   return make(640, 1072, (ctx, w, h) => {
-    const g = ctx.createLinearGradient(0, 0, w, h);
-    g.addColorStop(0, '#e3e7ec'); g.addColorStop(0.5, '#cfd4da'); g.addColorStop(1, '#dde1e6');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, w, h);
-    grain(ctx, w, h, r, 5, 40, false);
-    ctx.save();
-    ctx.translate(w, 0); ctx.scale(-1, 1);
-    const ink = 'rgba(70,76,84,0.55)';
+    ctx.clearRect(0, 0, w, h);
+    const ink = 'rgba(255,255,255,0.9)';
     const mono = brand?.monogram ?? '';
-    text(ctx, mono, w / 2, h * 0.42, 150, 'rgba(60,66,74,0.5)', 700);
-    text(ctx, mono, w / 2 + 1, h * 0.42 - 1, 150, 'rgba(255,255,255,0.35)', 700);
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.font = `700 190px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.strokeText(mono, w / 2, h * 0.40);
+    text(ctx, mono, w / 2, h * 0.40, 190, ink, 700);
     const lines = [brand?.name ?? '', brand?.tagline ?? '', '160 GB  ·  Model F-1', 'Designed with care. Assembled with patience.'];
-    lines.forEach((s, i) => text(ctx, s, w / 2, h * 0.80 + i * 24, i < 2 ? 18 : 15, ink, i < 2 ? 600 : 400));
-    ctx.restore();
+    lines.forEach((s, i) => text(ctx, s, w / 2, h * 0.79 + i * 26, i < 2 ? 20 : 16, ink, i < 2 ? 600 : 400));
   }, { aniso });
 }
 
