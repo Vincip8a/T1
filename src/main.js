@@ -23,8 +23,6 @@ function hasWebGL2() {
   }
 }
 
-const wait = (ms) => new Promise((r) => { setTimeout(r, ms); });
-
 function showConfigError() {
   const desktop = createDesktop(app, { config: { brand: { windowTitle: 'iPod' } } });
   const box = document.createElement('div');
@@ -51,7 +49,7 @@ function createSkipControl(onSkip) {
   btn.addEventListener('click', onSkip);
   const onKey = (e) => { if (e.key === 'Escape') onSkip(); };
   window.addEventListener('keydown', onKey);
-  document.body.append(btn);
+  document.body.prepend(btn); // first Tab stop
   return () => {
     window.removeEventListener('keydown', onKey);
     btn.remove(); // a focused button drops focus to <body>; main() then focuses the iPod
@@ -97,8 +95,9 @@ async function main() {
         intro = runIntro({ getTargetRect: () => ipod.getShellRect(), reducedMotion: prefersReducedMotion(), config });
         if (DEBUG) window.__intro = intro;
         // safety net: a render loop that died must never leave the iPod hidden
-        const limit = ((intro.duration || 0) * 3 + 12) * 1000;
-        await Promise.race([intro.done, wait(limit).then(() => intro.skip())]);
+        const watchdog = setTimeout(() => intro.skip(), ((intro.duration || 0) * 3 + 12) * 1000);
+        await intro.done;
+        clearTimeout(watchdog);
       }
     } catch {
       // intro chunk failed to load or the intro threw: reveal the iPod directly

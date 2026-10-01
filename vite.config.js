@@ -94,7 +94,8 @@ function configHtml() {
 // Relative base so the build works on GitHub Pages sub-paths and any static host.
 export default defineConfig({
   base: './',
-  build: { target: 'es2022' },
+  // the lazily loaded intro chunk carries three.js (~610 kB minified, ~160 kB gzip) by design
+  build: { target: 'es2022', chunkSizeWarningLimit: 700 },
   plugins: [configHtml()],
   server: {
     // agents and QA write screenshots there; reloads on those writes broke test runs
