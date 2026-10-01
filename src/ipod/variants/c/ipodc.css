@@ -1,28 +1,21 @@
 /* iPod Classic (6th/7th gen, silver), variant C.
    Hardware: every size is calc(var(--ipodc-u) * <mm>) with --ipodc-u = var(--ipod-h) / 103.5;
    the mm values are copied from IPOD (ipodSpec.js) into --ipodc-mm-* by index.js.
-   Screen UI: logical 320×240 px. One logical px = --ipodc-p = 100cqw / 320 of the LCD container
-   (with a --ipod-h based fallback where container units are missing).
+   Screen UI: logical 320×240 px. One logical px = --ipodc-p = 100cqw / 320 of the LCD container.
    Motion: every transition / animation lives in the prefers-reduced-motion: no-preference block
    at the end, so reduced motion holds before any JS runs. */
 
-@property --ipodc-p {
-  syntax: '<length>';
-  inherits: true;
-  initial-value: 1px;
-}
-
+.ipodc-host { display: contents; }
 .ipodc {
   --ipodc-h: var(--ipod-h, 560px);
   --ipodc-u: calc(var(--ipodc-h) / var(--ipodc-mm-h, 103.5));
-  --ipodc-font: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", "Nimbus Sans", sans-serif;
-  --ipodc-gloss: linear-gradient(180deg, #a3cbf6 0%, var(--ipodc-c-uiHighlightTop) 46%, #4b8fdc 54%, var(--ipodc-c-uiHighlightBottom) 100%);
+  --ipodc-font: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif;
+  /* the 6G highlight: glossy split across the middle */
+  --ipodc-gloss: linear-gradient(#a3cbf6, var(--ipodc-c-uiHighlightTop) 46%, #4b8fdc 54%, var(--ipodc-c-uiHighlightBottom));
   position: relative;
   flex: none;
   box-sizing: border-box;
-  display: block;
   margin: 0;
-  padding: 0;
   height: var(--ipodc-h);
   width: calc(var(--ipodc-h) * var(--ipodc-mm-w) / var(--ipodc-mm-h));
   border-radius: calc(var(--ipodc-u) * var(--ipodc-mm-r));
@@ -37,66 +30,48 @@
   font-family: var(--ipodc-font);
   /* satin anodised aluminium: soft vertical light falloff + gentle cylindrical side shading */
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, .34) 0%, rgba(255, 255, 255, .14) 20%, rgba(255, 255, 255, .03) 46%, rgba(0, 0, 0, .02) 72%, rgba(0, 0, 0, .075) 100%),
-    linear-gradient(90deg, rgba(0, 0, 0, .06) 0%, rgba(255, 255, 255, .09) 7%, rgba(255, 255, 255, 0) 26% 74%, rgba(255, 255, 255, .07) 93%, rgba(0, 0, 0, .07) 100%),
+    linear-gradient(#ffffff57, #ffffff24 20%, #ffffff08 46%, #00000005 72%, #00000013),
+    linear-gradient(90deg, #0000000f, #ffffff17 7%, transparent 26% 74%, #ffffff12 93%, #00000012),
     var(--ipodc-c-aluminium);
   box-shadow:
     /* polished steel rim hugging the front plate, very slight edge highlight */
-    inset 0 0 0 calc(var(--ipodc-u) * .14) rgba(84, 88, 94, .5),
-    inset 0 0 0 calc(var(--ipodc-u) * .34) rgba(255, 255, 255, .5),
-    inset 0 calc(var(--ipodc-u) * .45) calc(var(--ipodc-u) * .55) calc(var(--ipodc-u) * -.1) rgba(255, 255, 255, .5),
-    inset 0 calc(var(--ipodc-u) * -.5) calc(var(--ipodc-u) * .8) calc(var(--ipodc-u) * -.1) rgba(0, 0, 0, .09),
-    0 calc(var(--ipodc-u) * .5) calc(var(--ipodc-u) * 1.4) rgba(0, 0, 0, .2),
-    0 calc(var(--ipodc-u) * 2.2) calc(var(--ipodc-u) * 6) rgba(0, 0, 0, .15);
+    inset 0 0 0 calc(var(--ipodc-u) * .14) #54585e80,
+    inset 0 0 0 calc(var(--ipodc-u) * .34) #ffffff80,
+    inset 0 calc(var(--ipodc-u) * .45) calc(var(--ipodc-u) * .55) calc(var(--ipodc-u) * -.1) #ffffff80,
+    inset 0 calc(var(--ipodc-u) * -.5) calc(var(--ipodc-u) * .8) calc(var(--ipodc-u) * -.1) #00000017,
+    0 calc(var(--ipodc-u) * .5) calc(var(--ipodc-u) * 1.4) #0003,
+    0 calc(var(--ipodc-u) * 2.2) calc(var(--ipodc-u) * 6) #00000026;
 }
 .ipodc.is-revealed { visibility: inherit; }
 /* keyboard focus only: a pointer press focuses the iPod too, but must not draw the ring */
-.ipodc:focus-visible {
-  outline: 3px solid #0b4fc4; /* ≥ 4.5:1 on the light window and the desktop */
-  outline-offset: 4px;
-}
-.ipodc[data-input="pointer"]:focus-visible { outline: none; }
+.ipodc:focus-visible { outline: 3px solid #0b4fc4; outline-offset: 4px; } /* ≥ 4.5:1 on window and desktop */
+.ipodc[data-input="pointer"] { outline: none; }
 
 /* fine satin grain (procedural, near-isotropic SVG noise set from JS) */
 .ipodc::before {
   content: "";
   position: absolute;
   inset: 0;
+  z-index: -1;
   border-radius: inherit;
-  background-image: var(--ipodc-noise);
-  background-size: calc(var(--ipodc-u) * 52) calc(var(--ipodc-u) * 52);
+  background: var(--ipodc-noise) 0 0 / calc(var(--ipodc-u) * 52);
   mix-blend-mode: soft-light;
   opacity: .08;
   pointer-events: none;
-  z-index: -1;
 }
 
-.ipodc-defs { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
-.ipodc-sr {
-  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
-}
+.ipodc-defs, .ipodc-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-/* ───────────── top edge: hold switch + headphone jack hints ─────────────
-   Both openings just break the rim line at the top, which is enough to read the silhouette of
-   the real device. Everything stays inside the body rect. */
-.ipodc-edge {
-  position: absolute;
-  left: 0; right: 0; top: 0;
-  height: calc(var(--ipodc-u) * 1.2);
-  pointer-events: none;
-}
-.ipodc-hold, .ipodc-jack { position: absolute; top: 0; box-sizing: border-box; }
+/* ───────────── top edge: hold switch (slider in its left half = hold off) + headphone jack ───────────── */
+.ipodc-edge > * { position: absolute; top: 0; box-shadow: 0 calc(var(--ipodc-u) * .1) #fff9, inset 0 0 0 calc(var(--ipodc-u) * .06) #0006; }
 .ipodc-hold {
-  /* recessed slot with the aluminium slider sitting in its left half (hold off) */
   left: calc(var(--ipodc-u) * var(--ipodc-mm-hold-x));
   width: calc(var(--ipodc-u) * var(--ipodc-mm-hold-w));
   height: calc(var(--ipodc-u) * .62);
   border-radius: 0 0 calc(var(--ipodc-u) * .35) calc(var(--ipodc-u) * .35);
   background:
-    linear-gradient(180deg, #e9ebee 0%, #b4b8bd 55%, #8f9399 100%) left / 52% 78% no-repeat,
-    linear-gradient(180deg, #17181a 0%, #2c2e31 70%, #45484c 100%);
-  box-shadow: 0 calc(var(--ipodc-u) * .1) 0 rgba(255, 255, 255, .55), inset 0 0 0 calc(var(--ipodc-u) * .06) rgba(0, 0, 0, .45);
+    linear-gradient(#e9ebee, #b4b8bd 55%, #8f9399) 0 0 / 52% 78% no-repeat,
+    linear-gradient(#17181a, #2c2e31 70%, #45484c);
 }
 .ipodc-jack {
   /* round port seen at a grazing angle: a dark half-ellipse with a bright lip */
@@ -104,151 +79,126 @@
   width: calc(var(--ipodc-u) * var(--ipodc-mm-jack-d));
   height: calc(var(--ipodc-u) * .7);
   border-radius: 0 0 50% 50% / 0 0 100% 100%;
-  background: radial-gradient(70% 120% at 50% 0%, #050506 0%, #1b1c1e 55%, #3c3f43 100%);
-  box-shadow: 0 calc(var(--ipodc-u) * .1) 0 rgba(255, 255, 255, .6), inset 0 0 0 calc(var(--ipodc-u) * .07) rgba(120, 124, 130, .7);
+  background: radial-gradient(70% 120% at 50% 0, #050506, #1b1c1e 55%, #3c3f43);
 }
 
 /* ───────────── display window ───────────── */
+.ipodc-window, .ipodc-lcd, .ipodc-glare, .ipodc-ui, .ipodc-wheel { position: absolute; overflow: hidden; }
 .ipodc-window {
-  position: absolute;
   left: calc(var(--ipodc-u) * var(--ipodc-mm-win-x));
   top: calc(var(--ipodc-u) * var(--ipodc-mm-win-y));
   width: calc(var(--ipodc-u) * var(--ipodc-mm-win-w));
   height: calc(var(--ipodc-u) * var(--ipodc-mm-win-h));
   border-radius: calc(var(--ipodc-u) * var(--ipodc-mm-win-r));
   background: var(--ipodc-c-screenWindow);
-  overflow: hidden;
   box-shadow:
-    0 0 0 calc(var(--ipodc-u) * .13) rgba(64, 68, 74, .55),
-    0 calc(var(--ipodc-u) * .15) 0 calc(var(--ipodc-u) * .13) rgba(255, 255, 255, .45),
-    inset 0 calc(var(--ipodc-u) * .25) calc(var(--ipodc-u) * .4) rgba(0, 0, 0, .9);
+    0 0 0 calc(var(--ipodc-u) * .13) #40444a8c,
+    0 calc(var(--ipodc-u) * .15) 0 calc(var(--ipodc-u) * .13) #ffffff73,
+    inset 0 calc(var(--ipodc-u) * .25) calc(var(--ipodc-u) * .4) #000e;
 }
 .ipodc-lcd {
-  position: absolute;
   left: calc(var(--ipodc-u) * var(--ipodc-mm-lcd-x));
   top: calc(var(--ipodc-u) * var(--ipodc-mm-lcd-y));
   width: calc(var(--ipodc-u) * var(--ipodc-mm-lcd-w));
   height: calc(var(--ipodc-u) * var(--ipodc-mm-lcd-h));
   background: var(--ipodc-c-lcdOff);
-  overflow: hidden;
   container-type: size;
 }
 /* faint diagonal reflection on the acrylic window */
 .ipodc-glare {
-  position: absolute;
   inset: 0;
-  pointer-events: none;
-  border-radius: inherit;
-  background:
-    linear-gradient(121deg, rgba(255, 255, 255, .12) 0%, rgba(255, 255, 255, .065) 30%, rgba(255, 255, 255, .04) 46.6%, rgba(255, 255, 255, 0) 47%),
-    linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, 0) 12%);
   z-index: 3;
+  pointer-events: none;
+  background:
+    linear-gradient(121deg, #ffffff1f, #ffffff11 30%, #ffffff0a 46.6%, transparent 47%),
+    linear-gradient(#ffffff0d, transparent 12%);
 }
 
 /* ───────────── logical 320×240 UI ───────────── */
 .ipodc-ui {
   --ipodc-p: calc(100cqw / 320);
-  position: absolute;
   inset: 0;
-  overflow: hidden;
   background: var(--ipodc-c-uiBackground);
   color: var(--ipodc-c-uiText);
-  font-family: var(--ipodc-font);
-  font-size: calc(var(--ipodc-p) * 13);
-  line-height: 1.2;
+  font: calc(var(--ipodc-p) * 13)/1.2 var(--ipodc-font);
   -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-}
-/* no container query units (older Safari / Firefox): derive the logical px from --ipod-h */
-@supports not (width: 1cqw) {
-  .ipodc-ui { --ipodc-p: calc(var(--ipodc-u) * var(--ipodc-mm-lcd-w) / 320); }
 }
 
 /* title bar */
 .ipodc-bar {
   position: absolute;
-  left: 0; top: 0; right: 0;
+  inset: 0 0 auto;
+  z-index: 5;
   height: calc(var(--ipodc-p) * 22);
   box-sizing: border-box;
-  background: linear-gradient(180deg, #fdfdfd 0%, #eceef0 42%, #dadde0 58%, #c9cdd2 100%);
+  background: linear-gradient(#fdfdfd, #eceef0 42%, #dadde0 58%, #c9cdd2);
   border-bottom: calc(var(--ipodc-p) * 1) solid #7b8086;
-  z-index: 5;
 }
 .ipodc-titles {
   position: absolute;
-  left: calc(var(--ipodc-p) * 38); right: calc(var(--ipodc-p) * 38); top: 0;
-  height: calc(var(--ipodc-p) * 21);
+  inset: 0 calc(var(--ipodc-p) * 38);
   overflow: hidden;
 }
 .ipodc-title {
   position: absolute;
   inset: 0;
   font: 700 calc(var(--ipodc-p) * 14)/calc(var(--ipodc-p) * 21) var(--ipodc-font);
+  letter-spacing: -.01em;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: #000;
-  letter-spacing: -.01em;
 }
+.ipodc-ind, .ipodc-batt { position: absolute; top: calc(var(--ipodc-p) * 5); }
 .ipodc-ind {
-  position: absolute;
-  left: calc(var(--ipodc-p) * 8); top: calc(var(--ipodc-p) * 5.5);
+  left: calc(var(--ipodc-p) * 8);
+  top: calc(var(--ipodc-p) * 5.5);
   width: calc(var(--ipodc-p) * 10); height: calc(var(--ipodc-p) * 10);
   display: none;
 }
-.ipodc-ind svg, .ipodc-batt svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ipodc-bar svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .ipodc-ind.is-on { display: block; }
 .ipodc-ind .ipodc-ind-pause, .ipodc-ind.is-paused .ipodc-ind-play { display: none; }
 .ipodc-ind.is-paused .ipodc-ind-pause { display: inline; }
 .ipodc-batt {
-  position: absolute;
-  right: calc(var(--ipodc-p) * 7); top: calc(var(--ipodc-p) * 5);
+  right: calc(var(--ipodc-p) * 7);
   width: calc(var(--ipodc-p) * 23); height: calc(var(--ipodc-p) * 11);
 }
 
 /* stage with the sliding screens */
 .ipodc-stage {
   position: absolute;
-  left: 0; right: 0; top: calc(var(--ipodc-p) * 22); bottom: 0;
+  inset: calc(var(--ipodc-p) * 22) 0 0;
   overflow: hidden;
-  background: #fff;
   touch-action: none;
 }
-.ipodc-screen, .ipodc-view {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-}
-.ipodc-screen { background: #fff; }
+.ipodc-screen, .ipodc-view { position: absolute; inset: 0; overflow: hidden; background: #fff; }
 .ipodc-screen.is-split .ipodc-view { right: 50%; }
 .ipodc-screen.has-sb .ipodc-view { right: calc(var(--ipodc-p) * 9); }
 .ipodc-screen.is-split.has-sb .ipodc-view { right: calc(50% + var(--ipodc-p) * 9); }
-.ipodc-content { position: relative; transform: translate3d(0, calc(var(--ipodc-p) * var(--ipodc-off, 0) * -1), 0); }
-@keyframes ipodc-bump-down { 40% { transform: translateY(calc(var(--ipodc-p) * -3)); } }
-@keyframes ipodc-bump-up { 40% { transform: translateY(calc(var(--ipodc-p) * 3)); } }
+.ipodc-content { position: relative; transform: translateY(calc(var(--ipodc-p) * var(--ipodc-off, 0) * -1)); }
+@keyframes ipodc-bump { 40% { transform: translateY(calc(var(--ipodc-p) * var(--ipodc-b))); } }
+.ipodc-view.bump-down { --ipodc-b: -3; }
+.ipodc-view.bump-up { --ipodc-b: 3; }
 
 .ipodc-list { position: relative; }
-/* the gliding highlight bar, with the 6G gloss split across its middle */
+/* the gliding highlight bar */
 .ipodc-hl {
   position: absolute;
-  left: 0; right: 0; top: 0;
+  inset: 0 0 auto;
   height: calc(var(--ipodc-p) * 27);
-  transform: translate3d(0, calc(var(--ipodc-p) * 27 * var(--ipodc-i, 0)), 0);
+  transform: translateY(calc(var(--ipodc-p) * 27 * var(--ipodc-i, 0)));
   background: var(--ipodc-gloss);
-  box-shadow: inset 0 calc(var(--ipodc-p) * 1) 0 rgba(255, 255, 255, .25), inset 0 calc(var(--ipodc-p) * -1) 0 rgba(0, 0, 0, .16);
-  pointer-events: none;
+  box-shadow: inset 0 calc(var(--ipodc-p) * 1) #ffffff40, inset 0 calc(var(--ipodc-p) * -1) #00000029;
 }
 .ipodc-list.is-empty .ipodc-hl { display: none; }
 .ipodc-row {
   position: relative;
-  z-index: 1;
   display: flex;
   align-items: center;
   gap: calc(var(--ipodc-p) * 8);
   height: calc(var(--ipodc-p) * 27);
   padding: 0 calc(var(--ipodc-p) * 8) 0 calc(var(--ipodc-p) * 7);
-  box-sizing: border-box;
   color: #000;
   text-decoration: none;
   white-space: nowrap;
@@ -256,23 +206,16 @@
   cursor: pointer;
   -webkit-user-drag: none;
 }
+.ipodc-row > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .ipodc-row-label {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: auto;
   font: 700 calc(var(--ipodc-p) * 14.5)/calc(var(--ipodc-p) * 27) var(--ipodc-font);
   letter-spacing: -.01em;
 }
 .ipodc-row-detail {
-  flex: 0 1 auto;
-  min-width: 0;
   max-width: 58%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font: 400 calc(var(--ipodc-p) * 12.5)/calc(var(--ipodc-p) * 27) var(--ipodc-font);
+  font: calc(var(--ipodc-p) * 12.5)/calc(var(--ipodc-p) * 27) var(--ipodc-font);
   color: #808387;
-  text-align: right;
 }
 .ipodc-chev {
   flex: none;
@@ -281,8 +224,8 @@
   visibility: hidden;
 }
 .ipodc-row.is-sel { color: #fff; }
-.ipodc-row.is-sel .ipodc-row-label { text-shadow: 0 calc(var(--ipodc-p) * -1) 0 rgba(0, 30, 90, .3); }
-.ipodc-row.is-sel .ipodc-row-detail { color: rgba(255, 255, 255, .92); }
+.ipodc-row.is-sel .ipodc-row-label { text-shadow: 0 calc(var(--ipodc-p) * -1) #001e5a4d; }
+.ipodc-row.is-sel .ipodc-row-detail { color: #ffffffeb; }
 .ipodc-row.is-sel .ipodc-chev { visibility: inherit; }
 /* a link the config rejected (see console): visibly inert */
 .ipodc-row.is-dead { cursor: default; color: #a4a7ab; }
@@ -290,84 +233,64 @@
 /* scrollbar (only when the content overflows) */
 .ipodc-sb {
   position: absolute;
-  top: 0; right: 0; bottom: 0;
+  inset: 0 0 0 auto;
   width: calc(var(--ipodc-p) * 9);
   box-sizing: border-box;
   display: none;
-  background: linear-gradient(90deg, #c9cbce 0%, #f4f5f6 45%, #e2e4e6 100%);
+  background: linear-gradient(90deg, #c9cbce, #f4f5f6 45%, #e2e4e6);
   border-left: calc(var(--ipodc-p) * 1) solid #8b8f94;
 }
 .ipodc-screen.has-sb .ipodc-sb { display: block; }
 .ipodc-screen.is-split .ipodc-sb { right: 50%; }
 .ipodc-sb-thumb {
-  position: absolute;
-  left: 0; right: 0; top: 0;
   height: calc(var(--ipodc-p) * var(--ipodc-th, 30));
-  transform: translate3d(0, calc(var(--ipodc-p) * var(--ipodc-tt, 0)), 0);
+  transform: translateY(calc(var(--ipodc-p) * var(--ipodc-tt, 0)));
   box-sizing: border-box;
-  background: linear-gradient(90deg, #3f6fb3 0%, #8fb8ea 45%, #5f92d6 60%, #2d61ad 100%);
+  background: linear-gradient(90deg, #3f6fb3, #8fb8ea 45%, #5f92d6 60%, #2d61ad);
   border-block: calc(var(--ipodc-p) * 1) solid #284f8c;
 }
 
 /* split-screen preview pane */
 .ipodc-preview {
   position: absolute;
-  top: 0; bottom: 0; right: 0; left: 50%;
+  inset: 0 0 0 50%;
   overflow: hidden;
-  background: #e9ebee;
 }
 .ipodc-preview::after {
   /* shadow cast by the list half onto the preview */
   content: "";
   position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: calc(var(--ipodc-p) * 9);
-  background: linear-gradient(90deg, rgba(0, 0, 0, .36), rgba(0, 0, 0, .11) 35%, rgba(0, 0, 0, 0));
-  pointer-events: none;
+  inset: 0 auto 0 0;
   z-index: 3;
+  width: calc(var(--ipodc-p) * 9);
+  background: linear-gradient(90deg, #0000005c, #0000001c 35%, transparent);
 }
 .ipodc-pv { position: absolute; inset: 0; opacity: 0; overflow: hidden; }
 .ipodc-pv.is-on { opacity: 1; }
-.ipodc-pv--icon {
-  background:
-    radial-gradient(120% 70% at 50% 28%, #fff 0%, #f4f5f7 45%, rgba(244, 245, 247, 0) 70%),
-    linear-gradient(180deg, #fbfbfc 0%, #eceef1 100%);
-}
+.ipodc-pv--icon { background: radial-gradient(120% 70% at 50% 28%, #fff, #f4f5f7 45%, #f4f5f700 70%), linear-gradient(#fbfbfc, #eceef1); }
 .ipodc-pv-floor {
   position: absolute;
-  left: 0; right: 0; bottom: 0;
-  top: calc(var(--ipodc-p) * 124);
-  background: linear-gradient(180deg, #d9dde2 0%, #e7e9ed 40%, #eef0f2 100%);
-  box-shadow: inset 0 calc(var(--ipodc-p) * 1) 0 rgba(255, 255, 255, .9);
+  inset: calc(var(--ipodc-p) * 124) 0 0;
+  background: linear-gradient(#d9dde2, #e7e9ed 40%, #eef0f2);
+  box-shadow: inset 0 calc(var(--ipodc-p) * 1) #ffffffe6;
 }
 .ipodc-pv-float, .ipodc-pv-refl {
   position: absolute;
-  left: 50%;
+  left: calc(50% - var(--ipodc-p) * 46);
+  top: calc(var(--ipodc-p) * 28);
   width: calc(var(--ipodc-p) * 92); height: calc(var(--ipodc-p) * 92);
-  margin-left: calc(var(--ipodc-p) * -46);
 }
-.ipodc-pv-float { top: calc(var(--ipodc-p) * 28); }
-.ipodc-pv-refl {
-  top: calc(var(--ipodc-p) * 121);
-  transform: scaleY(-1);
-  opacity: .3;
-  -webkit-mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, .3) 30%, transparent 56%);
-  mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, .3) 30%, transparent 56%);
-}
+.ipodc-pv-refl, .ipodc-np-refl { transform: scaleY(-1); mask-image: linear-gradient(0deg, #000, #0000004d var(--ipodc-m1), transparent var(--ipodc-m2)); }
+.ipodc-pv-refl { --ipodc-m1: 30%; --ipodc-m2: 56%; top: calc(var(--ipodc-p) * 121); opacity: .3; }
 .ipodc-pv svg { display: block; width: 100%; height: 100%; }
-.ipodc-pv-float-in { width: 100%; height: 100%; }
+.ipodc-pv-float-in { height: 100%; }
 @keyframes ipodc-float {
   from { transform: translateY(calc(var(--ipodc-p) * 1)) scale(1); }
   to { transform: translateY(calc(var(--ipodc-p) * -2)) scale(1.035); }
 }
 /* media: full-height cover with a slow horizontal pan */
 .ipodc-pv--art { background: #000; }
-.ipodc-pv-cover {
-  --ipodc-cs: 218;
-  position: absolute;
-  left: 0; top: 0;
-  transform: translateX(calc(var(--ipodc-p) * -29));
-}
+.ipodc-pv-cover { --ipodc-cs: 218; transform: translateX(calc(var(--ipodc-p) * -29)); }
 @keyframes ipodc-pan {
   from { transform: translateX(calc(var(--ipodc-p) * -12)); }
   to { transform: translateX(calc(var(--ipodc-p) * -46)); }
@@ -379,40 +302,33 @@
   overflow: hidden;
   width: calc(var(--ipodc-p) * var(--ipodc-cs));
   height: calc(var(--ipodc-p) * var(--ipodc-cs));
-  background: #222;
 }
+.ipodc-art > * { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .ipodc-art-fb {
-  position: absolute;
-  inset: 0;
   display: grid;
   place-items: center;
   background:
-    radial-gradient(circle, rgba(255, 255, 255, 0) 0 30%, rgba(255, 255, 255, .07) 30.5% 31%, rgba(255, 255, 255, 0) 31.5% 44%, rgba(255, 255, 255, .06) 44.5% 45%, rgba(255, 255, 255, 0) 45.5%),
-    radial-gradient(120% 90% at 20% 10%, #8fd3ff 0%, rgba(143, 211, 255, 0) 55%),
-    linear-gradient(145deg, #2c82d6 0%, #164f8f 55%, #07305c 100%);
+    radial-gradient(circle, transparent 30%, #ffffff12 30.5% 31%, transparent 31.5% 44%, #ffffff0f 44.5% 45%, transparent 45.5%),
+    radial-gradient(120% 90% at 20% 10%, #8fd3ff, #8fd3ff00 55%),
+    linear-gradient(145deg, #2c82d6, #164f8f 55%, #07305c);
 }
 .ipodc-art-fb b {
   font: 800 calc(var(--ipodc-p) * var(--ipodc-cs) * .34)/1 var(--ipodc-font);
-  color: rgba(255, 255, 255, .95);
+  color: #fffffff2;
   letter-spacing: -.04em;
-  text-shadow: 0 .02em .06em rgba(0, 0, 0, .35);
+  text-shadow: 0 .02em .06em #0000005a;
 }
-.ipodc-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 
 /* text page */
 .ipodc-text {
-  margin: 0;
   padding: calc(var(--ipodc-p) * 8) calc(var(--ipodc-p) * 10) calc(var(--ipodc-p) * 10) calc(var(--ipodc-p) * 9);
-  font: 400 calc(var(--ipodc-p) * 13.5)/calc(var(--ipodc-p) * 17) var(--ipodc-font);
-  color: #000;
+  font: calc(var(--ipodc-p) * 13.5)/calc(var(--ipodc-p) * 17) var(--ipodc-font);
   white-space: pre-line;
   overflow-wrap: break-word;
   hyphens: auto;
-  -webkit-hyphens: auto;
 }
 .ipodc-text:empty { display: none; }
-.ipodc-text + .ipodc-list { box-shadow: 0 calc(var(--ipodc-p) * -1) 0 #d3d5d8; }
-.ipodc-text + .ipodc-list.is-empty { box-shadow: none; }
+.ipodc-text + .ipodc-list { box-shadow: 0 calc(var(--ipodc-p) * -1) #d3d5d8; }
 
 /* ───────────── Now Playing (6G layout) ───────────── */
 .ipodc-np-deco { position: absolute; inset: 0; }
@@ -422,84 +338,66 @@
   left: calc(var(--ipodc-p) * 12);
   top: calc(var(--ipodc-p) * 11);
 }
-.ipodc-np-art { box-shadow: 0 0 0 calc(var(--ipodc-p) * 1) rgba(0, 0, 0, .22); }
-.ipodc-np-refl {
-  top: calc(var(--ipodc-p) * 108);
-  transform: scaleY(-1);
-  opacity: .34;
-  -webkit-mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, .25) 14%, transparent 30%);
-  mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, .25) 14%, transparent 30%);
-}
-.ipodc-np-info {
-  position: absolute;
-  left: calc(var(--ipodc-p) * 120); right: calc(var(--ipodc-p) * 10); top: calc(var(--ipodc-p) * 8);
-}
+.ipodc-np-art { box-shadow: 0 0 0 calc(var(--ipodc-p) * 1) #00000038; }
+.ipodc-np-refl { --ipodc-m1: 14%; --ipodc-m2: 30%; top: calc(var(--ipodc-p) * 108); opacity: .34; }
+.ipodc-np-info, .ipodc-np-tracks { position: absolute; left: calc(var(--ipodc-p) * 120); right: calc(var(--ipodc-p) * 10); top: calc(var(--ipodc-p) * 8); }
 .ipodc-screen.no-tracks .ipodc-np-info { top: calc(var(--ipodc-p) * 24); }
-.ipodc-np-info div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ipodc-np-count { font: 400 calc(var(--ipodc-p) * 11)/calc(var(--ipodc-p) * 15) var(--ipodc-font); color: #55595f; }
-.ipodc-np-title { font: 700 calc(var(--ipodc-p) * 14.5)/calc(var(--ipodc-p) * 18) var(--ipodc-font); }
-.ipodc-np-artist { font: 700 calc(var(--ipodc-p) * 13)/calc(var(--ipodc-p) * 16) var(--ipodc-font); }
-.ipodc-np-album { font: 400 calc(var(--ipodc-p) * 13)/calc(var(--ipodc-p) * 16) var(--ipodc-font); }
-.ipodc-np-by { font: 400 calc(var(--ipodc-p) * 11)/calc(var(--ipodc-p) * 15) var(--ipodc-font); color: #6b6f75; }
+.ipodc-np-info div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font: 700 calc(var(--ipodc-p) * 13)/calc(var(--ipodc-p) * 16) var(--ipodc-font); }
+.ipodc-np-info .ipodc-np-title { font-size: calc(var(--ipodc-p) * 14.5); line-height: calc(var(--ipodc-p) * 18); }
+.ipodc-np-info .ipodc-np-album { font-weight: 400; }
+.ipodc-np-info :is(.ipodc-np-count, .ipodc-np-by) { font: calc(var(--ipodc-p) * 11)/calc(var(--ipodc-p) * 15) var(--ipodc-font); color: #6b6f75; }
 .ipodc-np-by:empty { display: none; }
 
 /* quiet track list under the meta: no rules, no selection, the playing one gets the blue speaker */
-.ipodc-np-tracks {
-  position: absolute;
-  left: calc(var(--ipodc-p) * 116); right: calc(var(--ipodc-p) * 10); top: calc(var(--ipodc-p) * 92);
-  height: calc(var(--ipodc-p) * 45);
-  overflow: hidden;
-}
-.ipodc-np-tracks-in { transform: translate3d(0, calc(var(--ipodc-p) * -15 * var(--ipodc-tt, 0)), 0); }
+.ipodc-np-tracks { left: calc(var(--ipodc-p) * 116); top: calc(var(--ipodc-p) * 92); height: calc(var(--ipodc-p) * 45); overflow: hidden; }
+.ipodc-np-tracks-in { transform: translateY(calc(var(--ipodc-p) * -15 * var(--ipodc-tt, 0))); }
 .ipodc-trk {
   display: flex;
   align-items: center;
   gap: calc(var(--ipodc-p) * 3);
   height: calc(var(--ipodc-p) * 15);
-  font: 400 calc(var(--ipodc-p) * 11.5)/calc(var(--ipodc-p) * 15) var(--ipodc-font);
+  font-size: calc(var(--ipodc-p) * 11.5);
   color: #6b6f75;
   cursor: pointer;
   white-space: nowrap;
 }
+.ipodc-trk > * { flex: none; }
 .ipodc-trk-ico {
-  flex: none;
   width: calc(var(--ipodc-p) * 11); height: calc(var(--ipodc-p) * 9);
   fill: currentColor;
   color: var(--ipodc-c-uiHighlightBottom);
   visibility: hidden;
 }
-.ipodc-trk-t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.ipodc-trk-d { flex: none; color: #8a8e93; font-size: calc(var(--ipodc-p) * 10.5); font-variant-numeric: tabular-nums; }
+.ipodc-trk .ipodc-trk-t { flex: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ipodc-trk-d { color: #8a8e93; font-size: calc(var(--ipodc-p) * 10.5); font-variant-numeric: tabular-nums; }
 .ipodc-trk.is-cur { color: #000; font-weight: 700; }
 .ipodc-trk.is-cur .ipodc-trk-ico { visibility: inherit; }
 
 .ipodc-np-prog, .ipodc-np-vol {
   position: absolute;
-  left: calc(var(--ipodc-p) * 12); right: calc(var(--ipodc-p) * 12); top: calc(var(--ipodc-p) * 148);
-  height: calc(var(--ipodc-p) * 32);
+  inset: calc(var(--ipodc-p) * 148) calc(var(--ipodc-p) * 12) auto;
 }
-.ipodc-np-vol { opacity: 0; display: flex; align-items: flex-start; gap: calc(var(--ipodc-p) * 6); color: #55595f; }
+.ipodc-np-vol { opacity: 0; display: flex; gap: calc(var(--ipodc-p) * 6); color: #55595f; }
 .ipodc-screen.is-vol .ipodc-np-vol { opacity: 1; }
 .ipodc-screen.is-vol .ipodc-np-prog { opacity: 0; }
 .ipodc-np-vol .ipodc-meter { flex: 1; }
-.ipodc-np-vol svg { flex: none; width: calc(var(--ipodc-p) * 13); height: calc(var(--ipodc-p) * 12); fill: currentColor; }
-/* 6G capsule: grey glossy recessed track, blue gloss fill (light top, dark bottom) */
+.ipodc-np-vol svg { width: calc(var(--ipodc-p) * 13); height: calc(var(--ipodc-p) * 12); fill: currentColor; }
+/* 6G capsule: grey glossy recessed track, blue gloss fill */
 .ipodc-meter {
   position: relative;
   height: calc(var(--ipodc-p) * 12);
   box-sizing: border-box;
   border: calc(var(--ipodc-p) * 1) solid #8e9298;
   border-radius: calc(var(--ipodc-p) * 3);
-  background: linear-gradient(180deg, #c3c6ca 0%, #e4e6e8 30%, #f9f9fa 52%, #eceef0 100%);
-  box-shadow: inset 0 calc(var(--ipodc-p) * 1) calc(var(--ipodc-p) * 1.5) rgba(0, 0, 0, .28), 0 calc(var(--ipodc-p) * 1) 0 rgba(255, 255, 255, .8);
+  background: linear-gradient(#c3c6ca, #e4e6e8 30%, #f9f9fa 52%, #eceef0);
+  box-shadow: inset 0 calc(var(--ipodc-p) * 1) calc(var(--ipodc-p) * 1.5) #00000047, 0 calc(var(--ipodc-p) * 1) #fffc;
   overflow: hidden;
 }
 .ipodc-meter-fill {
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
   width: calc(100% * var(--ipodc-f, 0));
+  height: 100%;
   background: var(--ipodc-gloss);
-  box-shadow: inset 0 calc(var(--ipodc-p) * 1) 0 rgba(255, 255, 255, .3);
+  box-shadow: inset 0 calc(var(--ipodc-p) * 1) #ffffff4d;
 }
 .ipodc-np-times {
   display: flex;
@@ -512,13 +410,12 @@
 .ipodc-screen--nowplaying .ipodc-view {
   top: auto;
   height: calc(var(--ipodc-p) * 27);
-  box-shadow: 0 calc(var(--ipodc-p) * -1) 0 #dfe1e4;
+  box-shadow: 0 calc(var(--ipodc-p) * -1) #dfe1e4;
 }
 .ipodc-screen--nowplaying.no-cta .ipodc-view { display: none; }
-.ipodc-screen--nowplaying .ipodc-hl { background: linear-gradient(180deg, #f6f7f8 0%, #e8eaec 100%); box-shadow: none; }
+.ipodc-screen--nowplaying .ipodc-hl { background: linear-gradient(#f6f7f8, #e8eaec); box-shadow: none; }
 .ipodc-screen--nowplaying .ipodc-row.is-sel { color: #5d6167; }
-.ipodc-screen--nowplaying .ipodc-row-label { font-size: calc(var(--ipodc-p) * 13); }
-.ipodc-screen--nowplaying .ipodc-row.is-sel .ipodc-row-label { text-shadow: none; }
+.ipodc-screen--nowplaying .ipodc-row-label { font-size: calc(var(--ipodc-p) * 13); text-shadow: none !important; }
 .ipodc.is-centre .ipodc-screen--nowplaying .ipodc-hl { background: var(--ipodc-gloss); }
 .ipodc.is-centre .ipodc-screen--nowplaying .ipodc-row.is-sel { color: #fff; }
 @media (hover: hover) {
@@ -530,27 +427,27 @@
 .ipodc-toast {
   position: absolute;
   left: 50%; top: 54%;
+  z-index: 8;
   min-width: calc(var(--ipodc-p) * 168);
   max-width: calc(var(--ipodc-p) * 250);
   box-sizing: border-box;
   padding: calc(var(--ipodc-p) * 12) calc(var(--ipodc-p) * 16) calc(var(--ipodc-p) * 11);
   transform: translate(-50%, -42%) scale(.96);
   border-radius: calc(var(--ipodc-p) * 9);
-  background: linear-gradient(180deg, rgba(58, 60, 64, .93), rgba(20, 21, 23, .95));
-  box-shadow: 0 0 0 calc(var(--ipodc-p) * 1) rgba(255, 255, 255, .18) inset, 0 calc(var(--ipodc-p) * 4) calc(var(--ipodc-p) * 14) rgba(0, 0, 0, .35);
+  background: linear-gradient(#3a3c40ed, #141517f2);
+  box-shadow: inset 0 0 0 calc(var(--ipodc-p) * 1) #ffffff2e, 0 calc(var(--ipodc-p) * 4) calc(var(--ipodc-p) * 14) #0000005a;
   color: #fff;
   text-align: center;
   opacity: 0;
   pointer-events: none;
-  z-index: 8;
 }
 .ipodc-toast svg { display: block; width: calc(var(--ipodc-p) * 26); height: calc(var(--ipodc-p) * 26); margin: 0 auto calc(var(--ipodc-p) * 6); }
 .ipodc-toast b { display: block; font: 700 calc(var(--ipodc-p) * 14)/calc(var(--ipodc-p) * 18) var(--ipodc-font); }
 .ipodc-toast span {
   display: block;
   margin-top: calc(var(--ipodc-p) * 2);
-  font: 400 calc(var(--ipodc-p) * 12)/calc(var(--ipodc-p) * 15) var(--ipodc-font);
-  color: rgba(255, 255, 255, .78);
+  font-size: calc(var(--ipodc-p) * 12);
+  color: #ffffffc7;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .ipodc-toast.is-on { opacity: 1; transform: translate(-50%, -50%); }
@@ -559,66 +456,61 @@
 .ipodc-boot {
   position: absolute;
   inset: 0;
-  background: #000;
+  z-index: 9;
   display: grid;
   place-items: center;
-  z-index: 9;
+  background: #000;
 }
 .ipodc-boot[hidden] { display: none; }
-.ipodc-boot.is-out { opacity: 0; }
+.ipodc-boot.is-out, .ipodc-boot-mono { opacity: 0; }
 .ipodc-boot-mono {
   font: 700 calc(var(--ipodc-p) * 80)/1 var(--ipodc-font);
   letter-spacing: -.05em;
   padding: 0 .06em;
   color: transparent;
-  background: linear-gradient(180deg, #fff 0%, #eef0f2 46%, #b9bdc3 52%, #e9ebee 100%);
+  background: linear-gradient(#fff, #eef0f2 46%, #b9bdc3 52%, #e9ebee);
   -webkit-background-clip: text;
   background-clip: text;
-  opacity: 0;
 }
 .ipodc-boot.show-mono .ipodc-boot-mono { opacity: 1; }
 
 /* ───────────── click wheel ───────────── */
 .ipodc-wheel {
-  position: absolute;
   left: calc(var(--ipodc-u) * var(--ipodc-mm-wh-x));
   top: calc(var(--ipodc-u) * var(--ipodc-mm-wh-y));
   width: calc(var(--ipodc-u) * var(--ipodc-mm-wh-d));
   height: calc(var(--ipodc-u) * var(--ipodc-mm-wh-d));
+  overflow: visible;
   border-radius: 50%;
   touch-action: none;
   cursor: pointer;
   /* matte light-grey plastic, seated in a shallow recess of the face (dark seam, white lower lip) */
-  background: radial-gradient(130% 110% at 50% 16%, #f0f1f2 0%, var(--ipodc-c-wheel) 52%, #d9dbde 100%);
+  background: radial-gradient(130% 110% at 50% 16%, #f0f1f2, var(--ipodc-c-wheel) 52%, #d9dbde);
   box-shadow:
-    0 calc(var(--ipodc-u) * -.06) 0 calc(var(--ipodc-u) * .2) rgba(0, 0, 0, .12),
-    0 0 0 calc(var(--ipodc-u) * .2) rgba(0, 0, 0, .12),
-    0 calc(var(--ipodc-u) * .22) 0 calc(var(--ipodc-u) * .2) rgba(255, 255, 255, .6),
-    inset 0 calc(var(--ipodc-u) * .22) calc(var(--ipodc-u) * .45) rgba(0, 0, 0, .12),
-    inset 0 calc(var(--ipodc-u) * -.15) calc(var(--ipodc-u) * .3) rgba(255, 255, 255, .7);
+    0 calc(var(--ipodc-u) * -.06) 0 calc(var(--ipodc-u) * .2) #0000001f,
+    0 0 0 calc(var(--ipodc-u) * .2) #0000001f,
+    0 calc(var(--ipodc-u) * .22) 0 calc(var(--ipodc-u) * .2) #fff9,
+    inset 0 calc(var(--ipodc-u) * .22) calc(var(--ipodc-u) * .45) #0000001f,
+    inset 0 calc(var(--ipodc-u) * -.15) calc(var(--ipodc-u) * .3) #ffffffb3;
 }
 .ipodc-wheel.is-spinning { cursor: grabbing; }
-/* the wheel rocks very slightly towards a pressed button, like the real switch plate */
-.ipodc-wheel[data-press="menu"] { transform: perspective(calc(var(--ipodc-u) * 140)) rotateX(1.4deg); }
-.ipodc-wheel[data-press="play"] { transform: perspective(calc(var(--ipodc-u) * 140)) rotateX(-1.4deg); }
-.ipodc-wheel[data-press="next"] { transform: perspective(calc(var(--ipodc-u) * 140)) rotateY(1.4deg); }
-.ipodc-wheel[data-press="prev"] { transform: perspective(calc(var(--ipodc-u) * 140)) rotateY(-1.4deg); }
-/* pressed quadrant: a soft shade masked to the 90° sector under the finger (below labels and centre) */
+/* pressed button: the wheel rocks very slightly towards it, like the real switch plate, and a soft
+   shade is masked to the 90° sector under the finger (below labels and centre) */
+.ipodc-wheel[data-press] { transform: perspective(calc(var(--ipodc-u) * 140)) rotate3d(calc(cos(var(--ipodc-q))), calc(sin(var(--ipodc-q))), 0, 1.4deg); }
+.ipodc-wheel[data-press="next"] { --ipodc-q: 90deg; }
+.ipodc-wheel[data-press="play"] { --ipodc-q: 180deg; }
+.ipodc-wheel[data-press="prev"] { --ipodc-q: 270deg; }
+.ipodc-wheel { --ipodc-q: 0deg; }
 .ipodc-wheel::before {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: 50%;
   opacity: 0;
-  pointer-events: none;
-  background: radial-gradient(closest-side, rgba(0, 0, 0, .05) 40%, rgba(0, 0, 0, .13));
-  -webkit-mask: conic-gradient(from calc(var(--ipodc-q, 0deg) - 45deg), #000 0 90deg, transparent 0);
-  mask: conic-gradient(from calc(var(--ipodc-q, 0deg) - 45deg), #000 0 90deg, transparent 0);
+  background: radial-gradient(closest-side, #0000000d 40%, #00000021);
+  mask: conic-gradient(from calc(var(--ipodc-q) - 45deg), #000 90deg, #0000 0);
 }
 .ipodc-wheel[data-press]::before { opacity: 1; }
-.ipodc-wheel[data-press="next"] { --ipodc-q: 90deg; }
-.ipodc-wheel[data-press="play"] { --ipodc-q: 180deg; }
-.ipodc-wheel[data-press="prev"] { --ipodc-q: 270deg; }
 
 .ipodc-wbtn {
   position: absolute;
@@ -637,71 +529,55 @@
 
 /* centre button: smooth matte aluminium tone, slightly concave (shadowed top, lit bottom) */
 .ipodc-center {
+  --ipodc-s1: .35;
+  --ipodc-s2: .7;
+  --ipodc-sa: .14;
   position: absolute;
-  left: 50%; top: 50%;
-  width: calc(var(--ipodc-u) * var(--ipodc-mm-cb-d));
-  height: calc(var(--ipodc-u) * var(--ipodc-mm-cb-d));
-  margin: calc(var(--ipodc-u) * var(--ipodc-mm-cb-d) / -2) 0 0 calc(var(--ipodc-u) * var(--ipodc-mm-cb-d) / -2);
+  inset: calc(50% - var(--ipodc-u) * var(--ipodc-mm-cb-d) / 2);
   border-radius: 50%;
-  cursor: pointer;
   touch-action: none;
   background:
-    radial-gradient(90% 90% at 50% 70%, rgba(255, 255, 255, .22) 0%, rgba(255, 255, 255, 0) 60%),
-    linear-gradient(180deg, rgba(0, 0, 0, .1) 0%, rgba(0, 0, 0, .025) 40%, rgba(255, 255, 255, .08) 70%, rgba(255, 255, 255, .24) 100%),
+    radial-gradient(90% 90% at 50% 70%, #ffffff38, #fff0 60%),
+    linear-gradient(#0000001a, #00000006 40%, #ffffff14 70%, #ffffff3d),
     var(--ipodc-c-centerButton);
   box-shadow:
-    0 0 0 calc(var(--ipodc-u) * .15) rgba(100, 104, 110, .5),
-    0 calc(var(--ipodc-u) * .19) 0 calc(var(--ipodc-u) * .13) rgba(255, 255, 255, .65),
-    inset 0 calc(var(--ipodc-u) * .35) calc(var(--ipodc-u) * .7) rgba(0, 0, 0, .14),
-    inset 0 calc(var(--ipodc-u) * -.25) calc(var(--ipodc-u) * .45) rgba(255, 255, 255, .5);
+    0 0 0 calc(var(--ipodc-u) * .15) #64686e80,
+    0 calc(var(--ipodc-u) * .19) 0 calc(var(--ipodc-u) * .13) #ffffffa6,
+    inset 0 calc(var(--ipodc-u) * var(--ipodc-s1)) calc(var(--ipodc-u) * var(--ipodc-s2)) rgba(0, 0, 0, var(--ipodc-sa)),
+    inset 0 calc(var(--ipodc-u) * -.25) calc(var(--ipodc-u) * .45) #ffffff80;
 }
-.ipodc-center.is-pressed {
-  filter: brightness(.94);
-  transform: scale(.992);
-  box-shadow:
-    0 0 0 calc(var(--ipodc-u) * .15) rgba(100, 104, 110, .5),
-    0 calc(var(--ipodc-u) * .19) 0 calc(var(--ipodc-u) * .13) rgba(255, 255, 255, .65),
-    inset 0 calc(var(--ipodc-u) * .55) calc(var(--ipodc-u) * 1) rgba(0, 0, 0, .22),
-    inset 0 calc(var(--ipodc-u) * -.2) calc(var(--ipodc-u) * .4) rgba(255, 255, 255, .42);
-}
+.ipodc-center.is-pressed { --ipodc-s1: .55; --ipodc-s2: 1; --ipodc-sa: .22; filter: brightness(.94); transform: scale(.992); }
 
 /* ───────────── motion (opt-in) ─────────────
-   Only with prefers-reduced-motion: no-preference. .is-instant suspends the list transitions for
-   one frame while a screen is laid out. The WAAPI screen slides check the same query in JS. */
+   .is-instant suspends the list transitions for one frame while a screen is laid out.
+   The WAAPI screen slides check the same query in JS. */
 @media (prefers-reduced-motion: no-preference) {
   .ipodc-screen:not(.is-instant) :is(.ipodc-content, .ipodc-sb-thumb) { transition: transform .12s cubic-bezier(.25, .7, .3, 1); }
-  .ipodc-screen:not(.is-instant) .ipodc-hl { transition: transform .085s cubic-bezier(.25, .7, .3, 1), background .2s ease; }
-  .ipodc-screen:not(.is-instant) :is(.ipodc-row, .ipodc-row-detail, .ipodc-chev) { transition: color .07s linear; }
+  .ipodc-screen:not(.is-instant) .ipodc-hl { transition: transform .085s cubic-bezier(.25, .7, .3, 1); }
+  .ipodc-screen:not(.is-instant) :is(.ipodc-row, .ipodc-row-detail) { transition: color .07s linear; }
   .ipodc-screen:not(.is-instant) .ipodc-meter-fill { transition: width .25s linear; }
-  .ipodc-screen:not(.is-instant) .ipodc-np-tracks-in { transition: transform .2s ease; }
-  .ipodc-np-prog, .ipodc-np-vol { transition: opacity .18s ease; }
-  .ipodc-view.bump-down { animation: ipodc-bump-down .22s ease-out; }
-  .ipodc-view.bump-up { animation: ipodc-bump-up .22s ease-out; }
-  .ipodc-pv { transition: opacity .45s ease; }
+  .ipodc-screen:not(.is-instant) .ipodc-np-tracks-in { transition: transform .2s; }
+  .ipodc-np-prog, .ipodc-np-vol { transition: opacity .18s; }
+  .ipodc-view[class*=bump] { animation: ipodc-bump .22s ease-out; }
+  .ipodc-pv { transition: opacity .45s; }
   .ipodc-pv.is-on :is(.ipodc-pv-float, .ipodc-pv-float-in) { animation: ipodc-float 7s ease-in-out infinite alternate; }
   .ipodc-pv.is-on .ipodc-pv-cover { animation: ipodc-pan 16s ease-in-out infinite alternate; }
-  .ipodc-toast { transition: opacity .18s ease, transform .18s ease; }
+  .ipodc-toast { transition: .18s; transition-property: opacity, transform; }
   .ipodc-toast.is-on { transform: translate(-50%, -50%) scale(1); }
-  .ipodc-boot { transition: opacity .32s ease; }
-  .ipodc-boot-mono { transform: scale(.985); transition: opacity .34s ease, transform 1.2s ease-out; }
-  .ipodc-boot.show-mono .ipodc-boot-mono { transform: scale(1); }
-  .ipodc-wheel { transition: transform .14s ease; }
-  .ipodc-wheel[data-press] { transition-duration: .04s; }
-  .ipodc-wheel::before { transition: opacity .16s ease; }
-  .ipodc-wheel[data-press]::before { transition-duration: .03s; }
-  .ipodc-center { transition: filter .12s ease, box-shadow .12s ease, transform .12s ease; }
-  .ipodc-center.is-pressed { transition-duration: .03s; }
+  .ipodc-boot { transition: opacity .32s; }
+  .ipodc-boot-mono { transform: scale(.985); transition: opacity .34s, transform 1.2s ease-out; }
+  .ipodc-boot.show-mono .ipodc-boot-mono { transform: none; }
+  .ipodc-wheel, .ipodc-wheel::before, .ipodc-center { transition: .14s; transition-property: transform, opacity, filter, box-shadow; }
+  .ipodc-wheel[data-press], .ipodc-wheel[data-press]::before, .ipodc-center.is-pressed { transition-duration: .03s; }
 }
 /* reduced motion: nothing moves, rocks or scales */
 @media (prefers-reduced-motion: reduce) {
-  .ipodc .ipodc-wheel[data-press], .ipodc .ipodc-center.is-pressed { transform: none; }
+  .ipodc-wheel[data-press], .ipodc-center.is-pressed { transform: none; }
 }
 
 /* ───────────── forced colours / high contrast ───────────── */
 @media (forced-colors: active) {
-  .ipodc { border: 2px solid CanvasText; }
-  .ipodc:focus-visible { outline: 3px solid Highlight; }
-  .ipodc-hl { forced-color-adjust: none; background: Highlight; box-shadow: none; }
-  .ipodc-row.is-sel :is(&, *) { forced-color-adjust: none; color: HighlightText; }
-  .ipodc-wheel, .ipodc-center { border: 1px solid ButtonText; }
+  .ipodc, .ipodc-wheel, .ipodc-center { border: 1px solid CanvasText; }
+  .ipodc-hl { forced-color-adjust: none; background: Highlight; }
+  .ipodc-row.is-sel, .ipodc-row.is-sel * { forced-color-adjust: none; color: HighlightText; }
 }

@@ -9,11 +9,12 @@ const zoneOf = (a) => (a > -45 && a <= 45 ? 'next' : a > 45 && a <= 135 ? 'play'
 
 /**
  * @param wheel element covering the whole wheel (the centre button inside it is ignored)
+ * @param on(target, type, fn) adds a listener that the caller removes on destroy
  * @param cb.onStep(dir, pointerType) → boolean (false at a list end stops the run)
  * @param cb.onPress(zone)  a completed press on 'menu' | 'next' | 'prev' | 'play'
  * @param cb.onDown()       first touch (focus, audio unlock)
  */
-export function createWheel(wheel, { onStep, onPress, onDown }) {
+export function createWheel(wheel, on, { onStep, onPress, onDown }) {
   let g = null;
   const setPress = (z) => { if (z) wheel.dataset.press = z; else delete wheel.dataset.press; };
 
@@ -77,10 +78,6 @@ export function createWheel(wheel, { onStep, onPress, onDown }) {
     wheel.classList.remove('is-spinning');
   }
 
-  const evs = { pointerdown: down, pointermove: move, pointerup: up, pointercancel: up, lostpointercapture: up };
-  for (const [k, fn] of Object.entries(evs)) wheel.addEventListener(k, fn);
-  return {
-    stop,
-    destroy() { stop(); for (const [k, fn] of Object.entries(evs)) wheel.removeEventListener(k, fn); },
-  };
+  for (const [k, fn] of Object.entries({ pointerdown: down, pointermove: move, pointerup: up, pointercancel: up, lostpointercapture: up })) on(wheel, k, fn);
+  return stop;
 }

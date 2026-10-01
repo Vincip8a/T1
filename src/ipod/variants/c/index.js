@@ -7,19 +7,17 @@
 // builders), sound.js (WebAudio ticks), art.js (procedural SVG), util.js (helpers, timers).
 import './ipodc.css';
 import { IPOD, COLORS } from '../../../shared/ipodSpec.js';
-import { prefersReducedMotion } from '../../../shared/config.js';
+import { prefersReducedMotion as isReduced } from '../../../shared/config.js';
 import { h, createTimers } from './util.js';
 import { NOISE_SVG, GLYPH, playIndicator, battery, TOAST_ICON, sharedDefs } from './art.js';
 import { createSound } from './sound.js';
 import { createPlayer } from './player.js';
 import { createWheel } from './wheel.js';
-import { createScreens, ROW } from './screens.js';
+import { createScreens } from './screens.js';
 
-const LW = IPOD.screen.pxWidth; // 320 logical px
 const SLIDE_MS = 260;
-const PAGE = 7;                 // rows per PageUp / PageDown (one screen minus one)
 const EASE = 'cubic-bezier(.32,.08,.24,1)';
-let instanceSeq = 0;
+let seq = 0;
 
 // UI strings (not content): overridable per site via config.ui, German 6G firmware defaults.
 const DEFAULT_UI = {
@@ -37,7 +35,7 @@ const DEFAULT_UI = {
   mailOpening: 'E-Mail wird geöffnet',
   linkOpening: 'Wird geöffnet …',
   backHint: 'Zurück mit MENU',
-  hint: 'Pfeiltasten oder Click Wheel zum Blättern, Bild auf/ab und Pos1/Ende springen, Enter wählt aus, Escape geht zurück, Leertaste startet oder pausiert, Umschalt+Pfeil links/rechts wechselt den Titel.',
+  hint: 'Pfeiltasten oder Click Wheel blättern, Enter wählt, Escape geht zurück, Leertaste spielt oder pausiert.',
 };
 
 export function mountIpod(container, { config } = {}) {
@@ -45,40 +43,37 @@ export function mountIpod(container, { config } = {}) {
   const brand = config.brand ?? {};
   const menu = (Array.isArray(config.menu) ? config.menu : []).filter((m) => m && typeof m === 'object');
   const L = { ...DEFAULT_UI };
-  for (const [k, v] of Object.entries(config.ui ?? {})) if (typeof v === 'string' && k in L) L[k] = v;
-  const P = `ipodc${++instanceSeq}`;
+  for (const [k, v] of Object.entries(config.ui ?? {})) if (k in L && typeof v === 'string') L[k] = v;
+  const P = `ipodc${++seq}`;
   let uid = 0;
   const nid = (s) => `${P}-${s}${++uid}`;
   const cleanups = [];
-  const on = (target, type, fn, opts) => {
-    target.addEventListener(type, fn, opts);
-    cleanups.push(() => target.removeEventListener(type, fn, opts));
+  const on = (t, type, fn, o) => {
+    t.addEventListener(type, fn, o);
+    cleanups.push(() => t.removeEventListener(type, fn, o));
   };
   const timers = createTimers();
   const soundOn = config.settings?.clickSound !== false;
   const sound = createSound(soundOn);
-  const isReduced = prefersReducedMotion; // read live at the moment of use (CSS follows the media query itself)
   let destroyed = false;
   let phase = 'off'; // off → boot → ready
 
   // ── body: the focus target and the listbox whose options are the current screen's rows
   const hintId = nid('hint');
   const el = h('div', 'ipodc', { tabindex: 0, role: 'listbox', 'aria-describedby': hintId });
-  const sw = IPOD.screenWindow;
+  const { screenWindow: sw, screen: sc, wheel: wh } = IPOD;
   const mm = {
     w: IPOD.width, h: IPOD.height, r: IPOD.cornerRadius,
     'win-x': sw.x, 'win-y': sw.y, 'win-w': sw.width, 'win-h': sw.height, 'win-r': sw.radius,
-    'lcd-x': (sw.width - IPOD.screen.width) / 2, 'lcd-y': (sw.height - IPOD.screen.height) / 2,
-    'lcd-w': IPOD.screen.width, 'lcd-h': IPOD.screen.height,
-    'wh-x': IPOD.wheel.cx - IPOD.wheel.diameter / 2, 'wh-y': IPOD.wheel.cy - IPOD.wheel.diameter / 2,
-    'wh-d': IPOD.wheel.diameter, 'cb-d': IPOD.centerButton.diameter,
-    'lab-r': (IPOD.wheelLabels.radiusFactor * IPOD.wheel.diameter) / 2,
-    'hold-x': IPOD.holdSwitch.x, 'hold-w': IPOD.holdSwitch.width,
-    'jack-x': IPOD.headphoneJack.x, 'jack-d': IPOD.headphoneJack.diameter,
+    'lcd-x': (sw.width - sc.width) / 2, 'lcd-y': (sw.height - sc.height) / 2, 'lcd-w': sc.width, 'lcd-h': sc.height,
+    'wh-x': wh.cx - wh.diameter / 2, 'wh-y': wh.cy - wh.diameter / 2, 'wh-d': wh.diameter,
+    'cb-d': IPOD.centerButton.diameter, 'lab-r': (IPOD.wheelLabels.radiusFactor * wh.diameter) / 2,
+    'hold-x': IPOD.holdSwitch.x, 'hold-w': IPOD.holdSwitch.width, 'jack-x': IPOD.headphoneJack.x, 'jack-d': IPOD.headphoneJack.diameter,
   };
-  for (const [k, v] of Object.entries(mm)) el.style.setProperty(`--ipodc-mm-${k}`, +v.toFixed(4));
-  for (const [k, v] of Object.entries(COLORS)) el.style.setProperty(`--ipodc-c-${k}`, v);
-  el.style.setProperty('--ipodc-noise', `url("data:image/svg+xml,${encodeURIComponent(NOISE_SVG)}")`);
+  const prop = (k, v) => el.style.setProperty(`--ipodc-${k}`, v);
+  for (const k in mm) prop(`mm-${k}`, +mm[k].toFixed(4));
+  for (const k in COLORS) prop(`c-${k}`, COLORS[k]);
+  prop('noise', `url("data:image/svg+xml,${encodeURIComponent(NOISE_SVG)}")`);
 
   // ── screen
   const hidden = { 'aria-hidden': 'true' };
@@ -108,17 +103,19 @@ export function mountIpod(container, { config } = {}) {
     + ['next', 'prev', 'play'].map((n) => `<span class="ipodc-wbtn ipodc-wbtn--${n}">${GLYPH[n]}</span>`).join('');
   const centerBtn = h('div', 'ipodc-center');
   wheel.append(centerBtn);
-  // the live region sits beside the body (outside the listbox, which may only own options)
-  const live = h('div', 'ipodc-sr', { 'aria-live': 'polite', 'aria-atomic': 'true' });
-  const hint = h('div', 'ipodc-sr', { id: hintId, text: L.hint });
   const edge = h('div', 'ipodc-edge', hidden); // top edge: hold switch and headphone jack
   edge.append(h('span', 'ipodc-hold'), h('span', 'ipodc-jack'));
-  el.append(edge, win, wheel, hint);
+  el.append(edge, win, wheel, h('div', 'ipodc-sr', { id: hintId, text: L.hint }));
   el.insertAdjacentHTML('beforeend', sharedDefs(`${P}s`));
-  container.append(el, live);
+  // a landmark around the body (display: contents, so it adds no box); the live region sits
+  // beside the body because the listbox may only own options
+  const live = h('div', 'ipodc-sr', { 'aria-live': 'polite', 'aria-atomic': 'true' });
+  const host = h('section', 'ipodc-host', { 'aria-label': 'iPod' });
+  host.append(el, live);
+  container.append(host);
 
   /** real px per logical px (to measure wrapped text) */
-  const pxPer = () => (lcd.clientWidth > 0 ? lcd.clientWidth / LW : 1);
+  const pxPer = () => lcd.clientWidth / IPOD.screen.pxWidth || 1;
 
   let announceT = 0;
   const announce = (text) => {
@@ -129,23 +126,23 @@ export function mountIpod(container, { config } = {}) {
 
   // ── player
   const npItem = menu.find((m) => m.type === 'nowplaying');
-  const tracks = !npItem ? [] : Array.isArray(npItem.tracks) && npItem.tracks.length
+  const tracks = !npItem ? [] : npItem.tracks?.length
     ? npItem.tracks.filter((t) => t && typeof t === 'object')
-    : [{ title: npItem.title ?? '', artist: npItem.artist ?? '', duration: '3:30' }];
+    : [{ title: npItem.title, artist: npItem.artist }];
   const player = createPlayer(tracks, (kind) => {
     ind.classList.toggle('is-on', player.started);
     ind.classList.toggle('is-paused', !player.playing);
     current()?.update?.(kind === 'track');
     if (kind === 'track') {
       const t = tracks[player.track];
-      announce(`${t.title ?? ''}${t.artist ? `, ${t.artist}` : ''}`);
+      announce([t.title, t.artist].filter(Boolean).join(', '));
     }
   });
 
   // ── toast
   let toastT = 0;
   function showToast(icon, text, sub) {
-    toast.innerHTML = TOAST_ICON[icon] ?? '';
+    toast.innerHTML = TOAST_ICON[icon];
     toast.append(h('b', null, { text }));
     if (sub) toast.append(h('span', null, { text: sub }));
     toast.classList.add('is-on');
@@ -154,14 +151,16 @@ export function mountIpod(container, { config } = {}) {
     toastT = timers.later(() => toast.classList.remove('is-on'), 1700);
   }
 
-  // ── links
+  // ── links (a link row is the real <a>)
   let programmatic = false;
-  let lastLink = { a: null, t: 0 };
+  let lastLink = null;
+  let lastLinkT = 0;
   function linkGuard(a) { // held keys / double taps open a link once
     const now = performance.now();
-    if (lastLink.a === a && now - lastLink.t < 800) return true;
-    lastLink = { a, t: now };
-    return false;
+    const dup = lastLink === a && now - lastLinkT < 800;
+    lastLink = a;
+    lastLinkT = now;
+    return dup;
   }
   function followLink(a, spec) {
     if (linkGuard(a)) return;
@@ -170,13 +169,12 @@ export function mountIpod(container, { config } = {}) {
     linkFeedback(a, spec);
   }
   function linkFeedback(a, spec) {
-    const href = a.getAttribute('href');
-    if (a.hasAttribute('download')) showToast('check', L.downloadStarted, spec?.label);
-    else if (/^mailto:/i.test(href)) {
-      let to = href.slice(7).split('?')[0];
+    if (a.hasAttribute('download')) showToast('check', L.downloadStarted, spec.label);
+    else if (/^(https?|mailto):$/.test(a.protocol)) {
+      let to = a.hostname.replace(/^www\./, '') || a.pathname;
       try { to = decodeURIComponent(to); } catch { /* keep it raw */ }
-      showToast('mail', L.mailOpening, to);
-    } else if (/^https?:/i.test(href)) showToast('out', L.linkOpening, a.hostname.replace(/^www\./, ''));
+      showToast('out', a.protocol === 'mailto:' ? L.mailOpening : L.linkOpening, to);
+    }
   }
 
   // ── navigation
@@ -193,7 +191,7 @@ export function mountIpod(container, { config } = {}) {
     const a = node.animate([{ transform: `translateX(${from}%)` }, { transform: `translateX(${to}%)` }], { duration: SLIDE_MS, easing: EASE });
     anims.set(node, a);
     // wall-clock safety net: a stalled document timeline can never leave screens half-way
-    const guard = timers.later(() => { if (anims.get(node) === a) a.finish(); }, SLIDE_MS + 180);
+    const guard = timers.later(() => a.finish(), SLIDE_MS + 180);
     return a.finished.catch(() => {}).finally(() => {
       timers.cancel(guard);
       if (anims.get(node) === a) anims.delete(node);
@@ -209,7 +207,7 @@ export function mountIpod(container, { config } = {}) {
     return x;
   }
   function slide(outN, inN, dir) {
-    if (isReduced() || !outN || typeof inN.animate !== 'function') {
+    if (isReduced() || !inN.animate) {
       for (const a of [...anims.values()]) a.finish();
       return Promise.resolve();
     }
@@ -225,16 +223,16 @@ export function mountIpod(container, { config } = {}) {
     titleEl = h('span', 'ipodc-title', { text });
     titles.append(titleEl);
     el.setAttribute('aria-label', `${text} – iPod`);
-    if (!dir || isReduced() || !old.textContent || typeof old.animate !== 'function') { old.remove(); return; }
-    old.getAnimations().forEach((a) => a.cancel());
-    const o = { duration: SLIDE_MS, easing: EASE };
-    const kf = (d, o0, o1, at) => [
-      { opacity: o0, transform: `translateX(${d * (o0 ? 0 : 30)}%)` },
+    if (!dir || isReduced() || !old.textContent || !old.animate) return old.remove();
+    const kf = (d, o0, at) => [
+      { opacity: o0, transform: `translateX(${d * 30 * (1 - o0)}%)` },
       { opacity: 0, transform: `translateX(${d * 22}%)`, offset: at },
-      { opacity: o1, transform: `translateX(${d * (o1 ? 0 : 30)}%)` },
+      { opacity: 1 - o0, transform: `translateX(${d * 30 * o0}%)` },
     ];
-    old.animate(kf(-dir, 1, 0, 0.42), { ...o, fill: 'forwards' }).finished.then(() => old.remove(), () => old.remove());
-    titleEl.animate(kf(dir, 0, 1, 0.38), { ...o, fill: 'backwards' });
+    const o = { duration: SLIDE_MS, easing: EASE };
+    const rm = () => old.remove();
+    old.animate(kf(-dir, 1, 0.42), { ...o, fill: 'forwards' }).finished.then(rm, rm);
+    titleEl.animate(kf(dir, 0, 0.38), { ...o, fill: 'backwards' });
   }
 
   function show(s) {
@@ -245,33 +243,21 @@ export function mountIpod(container, { config } = {}) {
     syncAD();
     s.onShow?.();
   }
-  const describe = (s) => {
-    const extra = typeof s.summary === 'function' ? s.summary() : s.summary;
-    return [s.title, extra, s.currentLabel()].filter(Boolean).join('. ');
-  };
-  function open(item) {
-    const s = buildScreen(item);
-    const prev = current();
-    prev.onHide?.();
-    prev.node.setAttribute('aria-hidden', 'true');
-    stack.push(s);
-    show(s);
-    setTitle(s.title, 1);
-    slide(prev.node, s.node, 1).then(() => { if (!isCurrent(prev)) prev.node.remove(); });
-    announce(describe(s));
+  /** push (dir 1, item given) or pop (dir -1) one level with the horizontal slide */
+  function go(dir, item) {
+    const from = current();
+    if (dir > 0) stack.push(buildScreen(item)); else stack.pop();
+    const to = current();
+    from.onHide?.();
+    from.node.setAttribute('aria-hidden', 'true');
+    show(to);
+    setTitle(to.title, dir);
+    slide(from.node, to.node, dir).then(() => { if (!isCurrent(from)) from.node.remove(); });
+    const extra = dir > 0 && (typeof to.summary === 'function' ? to.summary() : to.summary);
+    announce([to.title, extra, to.currentLabel()].filter(Boolean).join('. '));
   }
-  function back() {
-    if (stack.length < 2) return false;
-    const top = stack.pop();
-    top.onHide?.();
-    top.node.setAttribute('aria-hidden', 'true');
-    const prev = current();
-    show(prev);
-    setTitle(prev.title, -1);
-    slide(top.node, prev.node, -1).then(() => top.node.remove());
-    announce(`${prev.title}. ${prev.currentLabel()}`);
-    return true;
-  }
+  const open = (item) => go(1, item);
+  const back = () => stack.length > 1 && go(-1);
 
   // ── actions
   let flashT = 0;
@@ -299,28 +285,18 @@ export function mountIpod(container, { config } = {}) {
   }
   const tap = (btn) => { flash(btn); press(btn); };
 
-  let lastHaptic = 0;
-  function step(dir, src) {
+  function step(dir) {
     if (phase !== 'ready' || destroyed || !dir) return false;
     const s = current();
     const moved = s.move(dir);
-    if (!moved) s.bump(dir);
-    else {
-      sound.play('tick');
-      const now = performance.now();
-      if (src === 'touch' && soundOn && now - lastHaptic > 35) {
-        lastHaptic = now;
-        try { navigator.vibrate?.(4); } catch { /* not allowed */ }
-      }
-    }
+    if (moved) sound.play('tick'); else s.bump(dir);
     return moved;
   }
   function scroll(steps) {
     const n = Math.trunc(Number(steps) || 0);
-    for (let i = 0; i < Math.abs(n); i++) if (!step(Math.sign(n), 'api')) break;
+    for (let i = 0; i < Math.abs(n); i++) if (!step(Math.sign(n))) break;
   }
   function jump(to) {
-    if (phase !== 'ready' || destroyed) return;
     const s = current();
     if (s.jump(to)) sound.play('tick'); else s.bump(to > s.index ? 1 : -1);
   }
@@ -332,12 +308,12 @@ export function mountIpod(container, { config } = {}) {
   const focusRoot = () => { if (document.activeElement !== el) el.focus({ preventScroll: true }); };
 
   // ── click wheel input (no momentum: the list stops when the finger lifts)
-  const wheelIn = createWheel(wheel, {
+  const stopWheel = createWheel(wheel, on, {
     onDown() { sound.ensure(); focusRoot(); unflash(); },
     onStep: step,
     onPress: tap,
   });
-  cleanups.push(() => wheelIn.destroy());
+  cleanups.push(stopWheel);
   on(wheel, 'contextmenu', (e) => e.preventDefault());
   on(wheel, 'touchmove', (e) => e.preventDefault(), { passive: false });
 
@@ -347,16 +323,15 @@ export function mountIpod(container, { config } = {}) {
   const centreUp = (e) => {
     if (centerDown !== e.pointerId) return;
     centerDown = null;
-    centerBtn.classList.remove('is-pressed');
-    el.classList.remove('is-centre');
+    unflash();
     if (e.type !== 'pointerup') return;
     const r = centerBtn.getBoundingClientRect();
-    if (Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2)) <= r.width / 2 + 8) tap('center');
+    if (Math.hypot(e.clientX - r.left - r.width / 2, e.clientY - r.top - r.height / 2) <= r.width / 2 + 8) tap('center');
   };
   on(centerBtn, 'pointerdown', (e) => {
     if (e.button) return;
     e.preventDefault();
-    wheelIn.stop(); // a thumb sliding from ring to centre never leaves a stuck press highlight
+    stopWheel(); // a thumb sliding from ring to centre never leaves a stuck press highlight
     sound.ensure();
     focusRoot();
     unflash();
@@ -365,60 +340,32 @@ export function mountIpod(container, { config } = {}) {
     el.classList.add('is-centre');
     try { centerBtn.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ }
   });
-  on(centerBtn, 'pointerup', centreUp);
-  on(centerBtn, 'pointercancel', centreUp);
-  on(centerBtn, 'lostpointercapture', centreUp);
+  for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) on(centerBtn, t, centreUp);
 
-  // ── screen: tap to choose, drag to scroll
-  let sp = null;
-  let suppressClick = false;
-  on(stage, 'pointerdown', (e) => {
-    if (phase !== 'ready' || e.button) return;
-    focusRoot(); // mousedown is prevented below, so focus the iPod explicitly
-    sp = { id: e.pointerId, y: e.clientY, x: e.clientX, acc: 0, drag: false, type: e.pointerType };
-    suppressClick = false;
-  });
-  on(stage, 'pointermove', (e) => {
-    if (!sp || e.pointerId !== sp.id) return;
-    const dy = e.clientY - sp.y;
-    if (!sp.drag) {
-      if (Math.abs(dy) < 8 || Math.abs(dy) < Math.abs(e.clientX - sp.x)) return;
-      sp.drag = suppressClick = true;
-      try { stage.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ }
-    }
-    sp.acc += dy;
-    sp.y = e.clientY;
-    const unit = ROW * pxPer() * 0.8;
-    while (sp.acc <= -unit) { sp.acc += unit; step(1, sp.type); }
-    while (sp.acc >= unit) { sp.acc -= unit; step(-1, sp.type); }
-  });
-  const endSp = (e) => { if (sp?.id === e.pointerId) sp = null; };
-  on(stage, 'pointerup', endSp);
-  on(stage, 'pointercancel', endSp);
-  on(stage, 'mousedown', (e) => e.preventDefault()); // keep focus on the iPod, no text selection
-  on(stage, 'touchmove', (e) => e.preventDefault(), { passive: false });
-  on(stage, 'dragstart', (e) => e.preventDefault());
+  // ── screen: tap a row to choose it
+  const prevent = (e) => e.preventDefault();
+  on(stage, 'pointerdown', (e) => { if (phase === 'ready' && !e.button) focusRoot(); }); // mousedown is prevented below
+  on(stage, 'mousedown', prevent); // keep focus on the iPod, no text selection
+  on(stage, 'dragstart', prevent);
   on(stage, 'click', (e) => {
     if (programmatic) return; // our own activation of a real <a>: let the browser follow it
-    if (suppressClick) { suppressClick = false; e.preventDefault(); return; }
     const s = current();
-    const ready = phase === 'ready' && s;
+    const ready = phase === 'ready';
     const trk = e.target.closest('.ipodc-trk');
     if (trk && ready && s.node.contains(trk) && e.detail < 2) {
       sound.play('press');
-      s.pickTrack?.(+trk.dataset.i);
-      return;
+      return s.pickTrack(+trk.dataset.i);
     }
     const row = e.target.closest('.ipodc-row');
     if (!row) return;
     const i = ready ? s.rows.indexOf(row) : -1;
-    const settling = !isReduced() && performance.now() - (s?.enteredAt ?? 0) < SLIDE_MS * 0.75;
+    const settling = !isReduced() && performance.now() - s.enteredAt < SLIDE_MS * 0.75;
     // only rows of the screen in place, never the 2nd click of a double-click or an inert row
-    if (i < 0 || e.detail > 1 || settling || row.classList.contains('is-dead')) { e.preventDefault(); return; }
+    if (i < 0 || e.detail > 1 || settling || row.classList.contains('is-dead')) return prevent(e);
     s.setIndex(i);
     sound.play('press');
     const spec = s.specs[i];
-    if (spec.onActivate || !row.href) { e.preventDefault(); spec.onActivate?.(); } else if (linkGuard(row)) e.preventDefault();
+    if (spec.onActivate || !row.href) { prevent(e); spec.onActivate?.(); } else if (linkGuard(row)) prevent(e);
     else linkFeedback(row, spec); // native navigation proceeds (new tab / mailto / download)
   });
 
@@ -428,79 +375,68 @@ export function mountIpod(container, { config } = {}) {
   on(el, 'wheel', (e) => {
     if (phase === 'off' || destroyed) return;
     e.preventDefault(); // also during boot: the page behind must never scroll under the iPod
-    if (phase !== 'ready') return;
     const now = performance.now();
     const gap = now - wLast;
     wLast = now;
     const raw = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
     // line/page mode, a big notch, or a separate notch after a pause (mice that report tiny deltas,
     // ~4 px on macOS) is exactly one step; continuous trackpad streams (~16 ms apart) accumulate
-    if (raw && (e.deltaMode || Math.abs(raw) >= 50 || gap > 220 || (gap > 90 && Math.abs(raw) >= 3))) { wAcc = 0; step(Math.sign(raw), 'wheel'); return; }
+    if (raw && (e.deltaMode || Math.abs(raw) >= 50 || gap > 220 || (gap > 90 && Math.abs(raw) >= 3))) {
+      wAcc = 0;
+      return step(Math.sign(raw));
+    }
     wAcc += raw;
-    while (wAcc >= 34) { wAcc -= 34; step(1, 'wheel'); }
-    while (wAcc <= -34) { wAcc += 34; step(-1, 'wheel'); }
+    for (; wAcc >= 34; wAcc -= 34) step(1);
+    for (; wAcc <= -34; wAcc += 34) step(-1);
   }, { passive: false });
 
   // ── keyboard
+  const KEYS = {
+    ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1,
+    Enter: 'center', Escape: 'menu', Backspace: 'menu', ' ': 'play', Spacebar: 'play',
+    MediaPlayPause: 'play', MediaTrackNext: 'next', MediaTrackPrevious: 'prev',
+  };
   function onKey(e) {
     if (phase !== 'ready' || destroyed || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
     const k = e.key;
-    const once = (btn) => { if (!e.repeat) { sound.ensure(); tap(btn); } };
+    const i = current().index;
+    let a = KEYS[k];
+    if (e.shiftKey && /^Arrow(Left|Right)$/.test(k)) a = a > 0 ? 'next' : 'prev';
     sound.ensure();
-    switch (k) {
-      case 'ArrowLeft': case 'ArrowRight':
-        if (e.shiftKey) { once(k === 'ArrowRight' ? 'next' : 'prev'); break; }
-        step(k === 'ArrowRight' ? 1 : -1, 'key');
-        break;
-      case 'ArrowDown': case 'ArrowUp': step(k === 'ArrowDown' ? 1 : -1, 'key'); break;
-      case 'PageDown': case 'PageUp': jump(current().index + (k === 'PageDown' ? PAGE : -PAGE)); break;
-      case 'Home': jump(-Infinity); break;
-      case 'End': jump(Infinity); break;
-      case 'Enter': once('center'); break;
-      case 'Escape': case 'Backspace': once('menu'); break;
-      case ' ': case 'Spacebar': case 'MediaPlayPause': once('play'); break;
-      case 'MediaTrackNext': once('next'); break;
-      case 'MediaTrackPrevious': once('prev'); break;
-      default: return;
-    }
+    if (k === 'Home' || k === 'End') jump(k === 'Home' ? -Infinity : Infinity);
+    else if (k === 'PageDown' || k === 'PageUp') jump(i + (k === 'PageDown' ? 7 : -7)); // one screen minus one row
+    else if (typeof a === 'number') step(a);
+    else if (!a) return;
+    else if (!e.repeat) tap(a);
     e.preventDefault();
   }
   on(el, 'keydown', onKey);
   // With nothing else focused (e.g. right after the intro) the iPod is the obvious keyboard target,
   // but only while it is really on screen and on top (not minimised, hidden or covered).
-  const onTop = () => {
+  on(document, 'keydown', (e) => {
+    if (e.key === 'Tab') el.dataset.input = 'key'; // keyboard navigation: show the focus ring
+    if ((e.target !== document.body && e.target !== document.documentElement) || phase !== 'ready') return;
     const r = centerBtn.getBoundingClientRect();
     const x = r.left + r.width / 2;
     const y = r.top + r.height / 2;
-    if (!r.width || x < 0 || y < 0 || x > innerWidth || y > innerHeight) return false;
-    return el.contains(document.elementFromPoint(x, y));
-  };
-  on(document, 'keydown', (e) => {
-    if (e.key === 'Tab') el.dataset.input = 'key'; // keyboard navigation: show the focus ring
-    if (e.target !== document.body && e.target !== document.documentElement) return;
-    if (e.defaultPrevented || phase !== 'ready' || !onTop()) return;
+    if (!r.width || !el.contains(document.elementFromPoint(x, y))) return;
     const se = document.scrollingElement;
     if (se && se.scrollHeight > se.clientHeight + 2 && /^(Arrow|Spacebar$| $|Page|Home$|End$)/.test(e.key)) return; // leave page scrolling alone
     onKey(e);
   });
-  // pointer users get no focus ring (focus still moves to the iPod so the keys work afterwards)
-  on(el, 'pointerdown', () => { el.dataset.input = 'pointer'; sound.ensure(); });
+  // pointer users get no focus ring (focus still moves to the iPod so the keys work afterwards);
   // touch pointerdown is not a user activation for audio: unlock on pointerup / click as well
-  on(el, 'pointerup', () => sound.ensure());
-  on(el, 'click', () => sound.ensure());
+  on(el, 'pointerdown', () => { el.dataset.input = 'pointer'; sound.ensure(); });
+  on(el, 'pointerup', sound.ensure);
+  on(el, 'click', sound.ensure);
 
   // ── resize
-  let ro = null;
-  if (typeof ResizeObserver !== 'undefined') {
-    let lastW = 0;
-    ro = new ResizeObserver(() => {
-      const w = lcd.clientWidth;
-      if (!w || Math.abs(w - lastW) < 0.5) return;
-      lastW = w;
-      current()?.layout();
-    });
-    ro.observe(lcd);
-  }
+  let lastW = 0;
+  const ro = new ResizeObserver(() => {
+    const w = lcd.clientWidth;
+    if (w && Math.abs(w - lastW) >= 0.5) { lastW = w; current().layout(); }
+  });
+  ro.observe(lcd);
 
   // ── boot / reveal
   const menuScr = menuScreen();
@@ -535,14 +471,13 @@ export function mountIpod(container, { config } = {}) {
   function destroy() {
     if (destroyed) return;
     destroyed = true;
-    for (const fn of cleanups.splice(0)) { try { fn(); } catch { /* ignore */ } }
+    for (const fn of cleanups) { try { fn(); } catch { /* ignore */ } }
     for (const a of anims.values()) a.cancel();
     timers.clearAll();
-    ro?.disconnect();
+    ro.disconnect();
     player.destroy();
     sound.close();
-    live.remove();
-    el.remove();
+    host.remove();
   }
 
   return {

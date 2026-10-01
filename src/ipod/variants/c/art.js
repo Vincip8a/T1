@@ -26,7 +26,6 @@ const stroke = (d, w = 2.4) => `<path d="${d}" fill="none" stroke="#fff" stroke-
 export const TOAST_ICON = {
   check: svg('0 0 26 26', ring + stroke('M7.5 13.4l3.7 3.7 7.3-8', 2.6)),
   out: svg('0 0 26 26', ring + stroke('M10 8.5h7.5V16M17.2 8.8 8.5 17.5')),
-  mail: svg('0 0 26 26', ring + stroke('M7 9h12v8.5H7zM7.6 9.8 13 14l5.4-4.2', 1.9)),
   back: svg('0 0 26 26', ring + stroke('M14.5 8 9.5 13l5 5', 2.6)),
 };
 
@@ -44,18 +43,17 @@ export const sharedDefs = (p) => `<svg class="ipodc-defs" aria-hidden="true" foc
 export function previewIcon(kind, p, monogram, s) {
   const gloss = (d, o = 0.55) => `<path d="${d}" fill="url(#${s}gl)" opacity="${o}"/>`;
   const blue = `fill="url(#${s}bl)" stroke="#164f9e" stroke-width="1.4"`;
-  const paper = (c) => `fill="url(#${p}a)" stroke="${c}" stroke-width="1.4"`;
+  const paper = 'fill="#f4f5f7" stroke="#8d939a" stroke-width="1.4"';
   let body;
   if (kind === 'contacts') {
-    const rings = [20, 38, 56, 74].map((y) => `<rect x="13" y="${y}" width="16" height="6" rx="3"/>`).join('');
-    body = `<defs>${lg(`${p}r`, '0 #8a8f96,0.5 #f4f5f6,1 #9aa0a7', 1, 0)}${lg(`${p}a`, '0 #e9ecef,1 #fff', 1, 0)}</defs><rect x="24" y="10" width="64" height="82" rx="6" ${paper('#a3a9b0')}/><rect x="20" y="8" width="64" height="84" rx="7" ${blue}/><rect x="27" y="8" width="2" height="84" fill="#173f7d" opacity=".35"/><circle cx="56" cy="39" r="12" fill="#fff"/><path d="M34 74c0-13 10-21 22-21s22 8 22 21z" fill="#fff"/><g fill="url(#${p}r)" stroke="#5f656c" stroke-width=".8">${rings}</g>${gloss('M30 9h48a6 6 0 0 1 6 6v24C64 46 46 46 30 41z')}`;
+    body = `<rect x="24" y="10" width="64" height="82" rx="6" ${paper}/><rect x="20" y="8" width="64" height="84" rx="7" ${blue}/><circle cx="56" cy="39" r="12" fill="#fff"/><path d="M34 74c0-13 10-21 22-21s22 8 22 21z" fill="#fff"/><path d="M13 23h16M13 41h16M13 59h16M13 77h16" stroke="#5f656c" stroke-width="7" stroke-linecap="round"/><path d="M13 23h16M13 41h16M13 59h16M13 77h16" stroke="#e4e6e9" stroke-width="4.4" stroke-linecap="round"/>${gloss('M30 9h48a6 6 0 0 1 6 6v24C64 46 46 46 30 41z')}`;
   } else if (kind === 'chat') {
-    body = `<defs>${lg(`${p}a`, '0 #fbfbfc,1 #c3c8ce')}</defs><path d="M44 20h40a10 10 0 0 1 10 10v22a10 10 0 0 1-10 10h-4l2 12-14-12H44a10 10 0 0 1-10-10V30a10 10 0 0 1 10-10z" ${paper('#8d939a')}/><path d="M14 36h42a10 10 0 0 1 10 10v20a10 10 0 0 1-10 10H34L18 88l3-12h-7A10 10 0 0 1 4 66V46a10 10 0 0 1 10-10z" ${blue}/>${gloss('M14 37h42a9 9 0 0 1 9 9v6C46 58 26 58 5 53v-7a9 9 0 0 1 9-9z', 0.6)}<g fill="#fff"><circle cx="21" cy="57" r="3.6"/><circle cx="35" cy="57" r="3.6"/><circle cx="49" cy="57" r="3.6"/></g>`;
+    body = `<path d="M44 20h40a10 10 0 0 1 10 10v22a10 10 0 0 1-10 10h-4l2 12-14-12H44a10 10 0 0 1-10-10V30a10 10 0 0 1 10-10z" ${paper}/><path d="M14 36h42a10 10 0 0 1 10 10v20a10 10 0 0 1-10 10H34L18 88l3-12h-7A10 10 0 0 1 4 66V46a10 10 0 0 1 10-10z" ${blue}/>${gloss('M14 37h42a9 9 0 0 1 9 9v6C46 58 26 58 5 53v-7a9 9 0 0 1 9-9z', 0.6)}<path d="M21 57h0M35 57h0M49 57h0" stroke="#fff" stroke-width="7.2" stroke-linecap="round"/>`;
   } else if (kind === 'download') {
-    body = `<defs>${lg(`${p}a`, '0 #fff,1 #d9dde2')}</defs><path d="M22 6h40l18 18v68a3 3 0 0 1-3 3H22a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3z" ${paper('#8d939a')}/><path d="M62 6v15a3 3 0 0 0 3 3h15" fill="#e7eaee" stroke="#8d939a" stroke-width="1.4"/><path d="M28 34h30M28 42h40M28 50h36M28 58h22" stroke="#b9bfc6" stroke-width="2.4" stroke-linecap="round"/><circle cx="68" cy="72" r="19" ${blue}/><path d="M68 61v19M60 73l8 8 8-8" fill="none" stroke="#fff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>${gloss('M51 68a17 17 0 0 1 34 0c-10 4-24 4-34 0z')}`;
+    body = `<path d="M22 6h40l18 18v68a3 3 0 0 1-3 3H22a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3zM62 6v18h18" ${paper}/><path d="M28 34h30M28 42h40M28 50h36M28 58h22" stroke="#b9bfc6" stroke-width="2.4" stroke-linecap="round"/><circle cx="68" cy="72" r="19" ${blue}/><path d="M68 61v19M60 73l8 8 8-8" fill="none" stroke="#fff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>${gloss('M51 68a17 17 0 0 1 34 0c-10 4-24 4-34 0z')}`;
   } else { // brand monogram medallion
     const m = esc(String(monogram ?? '').slice(0, 3));
-    body = `<defs><radialGradient id="${p}a" cx=".5" cy=".38" r=".62"><stop offset="0" stop-color="#fff"/><stop offset=".55" stop-color="#d9dce0"/><stop offset="1" stop-color="#9ea3aa"/></radialGradient>${lg(`${p}b`, '0 #5d6168,1 #2b2e33')}</defs><circle cx="50" cy="50" r="42" fill="url(#${p}a)" stroke="#80868e" stroke-width="1.5"/><circle cx="50" cy="50" r="35" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="1.2"/><circle cx="50" cy="50" r="36.2" fill="none" stroke="#000" stroke-opacity=".12"/><text x="50" y="50" dy=".35em" text-anchor="middle" font-family="Helvetica Neue,Helvetica,Arial,Liberation Sans,sans-serif" font-weight="700" font-size="${m.length > 2 ? 26 : 34}" letter-spacing="-1.5" fill="url(#${p}b)">${m}</text>${gloss('M14 44a36 36 0 0 1 72 0c-22 8-50 8-72 0z', 0.5)}`;
+    body = `<defs><radialGradient id="${p}a" cx=".5" cy=".38" r=".62"><stop offset="0" stop-color="#fff"/><stop offset=".55" stop-color="#d9dce0"/><stop offset="1" stop-color="#9ea3aa"/></radialGradient></defs><circle cx="50" cy="50" r="42" fill="url(#${p}a)" stroke="#80868e" stroke-width="1.5"/><circle cx="50" cy="50" r="35" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="1.2"/><text x="50" y="50" dy=".35em" text-anchor="middle" font-family="Helvetica Neue,Helvetica,Arial,sans-serif" font-weight="700" font-size="${m.length > 2 ? 26 : 34}" letter-spacing="-1.5" fill="#43474e">${m}</text>${gloss('M14 44a36 36 0 0 1 72 0c-22 8-50 8-72 0z', 0.5)}`;
   }
   return svg('0 0 100 100', body);
 }
