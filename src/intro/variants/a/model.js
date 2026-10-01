@@ -128,7 +128,6 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     const well = new THREE.MeshStandardMaterial({ color: '#0c0d0f', roughness: 0.7 });
     const ws = circle(R + 0.6); ws.holes.push(circle(cb - 2, 0, 0, true));
     add(p, ext(ws, 0.2, 0, 1, 96), well, whc[0], whc[1], -1.45);
-    p.mats.push(well);
   }
 
   // ---------- click-wheel flex (copper on kapton) ----------
@@ -138,11 +137,12 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     ft.repeat.set(1 / 14, 1 / 14);
     const mat = phys({ color: '#ffffff', map: ft, metalness: 0.25, roughness: 0.32, clearcoat: 0.8, clearcoatRoughness: 0.15 });
     const ring = circle(R - 3); ring.holes.push(circle(9.5, 0, 0, true));
-    add(p, ext(ring, 0.15, 0, 1, 96), mat, whc[0], whc[1], 0);
+    const rmap = T.capFit(tx(T.flexRingCanvas(2 * (R - 3), 9.5, R - 3)), 2 * (R - 3), 2 * (R - 3));
+    const rmat = phys({ color: '#ffffff', map: rmap, metalness: 0.2, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.12 });
+    add(p, ext(ring, 0.15, 0, 1, 96), rmat, whc[0], whc[1], 0);
     add(p, ext(rr(9, 30, 1.2), 0.15), mat, whc[0] + 6, whc[1] + R + 12, 0);
     const stiff = new THREE.MeshStandardMaterial({ color: '#ece9e1', roughness: 0.6 });
     add(p, ext(rr(10, 4, 0.6), 0.35), stiff, whc[0] + 6, whc[1] + R + 26, 0.2);
-    p.mats.push(stiff);
   }
 
   // ---------- LCD module + metal frame ----------
@@ -158,7 +158,6 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     add(p, pg, panel, swc[0], swc[1], 0.14);
     const flex = phys({ color: COLORS.flex, metalness: 0.25, roughness: 0.3, clearcoat: 0.8 });
     add(p, ext(rr(18, 12, 1), 0.15), flex, swc[0] - 8, swc[1] - fh / 2 - 5.5, -1.6);
-    p.mats.push(bezel);
   }
 
   // ---------- logic board ----------
@@ -180,7 +179,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
   {
     const p = mk('logicBoard');
     const pcb = T.capFit(tx(T.pcbCanvas(BW, BH, [...chips, ...others])), BW, BH);
-    const mat = phys({ color: '#ffffff', map: pcb, roughness: 0.4, metalness: 0.05, clearcoat: 0.7, clearcoatRoughness: 0.22 });
+    const mat = phys({ color: '#ffffff', map: pcb, roughness: 0.45, metalness: 0.05, clearcoat: 0.4, clearcoatRoughness: 0.3 });
     const board = rr(BW, BH, 3, 0, 0, 0.1);
     add(p, ext(board, 0.8, 0.1), mat, 0, BY, -0.4);
     chips.forEach((c, i) => {

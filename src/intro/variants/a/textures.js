@@ -308,6 +308,23 @@ export function glassAlphaCanvas(wMm, hMm, innerW, innerH) {
   return c;
 }
 
+/** Click-wheel sensor flex: amber kapton ring with capacitive electrode segments + traces. */
+export function flexRingCanvas(dMm, rIn, rOut) {
+  const S = 1024, px = S / dMm, c0 = S / 2;
+  const [c, g] = canvas(S, S);
+  g.fillStyle = COLORS.flex; g.fillRect(0, 0, S, S);
+  const seg = 16;
+  for (let i = 0; i < seg; i++) {
+    const a0 = (i / seg) * Math.PI * 2 + 0.03, a1 = ((i + 1) / seg) * Math.PI * 2 - 0.03;
+    g.beginPath(); g.arc(c0, c0, (rOut - 0.8) * px, a0, a1); g.arc(c0, c0, (rIn + 0.8) * px, a1, a0, true); g.closePath();
+    g.fillStyle = i % 2 ? '#d99a45' : '#cf8f3a'; g.fill();
+    g.strokeStyle = 'rgba(110,55,8,0.55)'; g.lineWidth = 2; g.stroke();
+  }
+  g.strokeStyle = 'rgba(240,190,110,0.7)'; g.lineWidth = 2.5;
+  for (const r of [rIn + 0.35, rOut - 0.35]) { g.beginPath(); g.arc(c0, c0, r * px, 0, 7); g.stroke(); }
+  return c;
+}
+
 /** Copper-on-kapton flex traces (colour). */
 export function flexCanvas() {
   const [c, g] = canvas(256, 256);

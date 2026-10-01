@@ -214,6 +214,10 @@ export function runIntro({ getTargetRect, reducedMotion = false } = {}) {
   // ---- per-frame state ----
   const screwM = new THREE.Matrix4(), screwQ = new THREE.Quaternion(), screwE = new THREE.Euler(), screwP = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
   const N = ipod.parts.length;
+  const E = new Float32Array(N);
+  const idx = (ids) => ids.map((id) => ipod.parts.findIndex((p) => p.id === id));
+  const SHELL = idx(['faceplate', 'screenGlass', 'clickWheel', 'lcd', 'backShell']);
+  const INTERNAL = idx(['wheelFlex', 'logicBoard', 'battery', 'storage', 'midframe']);
 
   function applyFinalCamera(b, kHero, fovHero) {
     const rect = targetRect();
@@ -237,6 +241,8 @@ export function runIntro({ getTargetRect, reducedMotion = false } = {}) {
       const u = clamp01(t / duration);
       rig.rotation.set(0, 0, 0); rig.position.set(0, 0, 0);
       ipod.parts.forEach((p) => { p.group.position.set(0, 0, p.z0); p.group.rotation.set(0, 0, 0); });
+      INTERNAL.forEach((i) => { ipod.parts[i].group.visible = false; });
+      ipod.screws.visible = false;
       ipod.screwBase.forEach((b, j) => { ipod.screws.setMatrixAt(j, screwM.makeTranslation(b.x, b.y, b.z)); });
       ipod.screws.instanceMatrix.needsUpdate = true;
       shadow.visible = false;
@@ -262,6 +268,7 @@ export function runIntro({ getTargetRect, reducedMotion = false } = {}) {
       const ur = clamp01((t - rs) / TL.reDur);
       const out = p3out(uo), back = arrive(ur);
       const e = out * (1 - back);
+      E[i] = e;
       p.group.position.set(0, 0, p.z0 + L.dz[i] * e);
       // in-flight tilt, then a small damped settle after contact
       const sgn = i % 2 ? -1 : 1, amp = (2.2 + (i % 3)) * DEG;
@@ -290,11 +297,16 @@ export function runIntro({ getTargetRect, reducedMotion = false } = {}) {
       ipod.screws.setMatrixAt(j, screwM.compose(screwP, screwQ, one));
     }
     ipod.screws.instanceMatrix.needsUpdate = true;
+    // While the case is closed the internals are invisible: skip them (also avoids sliver
+    // triangles of edge-on internals bleeding through on some rasterisers).
+    const closed = SHELL.every((i) => E[i] < 1e-4);
+    INTERNAL.forEach((i) => { ipod.parts[i].group.visible = !closed; });
+    ipod.screws.visible = !closed;
     // hero glint: a soft highlight sweeps diagonally across the front plate as it seats
     const tf = TL.reassemble + (N - 1) * TL.reStagger + TL.reDur * 0.8;
     const sw = clamp01((t - tf + 0.25) / 0.7);
     sweep.position.set(lerp(-60, 65, sw), lerp(75, -65, sw), 45);
-    sweep.intensity = 4200 * Math.sin(Math.PI * sw) ** 2;
+    sweep.intensity = 3000 * Math.sin(Math.PI * sw) ** 2;
 
     // reflections sweep slowly across the metal; a fixed angle at the end
     scene.environmentRotation.set(0, lerp(-0.5, 0.35, smooth(0, TL.camEnd, t)), 0);
@@ -340,7 +352,7 @@ export function runIntro({ getTargetRect, reducedMotion = false } = {}) {
 
   function frame(now) {
     if (!playing || disposed) return;
-    const dt = last ? Math.min((now - last) / 1000, 1 / 20) : 0;
+    const dt = last ? Math.min((now - last) / 1000, 0.1) : 0;
     last = now;
     t = Math.min(duration, t + dt);
     render();
@@ -398,7 +410,6 @@ export function runIntro({ getTargetRect, reducedMotion = false } = {}) {
       resolveDone();
     },
   };
-  controller._dbg = { ipod, scene, render };
   controller.play();
   return controller;
 }
