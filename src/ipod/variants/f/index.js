@@ -26,7 +26,9 @@ const STR = {
 const BUTTONS = ['menu', 'center', 'play', 'next', 'prev'];
 const SLIDE_MS = 300;
 
-const resolveUrl = (p) => (/^(https?:|mailto:|tel:|data:|blob:)/i.test(p) ? p : new URL(p, document.baseURI).href);
+// Relative config paths (cover, downloads) are relative to the site root; the dev harness lives one level down.
+const siteRoot = () => (/\/dev\/[^/]*$/.test(location.pathname) ? new URL('../', document.baseURI).href : document.baseURI);
+const resolveUrl = (p) => (/^(https?:|mailto:|tel:|data:|blob:)/i.test(p) ? p : new URL(p, siteRoot()).href);
 
 function wheelLabelsSvg() {
   const c = COLORS.wheelLabel;

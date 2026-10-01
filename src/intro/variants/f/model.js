@@ -51,14 +51,14 @@ export function buildModel(tex) {
   const parts = [];
   const M = {}; // materials, for disposal
 
-  M.alu = phys({ color: 0x9a9ea2, map: fit(tex.alu, W, H), roughnessMap: tex.aluRough, metalness: 0.55, roughness: 0.6, anisotropy: 0.4, anisotropyRotation: PI / 2, envMapIntensity: 0.45 });
-  M.aluSide = phys({ color: COLORS.aluminium, metalness: 0.6, roughness: 0.45, envMapIntensity: 0.5 });
-  M.steel = phys({ color: 0xd9dde2, map: fit(tex.steel, W - 1.2, H - 1.2), metalness: 0.2, roughness: 0.7, transparent: true, depthWrite: false });
-  M.steelSide = phys({ color: COLORS.steel, metalness: 1, roughness: 0.2, envMapIntensity: 1.1 });
-  M.wheel = phys({ color: 0xd6d6d6, map: fit(tex.wheel, 38.4, 38.4), metalness: 0, roughness: 0.5, clearcoat: 0.25, clearcoatRoughness: 0.3 });
+  M.alu = phys({ color: 0x9a9ea2, map: fit(tex.alu, W, H), roughnessMap: tex.aluRough, metalness: 0.55, roughness: 0.6, anisotropy: 0.3, anisotropyRotation: PI / 2, envMapIntensity: 0.45 });
+  M.aluSide = phys({ color: COLORS.aluminiumDark, metalness: 0.75, roughness: 0.5, envMapIntensity: 0.35 });
+  M.steel = phys({ color: COLORS.steel, map: fit(tex.steel, W - 1.2, H - 1.2), metalness: 0.2, roughness: 0.7, transparent: true, depthWrite: false });
+  M.steelSide = phys({ color: COLORS.steel, metalness: 1, roughness: 0.28, envMapIntensity: 0.75 });
+  M.wheel = phys({ color: 0xd8d8d8, map: fit(tex.wheel, IPOD.wheel.diameter, IPOD.wheel.diameter), metalness: 0, roughness: 0.5, clearcoat: 0.25, clearcoatRoughness: 0.3 });
   M.wheelSide = phys({ color: COLORS.wheel, metalness: 0, roughness: 0.55 });
-  M.button = phys({ color: 0x7e8288, metalness: 0, roughness: 0.42, clearcoat: 0.3, clearcoatRoughness: 0.25 });
-  M.glass = phys({ color: 0x15171a, metalness: 0, roughness: 0.06, clearcoat: 1, clearcoatRoughness: 0.04, envMapIntensity: 1.6, specularIntensity: 1 });
+  M.button = phys({ color: 0xd8d8d8, map: fit(tex.button, IPOD.centerButton.diameter, IPOD.centerButton.diameter), metalness: 0, roughness: 0.5, clearcoat: 0.15, clearcoatRoughness: 0.35 });
+  M.glass = phys({ color: COLORS.screenWindow, metalness: 0, roughness: 0.32, clearcoat: 0.5, clearcoatRoughness: 0.42, envMapIntensity: 0.3 });
   M.lcdFrame = phys({ color: 0xaeb2b7, metalness: 0.9, roughness: 0.55 });
   M.lcd = phys({ color: COLORS.lcdOff, metalness: 0.1, roughness: 0.3, clearcoat: 0.5, clearcoatRoughness: 0.15 });
   M.pcb = phys({ color: 0xffffff, map: fit(tex.pcb, 55, 93), metalness: 0.15, roughness: 0.55 });
@@ -78,6 +78,7 @@ export function buildModel(tex) {
   M.screw = phys({ color: 0xcfd3d8, metalness: 0.95, roughness: 0.35 });
   M.dark = phys({ color: 0x0a0b0d, roughness: 0.8 });
   M.white = phys({ color: 0xf4f4f2, roughness: 0.5 });
+  M.shadow = new THREE.MeshBasicMaterial({ map: tex.shadow, color: 0x06080c, transparent: true, opacity: 0, depthWrite: false });
 
   const add = (id, obj, ex, rest) => {
     obj.name = id;
@@ -90,39 +91,37 @@ export function buildModel(tex) {
   const sw = IPOD.screenWindow, wh = IPOD.wheel;
   const winC = { x: fx(sw.x + sw.width / 2), y: fy(sw.y + sw.height / 2) };
   const whC = { x: fx(wh.cx), y: fy(wh.cy) };
-  const R = wh.diameter / 2;
+  const R = wh.diameter / 2, BR = IPOD.centerButton.diameter / 2;
 
+  // Explosion offsets (mm at full spread). Seen from the front-left-above camera, +z parts
+  // step to the right, −z parts to the left, so lateral/vertical offsets keep every layer visible.
   // 1. Front plate (aluminium) with screen-window and wheel cut-outs.
   {
     const s = rr(W, H, IPOD.cornerRadius);
     s.holes.push(rr(sw.width, sw.height, sw.radius, winC.x, winC.y, THREE.Path));
     s.holes.push(circ(R, whC.x, whC.y));
-    const m = new THREE.Mesh(extrude(s, PZ.faceplate.thickness, 0.22, 3, 18), [M.alu, M.aluSide]);
-    m.castShadow = true;
-    add('faceplate', m, { z: 58, rx: -0.10 }, { x: 0, y: 0, z: -PZ.faceplate.z });
+    const m = new THREE.Mesh(extrude(s, PZ.faceplate.thickness, 0.3, 3, 18), [M.alu, M.aluSide]);
+    add('faceplate', m, { z: 72, rx: -0.08 }, { x: 0, y: 0, z: -PZ.faceplate.z });
   }
   // 2. Display window (dark glass).
   {
     const m = new THREE.Mesh(extrude(rr(sw.width - 0.05, sw.height - 0.05, sw.radius), PZ.screenGlass.thickness, 0.08, 2), M.glass);
-    m.castShadow = true;
-    add('screenGlass', m, { z: 42, ry: 0.08 }, { x: winC.x, y: winC.y, z: -PZ.screenGlass.z });
+    add('screenGlass', m, { z: 54, y: 7, ry: 0.06 }, { x: winC.x, y: winC.y, z: -PZ.screenGlass.z });
   }
-  // 3. Click wheel ring + centre button.
+  // 3. Click wheel ring (exactly the plate's hole radius: no seam) + centre button.
   {
-    const s = circ(R - 0.1, 0, 0, THREE.Shape);
-    s.holes.push(circ(IPOD.centerButton.diameter / 2 + 0.2));
-    const ring = new THREE.Mesh(extrude(s, PZ.clickWheel.thickness, 0.3, 3, 48), [M.wheel, M.wheelSide]);
-    ring.castShadow = true;
-    add('clickWheel', ring, { z: 27, rx: 0.16 }, { x: whC.x, y: whC.y, z: -PZ.clickWheel.z });
-    const btn = new THREE.Mesh(extrude(circ(IPOD.centerButton.diameter / 2, 0, 0, THREE.Shape), 1.8, 0.35, 4, 40), M.button);
-    btn.castShadow = true;
-    add('centerButton', btn, { z: 36, rx: 0.1 }, { x: whC.x, y: whC.y, z: -PZ.clickWheel.z });
+    const s = circ(R, 0, 0, THREE.Shape);
+    s.holes.push(circ(BR + 0.2));
+    const ring = new THREE.Mesh(extrude(s, PZ.clickWheel.thickness, 0.3, 3, 56), [M.wheel, M.wheelSide]);
+    add('clickWheel', ring, { z: 40, y: -5, rx: 0.14 }, { x: whC.x, y: whC.y, z: -PZ.clickWheel.z });
+    const btn = new THREE.Mesh(extrude(circ(BR, 0, 0, THREE.Shape), 1.8, 0.3, 4, 44), [M.button, M.wheelSide]);
+    add('centerButton', btn, { z: 56, y: -5, rx: 0.1 }, { x: whC.x, y: whC.y, z: -PZ.clickWheel.z });
   }
-  // 4. Click-wheel flex PCB (kapton disc with a dome-switch ring) – the ribbon tail is dynamic.
+  // 4. Click-wheel flex PCB (kapton disc with dome switches). Slightly larger than the wheel
+  // hole so it also backs the seam with a dark surface. The ribbon tail is dynamic (below).
   {
     const g = new THREE.Group();
-    const disc = new THREE.Mesh(extrude(circ(R - 1.2, 0, 0, THREE.Shape), PZ.wheelFlex.thickness, 0, 1, 40), [M.membrane, M.kapton]);
-    disc.castShadow = true;
+    const disc = new THREE.Mesh(extrude(circ(R + 0.6, 0, 0, THREE.Shape), PZ.wheelFlex.thickness, 0, 1, 48), [M.membrane, M.kapton]);
     g.add(disc);
     for (let i = 0; i < 5; i++) { // five dome switches (centre + 4 around) in silver
       const d = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.4, 0.25, 20), M.screw);
@@ -131,7 +130,7 @@ export function buildModel(tex) {
       d.position.set(i ? Math.cos(a) * R * 0.72 : 0, i ? Math.sin(a) * R * 0.72 : 0, 0.12);
       g.add(d);
     }
-    add('wheelFlex', g, { z: 14, rz: 0.05 }, { x: whC.x, y: whC.y, z: -PZ.wheelFlex.z });
+    add('wheelFlex', g, { z: 24, y: -7, rz: 0.05 }, { x: whC.x, y: whC.y, z: -PZ.wheelFlex.z });
   }
   // 5. LCD module: metal frame + dark panel.
   {
@@ -140,27 +139,24 @@ export function buildModel(tex) {
     const s = rr(fw, fh, 1.6);
     s.holes.push(rr(IPOD.screen.width, IPOD.screen.height, 0.6, 0, 0, THREE.Path));
     const frame = new THREE.Mesh(extrude(s, PZ.lcd.thickness, 0.15, 2), M.lcdFrame);
-    frame.castShadow = true;
     const panel = new THREE.Mesh(extrude(rr(IPOD.screen.width + 1.2, IPOD.screen.height + 1.2, 0.5), PZ.lcd.thickness - 0.5, 0.05, 1), M.lcd);
     panel.position.z = -0.35;
     const tail = box(14, 6, 0.3, M.kapton); // LCD flex stub at the bottom
     tail.position.set(8, -fh / 2 - 2.5, -PZ.lcd.thickness + 0.6);
     g.add(frame, panel, tail);
-    add('lcd', g, { z: 6, ry: 0.07 }, { x: winC.x, y: winC.y, z: -PZ.lcd.z });
+    add('lcd', g, { z: 12, y: 9, ry: 0.07 }, { x: winC.x, y: winC.y, z: -PZ.lcd.z });
   }
   // 6. Logic board with components on its back side.
   {
     const g = new THREE.Group();
     const bw = 55, bh = 93, t = PZ.logicBoard.thickness;
     const board = new THREE.Mesh(extrude(rr(bw, bh, 2.2), t, 0.06, 1), [M.pcb, M.pcbSide]);
-    board.castShadow = true; board.receiveShadow = true;
     g.add(board);
     const chipMat = [M.chipSide, M.chipSide, M.chipSide, M.chipSide, M.chipSide, M.chip];
     const chips = [[-8, 14, 11, 11, 1.0], [10, 16, 8, 12, 0.9], [-16, -4, 7, 7, 0.8], [16, -2, 9, 6, 0.8], [0, -20, 12, 8, 0.9], [-14, -24, 5, 5, 0.6]];
     for (const [x, y, w, h, d] of chips) {
       const c = box(w, h, d, chipMat);
       c.position.set(x, y, -t - d / 2);
-      c.castShadow = true;
       g.add(c);
     }
     for (let i = 0; i < 12; i++) { // small passives
@@ -177,48 +173,44 @@ export function buildModel(tex) {
     const conn1 = box(12, 3, 1.2, M.conn), conn2 = box(8, 2.4, 1.0, M.conn);
     conn1.position.set(8, -40, 0.6); conn2.position.set(-6, 10, 0.5);
     g.add(jack, hold, dock, conn1, conn2);
-    add('logicBoard', g, { z: -20, ry: -0.04 }, { x: 0, y: fy(51), z: -PZ.logicBoard.z });
+    add('logicBoard', g, { z: -26, ry: -0.04 }, { x: 0, y: fy(51), z: -PZ.logicBoard.z });
   }
-  // 7. Battery (pouch cell) – lower section.
+  // 7. Battery (pouch cell) – lower section, slides out down-left.
   {
     const m = new THREE.Mesh(extrude(rr(50, 24, 1.8), PZ.battery.thickness, 0.5, 3), [M.battery, M.batterySide]);
-    m.castShadow = true;
     const g = new THREE.Group();
     g.add(m);
     const tab = box(6, 4, 0.2, M.kapton);
     tab.position.set(18, 13.5, -0.4);
     g.add(tab);
-    add('battery', g, { z: -38, x: -6, rz: 0.06 }, { x: 0, y: fy(86), z: -PZ.battery.z });
+    add('battery', g, { z: -46, x: -16, y: -20, rz: 0.06 }, { x: 0, y: fy(86), z: -PZ.battery.z });
   }
-  // 8. 1.8" hard drive with rubber bumpers – upper section.
+  // 8. 1.8" hard drive with rubber bumpers – upper section, lifts up and back.
   {
     const g = new THREE.Group();
     const dw = 54, dh = 71, dt = PZ.storage.thickness;
     const drive = new THREE.Mesh(extrude(rr(dw, dh, 2.5), dt, 0.45, 3), [M.hdd, M.hddSide]);
-    drive.castShadow = true; drive.receiveShadow = true;
     g.add(drive);
     for (const [sx, sy] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) {
       const b = new THREE.Mesh(extrude(rr(7, 7, 2.2), dt + 0.8, 0.8, 2), M.rubber);
       b.position.set(sx * (dw / 2 - 2.6), sy * (dh / 2 - 2.6), 0.4);
-      b.castShadow = true;
       g.add(b);
     }
     const zif = box(22, 2.2, 1.6, M.kapton);
     zif.position.set(2, -dh / 2 - 1.2, -dt + 1.2);
     g.add(zif);
-    add('storage', g, { z: -44, y: 6, rx: 0.08 }, { x: 0, y: fy(40), z: -PZ.storage.z });
+    add('storage', g, { z: -56, x: 6, y: 24, rx: 0.08 }, { x: 0, y: fy(40), z: -PZ.storage.z });
   }
-  // 9. Mid-frame (black polycarbonate ring + cross-bar).
+  // 9. Mid-frame (black polycarbonate ring + cross-bar): a small displacement of its own.
   {
     const g = new THREE.Group();
     const s = rr(W - 1.4, H - 1.4, IPOD.cornerRadius - 0.7);
     s.holes.push(rr(W - 5.2, H - 5.2, IPOD.cornerRadius - 2.6, 0, 0, THREE.Path));
     const ring = new THREE.Mesh(extrude(s, PZ.midframe.thickness, 0.2, 1), M.frame);
-    ring.castShadow = true; ring.receiveShadow = true;
     const bar = box(W - 5.2, 1.6, 2.4, M.frame);
     bar.position.set(0, fy(51.3), -1.4);
     g.add(ring, bar);
-    add('midframe', g, { z: 0 }, { x: 0, y: 0, z: -PZ.midframe.z });
+    add('midframe', g, { z: -8, y: -3 }, { x: 0, y: 0, z: -PZ.midframe.z });
   }
   // 10. Back shell: polished stainless tray (plate + side walls) with the edge openings.
   {
@@ -229,12 +221,10 @@ export function buildModel(tex) {
     engraving.rotation.y = PI; // faces -Z; the rotation mirrors x so the text reads correctly from behind
     engraving.position.z = -IPOD.depth - 0.03;
     g.add(engraving);
-    plate.castShadow = true; plate.receiveShadow = true;
     const ws = rr(W, H, IPOD.cornerRadius);
     ws.holes.push(rr(W - 1.2, H - 1.2, IPOD.cornerRadius - 0.6, 0, 0, THREE.Path));
     const walls = new THREE.Mesh(extrude(ws, PZ.backShell.z - PZ.midframe.z + 0.2, 0.1, 1, 18), M.steelSide);
     walls.position.z = -PZ.midframe.z;
-    walls.castShadow = true;
     g.add(plate, walls);
     // openings as thin dark decals on the walls
     const zc = -IPOD.depth / 2;
@@ -247,9 +237,10 @@ export function buildModel(tex) {
     const dockSlot = new THREE.Mesh(new THREE.ShapeGeometry(rr(IPOD.dockConnector.width, IPOD.dockConnector.height, 0.8)), M.dark);
     dockSlot.rotation.x = PI / 2; dockSlot.position.set(0, -H / 2 - 0.02, zc);
     g.add(jackHole, holdSlot, slider, dockSlot);
-    add('backShell', g, { z: -74, x: -24, y: -12, rx: 0.12, flip: PI }, { x: 0, y: 0, z: 0 });
+    add('backShell', g, { z: -96, x: -36, y: 14, rx: 0.1, flip: PI }, { x: 0, y: 0, z: 0 });
   }
-  // 11. Screws (instanced): heads on the back of the mid-frame ring.
+  // 11. Screws (instanced): heads on the back of the mid-frame ring; they spin out backwards
+  // and drift outward so they stay visible beside the frame.
   const screws = (() => {
     const head = new THREE.CylinderGeometry(0.95, 0.95, 0.4, 16);
     const shaft = new THREE.CylinderGeometry(0.45, 0.4, 2.2, 10);
@@ -260,9 +251,8 @@ export function buildModel(tex) {
     geo.rotateX(PI / 2); // head at z≈0 with its slot facing -Z, shaft pointing +Z into the frame
     const pos = [[1.5, 12], [60.3, 12], [1.5, 51.8], [60.3, 51.8], [1.5, 92], [60.3, 92]].map(([x, y]) => new THREE.Vector3(fx(x), fy(y), -(PZ.midframe.z + PZ.midframe.thickness)));
     const im = new THREE.InstancedMesh(geo, M.screw, pos.length);
-    im.castShadow = true;
     root.add(im);
-    return { im, pos, ex: { z: -30, spin: 6 * PI } };
+    return { im, pos, ex: { z: -34, x: 9, spin: 6 * PI } };
   })();
   // 12. Clips (instanced): spring tabs on the mid-frame's long sides.
   const clips = (() => {
@@ -271,7 +261,17 @@ export function buildModel(tex) {
     for (const sx of [-1, 1]) for (const y of [-36, -14, 14, 36]) pos.push(new THREE.Vector3(sx * (W / 2 - 1.0), y, -5.2));
     const im = new THREE.InstancedMesh(geo, M.screw, pos.length);
     root.add(im);
-    return { im, pos, ex: { x: 12, rz: 0.5 } };
+    return { im, pos, ex: { x: 18, rz: 0.5 } };
+  })();
+
+  // Soft contact shadow just behind the assembled device (faded out while it is apart).
+  const shadow = (() => {
+    const img = tex.shadow.image, rh = img.height - 112, rw = rh * W / H;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(W * img.width / rw, H * img.height / rh), M.shadow);
+    m.position.set(0, -4, -IPOD.depth - 0.8);
+    m.renderOrder = -1;
+    root.add(m);
+    return m;
   })();
 
   // Dynamic ribbon flex (wheel flex tail → logic-board connector).
@@ -296,21 +296,25 @@ export function buildModel(tex) {
   const A = new THREE.Vector3(), B = new THREE.Vector3(), P1 = new THREE.Vector3(), P2 = new THREE.Vector3(), C = new THREE.Vector3(), T = new THREE.Vector3();
 
   /**
-   * Apply the explosion state. `k` scales the spread (mobile), `e` per part is the explosion
-   * amount (may overshoot > 1 for inertia). `screwSpin`/`clipE` drive the instanced parts.
+   * Apply the explosion state. `k` scales the spread (smaller on phones), `yk` fans the depth
+   * stack vertically (portrait: front parts down, back parts up), `e` per part is the explosion
+   * amount (may overshoot > 1 for inertia). `screwE`/`clipE` drive the instanced parts.
    */
-  function apply(k, screwE, clipE, time = 0) {
+  function apply(k, yk, screwE, clipE, time = 0) {
     parts.forEach((p, i) => {
       const e = p.e, ec = Math.min(1, Math.max(0, e)), s = Math.sin(PI * ec);
       const x = p.ex, drift = ec * ec * Math.sin(time * 1.9 + i * 1.3) * 0.7;
-      p.obj.position.set(p.rest.x + e * (x.x || 0) * k, p.rest.y + e * (x.y || 0) * k + drift, p.rest.z + e * (x.z || 0) * k);
+      p.obj.position.set(
+        p.rest.x + e * (x.x || 0) * k,
+        p.rest.y + e * ((x.y || 0) - (x.z || 0) * yk) * k + drift,
+        p.rest.z + e * (x.z || 0) * k);
       p.obj.rotation.set(s * (x.rx || 0), s * (x.ry || 0) + e * (x.flip || 0), s * (x.rz || 0));
     });
     screws.pos.forEach((v, i) => {
       const e = screwE, ec = Math.min(1, Math.max(0, e));
       tmpE.set(Math.sin(PI * ec) * 0.25 * (i % 2 ? 1 : -1), 0, e * screws.ex.spin);
       tmpQ.setFromEuler(tmpE);
-      tmpV.set(v.x, v.y, v.z + e * screws.ex.z * k);
+      tmpV.set(v.x + e * screws.ex.x * k * Math.sign(v.x), v.y - e * screws.ex.z * yk * k, v.z + e * screws.ex.z * k);
       screws.im.setMatrixAt(i, tmpM.compose(tmpV, tmpQ, tmpS));
     });
     screws.im.instanceMatrix.needsUpdate = true;
@@ -347,7 +351,7 @@ export function buildModel(tex) {
     for (const m of Object.values(M)) m.dispose();
   }
 
-  return { root, parts, byId, apply, dispose };
+  return { root, parts, byId, shadow, apply, dispose };
 }
 
 /** Minimal non-indexed merge (position/normal/uv) to avoid importing BufferGeometryUtils. */
