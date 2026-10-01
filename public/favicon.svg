@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="MP3-Player mit Click Wheel">
+  <defs>
+    <linearGradient id="fv-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6fc0ff"/>
+      <stop offset="1" stop-color="#11508f"/>
+    </linearGradient>
+    <linearGradient id="fv-body" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset=".55" stop-color="#dde3e9"/>
+      <stop offset="1" stop-color="#aeb7c0"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="url(#fv-bg)"/>
+  <rect x="8" y="3" width="16" height="26" rx="3.4" fill="url(#fv-body)" stroke="#2a4a6b" stroke-width="1"/>
+  <rect x="10.5" y="5.5" width="11" height="9" rx="1.4" fill="#10212f"/>
+  <circle cx="16" cy="22" r="5.4" fill="#f2f5f8" stroke="#8d97a2" stroke-width="1"/>
+  <circle cx="16" cy="22" r="1.9" fill="#b9c2cb"/>
+</svg>

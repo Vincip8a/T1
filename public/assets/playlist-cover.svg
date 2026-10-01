@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600" role="img" aria-label="Meine Playlist - Album-Cover">
+  <defs>
+    <linearGradient id="pc-bg" x1="0" y1="0" x2=".55" y2="1">
+      <stop offset="0" stop-color="#8fd3ff"/>
+      <stop offset=".42" stop-color="#2c82d6"/>
+      <stop offset="1" stop-color="#07305c"/>
+    </linearGradient>
+    <radialGradient id="pc-glow" cx=".3" cy=".18" r=".8">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".42"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="pc-disc" cx=".42" cy=".3" r=".75">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset=".58" stop-color="#e6ebf0"/>
+      <stop offset="1" stop-color="#b9c2cb"/>
+    </radialGradient>
+    <linearGradient id="pc-sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="600" fill="url(#pc-bg)"/>
+  <rect width="600" height="600" fill="url(#pc-glow)"/>
+  <circle cx="300" cy="286" r="250" fill="none" stroke="#ffffff" stroke-opacity="0.1" stroke-width="2"/>
+  <circle cx="300" cy="286" r="205" fill="none" stroke="#ffffff" stroke-opacity="0.07500000000000001" stroke-width="2"/>
+  <circle cx="300" cy="286" r="160" fill="none" stroke="#ffffff" stroke-opacity="0.05" stroke-width="2"/>
+  <circle cx="300" cy="286" r="124" fill="url(#pc-disc)"/>
+  <circle cx="300" cy="286" r="124" fill="none" stroke="#ffffff" stroke-opacity=".8" stroke-width="3"/>
+  <path d="M176 286 a124 124 0 0 1 248 0 Z" fill="url(#pc-sheen)"/>
+  <text x="300" y="316" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, 'Liberation Sans', 'DejaVu Sans', sans-serif" font-size="112"
+        font-weight="700" letter-spacing="2" fill="#0a3763">DN</text>
+  <rect x="196" y="474" width="13" height="34" rx="6" fill="#ffffff" fill-opacity="0.32"/>
+  <rect x="223" y="450" width="13" height="58" rx="6" fill="#ffffff" fill-opacity="0.46"/>
+  <rect x="250" y="422" width="13" height="86" rx="6" fill="#ffffff" fill-opacity="0.6000000000000001"/>
+  <rect x="277" y="438" width="13" height="70" rx="6" fill="#ffffff" fill-opacity="0.32"/>
+  <rect x="304" y="464" width="13" height="44" rx="6" fill="#ffffff" fill-opacity="0.46"/>
+  <rect x="331" y="412" width="13" height="96" rx="6" fill="#ffffff" fill-opacity="0.6000000000000001"/>
+  <rect x="358" y="446" width="13" height="62" rx="6" fill="#ffffff" fill-opacity="0.32"/>
+  <rect x="385" y="470" width="13" height="38" rx="6" fill="#ffffff" fill-opacity="0.46"/>
+  <text x="300" y="556" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, 'Liberation Sans', 'DejaVu Sans', sans-serif" font-size="40"
+        font-weight="600" letter-spacing="1" fill="#ffffff">Meine Playlist</text>
+</svg>
