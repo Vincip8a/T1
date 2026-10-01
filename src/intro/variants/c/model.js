@@ -5,15 +5,14 @@ import { toCreasedNormals, mergeGeometries } from 'three/examples/jsm/utils/Buff
 import { IPOD, PARTS, COLORS } from '../../../shared/ipodSpec.js';
 import * as T from './tex.js';
 
-const PI = Math.PI, V3 = THREE.Vector3;
+const { PI, abs, cos, hypot, max, min, sign, sin } = Math, V3 = THREE.Vector3;
 const W = IPOD.width, H = IPOD.height;
 const SX = (x) => x - W / 2, SY = (y) => H / 2 - y;
-/** Front-plate edge bevel: the full W×H outline is reached at z = -FACE_BEVEL. */
 export const FACE_BEVEL = 0.25;
-const SEG = 16; // arc segments of visible outlines
+const SEG = 16;
 
 function rrPath(p, w, h, r, cx = 0, cy = 0) {
-  r = Math.max(0.05, Math.min(r, w / 2 - 0.01, h / 2 - 0.01));
+  r = max(0.05, min(r, w / 2 - 0.01, h / 2 - 0.01));
   const x0 = cx - w / 2, x1 = cx + w / 2, y0 = cy - h / 2, y1 = cy + h / 2;
   p.moveTo(x0 + r, y0);
   p.lineTo(x1 - r, y0); p.absarc(x1 - r, y0 + r, r, -PI / 2, 0);
@@ -22,28 +21,25 @@ function rrPath(p, w, h, r, cx = 0, cy = 0) {
   p.lineTo(x0, y0 + r); p.absarc(x0 + r, y0 + r, r, PI, 1.5 * PI);
   return p;
 }
-/** Rounded rect whose bevelled (widest) outline is w×h. Holes grow by b so their wall is w×h. */
 const rr = (w, h, r, b = 0, cx = 0, cy = 0) => rrPath(new THREE.Shape(), w - 2 * b, h - 2 * b, r - b, cx, cy);
 const rrHole = (w, h, r, b = 0, cx = 0, cy = 0) => rrPath(new THREE.Path(), w + 2 * b, h + 2 * b, r + b, cx, cy);
-/** Circle as an n-gon (same tessellation for hole and wheel). */
 const circle = (r, hole = false, n = 128, cx = 0, cy = 0) => {
   const p = hole ? new THREE.Path() : new THREE.Shape();
-  for (let i = 0; i < n; i++) p[i ? 'lineTo' : 'moveTo'](cx + r * Math.cos((i * 2 * PI) / n), cy + r * Math.sin((i * 2 * PI) / n));
+  for (let i = 0; i < n; i++) p[i ? 'lineTo' : 'moveTo'](cx + r * cos((i * 2 * PI) / n), cy + r * sin((i * 2 * PI) / n));
   return p;
 };
 const holed = (s, ...h) => { s.holes.push(...h); return s; };
 
-/** Extrude, rounded bevel; z ∈ [-depth, 0]; flat cap normals, planar wall uv. */
 function ext(shape, depth, b = 0, segs = 2, curveSegments = 5) {
-  const bt = Math.max(0, Math.min(b, depth / 2 - 0.02));
+  const bt = max(0, min(b, depth / 2 - 0.02));
   const g = toCreasedNormals(new THREE.ExtrudeGeometry(shape, {
-    depth: Math.max(depth - 2 * bt, 0.02), bevelEnabled: b > 0, bevelThickness: bt, bevelSize: b, bevelSegments: segs, curveSegments,
+    depth: max(depth - 2 * bt, 0.02), bevelEnabled: b > 0, bevelThickness: bt, bevelSize: b, bevelSegments: segs, curveSegments,
   }).translate(0, 0, bt - depth), PI / 5);
   const n = g.attributes.normal, pos = g.attributes.position, uv = g.attributes.uv;
   for (let i = 0; i < pos.count; i += 3) {
     const z = pos.getZ(i);
-    if (Math.abs(z - pos.getZ(i + 1)) < 1e-5 && Math.abs(z - pos.getZ(i + 2)) < 1e-5) {
-      const nz = Math.sign(n.getZ(i) + n.getZ(i + 1) + n.getZ(i + 2)) || 1;
+    if (abs(z - pos.getZ(i + 1)) < 1e-5 && abs(z - pos.getZ(i + 2)) < 1e-5) {
+      const nz = sign(n.getZ(i) + n.getZ(i + 1) + n.getZ(i + 2)) || 1;
       for (let k = 0; k < 3; k++) n.setXYZ(i + k, 0, 0, nz);
     } else for (let k = 0; k < 3; k++) uv.setXY(i + k, pos.getX(i + k), pos.getY(i + k));
   }
@@ -56,16 +52,14 @@ const merge = (gs) => {
 };
 const box = (w, h, d, x, y, z) => new THREE.BoxGeometry(w, h, d).translate(x, y, z);
 
-/** DOM hand-off tone: sRGB multipliers for the plate, top → bottom. */
 const FACE_TONE = [0.973, 0.965, 0.951, 0.950, 0.959, 0.968, 0.975, 0.980, 0.990, 0.998, 1, 0.994, 0.993];
 
-/** Flat ring over the wheel well; vertex colours replay the DOM wheel's box-shadow seam + lip. */
 function recessLip(R, [cx, cy]) {
   const n = 256, pos = [], col = [], idx = [];
-  const cov = (x, y, oy) => Math.min(1, Math.max(0, (R + 0.2 - Math.hypot(x, y - oy)) / 0.1 + 0.5));
+  const cov = (x, y, oy) => min(1, max(0, (R + 0.2 - hypot(x, y - oy)) / 0.1 + 0.5));
   [-0.03, 0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.36, 0.42, 0.5, 0.7].forEach((dr, j) => {
     for (let i = 0; i <= n; i++) {
-      const a = (i / n) * 2 * PI, x = (R + dr) * Math.cos(a), y = (R + dr) * Math.sin(a);
+      const a = (i / n) * 2 * PI, x = (R + dr) * cos(a), y = (R + dr) * sin(a);
       const k = ((1 + 0.165 * cov(x, y, -0.22)) * (1 - 0.11 * cov(x, y, 0)) * (1 - 0.11 * cov(x, y, 0.06))) ** 2.2;
       pos.push(x + cx, y + cy, 0); col.push(k, k, k);
       const v = (j - 1) * (n + 1) + i, w = v + n + 1;
@@ -79,7 +73,6 @@ function recessLip(R, [cx, cy]) {
   return g;
 }
 
-/** Chips [x, y, w, h, d] as one mesh; the top (-z if `back`) samples atlas cell c0+i. */
 const chipGeo = (list, z0, back, c0) => merge(list.map(([x, y, w, h, d], i) => {
   const g = box(w, h, d, x, y, back ? z0 - d / 2 : z0 + d / 2), uv = g.attributes.uv, c = c0 + i, top = back ? 20 : 16;
   for (let k = 0; k < 24; k++) {
@@ -89,7 +82,6 @@ const chipGeo = (list, z0, back, c0) => merge(list.map(([x, y, w, h, d], i) => {
   return g;
 }));
 
-/** Kapton ribbon: cubic Bézier strip from a (tangent ta) on `from` to b (tb) on `to`. */
 function ribbon(mat, from, a, ta, to, b, tb, w, N = 20) {
   const pos = new Float32Array((N + 1) * 6), nrm = pos.slice(), uv = new Float32Array((N + 1) * 4), idx = [];
   for (let k = 0; k < 2 * N; k += 2) idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
@@ -120,7 +112,7 @@ function ribbon(mat, from, a, ta, to, b, tb, w, N = 20) {
         uv[i * 4 + e * 2] = e * w; uv[i * 4 + e * 2 + 1] = s;
       }
     }
-    at.forEach((x) => { x.needsUpdate = true; });
+    at[0].needsUpdate = at[1].needsUpdate = at[2].needsUpdate = true;
   }
   return { mesh, update };
 }
@@ -129,7 +121,6 @@ export function buildIpod({ maxAniso = 8 } = {}) {
   const textures = [];
   const tx = (c, o = {}) => { const t = T.tex(c, { aniso: maxAniso, ...o }); textures.push(t); return t; };
   const fit = (c, w, h = w, o) => T.capFit(tx(c, o), w, h);
-  // brushing tiles (uv = mm): steel 40 mm, anodised face 20 mm
   const brush = tx(T.brushed(3, 128, 16), { color: false, wrap: true });
   brush.repeat.set(1 / 40, 1 / 40);
   const fine = tx(T.brushed(4, 190, 36, 1024, [0.3, 0.3], 9000), { color: false, wrap: true });
@@ -154,7 +145,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
   const swc = [SX(sw.x + sw.width / 2), SY(sw.y + sw.height / 2)], whc = [SX(wh.cx), SY(wh.cy)];
   const R = wh.diameter / 2, CB = IPOD.centerButton.diameter / 2, ro = R - 3;
 
-  { // front plate: brushed anodised aluminium; tone map = the DOM plate's falloff
+  { // front plate: brushed anodised aluminium, tone = DOM plate
     const p = mk('faceplate'), b = FACE_BEVEL;
     mats.face = phys({ color: '#e1e4e7', map: fit(T.faceToneCanvas(FACE_TONE), W, H), metalness: 0.62, roughness: 0.44, roughnessMap: fine, anisotropy: 0.4, clearcoat: 0.25, clearcoatRoughness: 0.28 });
     add(p, ext(holed(rr(W, H, IPOD.cornerRadius, b), rrHole(sw.width, sw.height, sw.radius, b, ...swc), circle(R + 0.12 + b, true, 128, ...whc)), 0.8, b, 3, SEG), mats.face);
@@ -162,12 +153,12 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     mats.lip.vertexColors = true;
     add(p, recessLip(R, whc), mats.lip, 0, 0, 0.002);
   }
-  { // display window: tinted acrylic with printed black mask
+  {
     const p = mk('screenGlass'), gw = sw.width - 0.1, gh = sw.height - 0.1;
     mats.glass = phys({ color: '#030303', roughness: 0.04, clearcoat: 1, clearcoatRoughness: 0.03, transparent: true, alphaMap: fit(T.glassAlphaCanvas(gw, gh, sc.width + 0.6, sc.height + 0.6), gw, gh, { color: false }), ior: 1.49 });
     add(p, ext(rr(gw, gh, sw.radius, 0.1), 0.6, 0.1, 2, 8), mats.glass, ...swc);
   }
-  { // click wheel + centre button; sensor base veils the annulus
+  {
     const p = mk('clickWheel'), map = fit(T.wheelCanvas(wh.diameter, IPOD.wheelLabels.radiusFactor, CB), wh.diameter), cmap = fit(T.centreCanvas(2 * CB), 2 * CB);
     const glow = { color: '#fff', emissive: '#fff', emissiveIntensity: 0, clearcoat: 0.3, clearcoatRoughness: 0.3 };
     mats.wheel = phys({ ...glow, map, emissiveMap: map, roughness: 0.42 });
@@ -176,7 +167,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     add(p, ext(circle(CB - 0.1, false, 64), 1.2, 0.1), mats.centre, ...whc, -0.08);
     add(p, ext(holed(circle(R + 2.5, false, 96), circle(CB - 2, true, 48)), 0.2), std({ color: '#8a8d91', roughness: 0.8 }), ...whc, -1.35);
   }
-  { // click-wheel flex: sensor ring on kapton
+  {
     const p = mk('wheelFlex'), ft = tx(T.flexCanvas(), { wrap: true });
     ft.repeat.set(1 / 10, 1 / 10);
     const kap = (map, o) => phys({ color: '#fff', map, metalness: 0.2, roughness: 0.34, clearcoat: 0.85, clearcoatRoughness: 0.14, side: THREE.DoubleSide, ...o });
@@ -186,7 +177,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     add(p, ext(rr(7, 4.5, 0.6), 0.15), mats.flex, whc[0] - 6, whc[1] - ro + 0.2);
   }
   const fh = sw.height + 3;
-  { // LCD module: brushed steel frame, dark panel
+  {
     const p = mk('lcd');
     add(p, ext(rr(sw.width + 3, fh, 1.2, 0.15), 2.4, 0.15), std({ color: COLORS.steel, metalness: 0.92, roughness: 0.3, roughnessMap: brush }), ...swc);
     add(p, ext(rr(sw.width - 0.6, sw.height - 0.6, 0.6), 0.1), std({ color: '#0d0e10', roughness: 0.55 }), ...swc, 0.1);
@@ -194,7 +185,6 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     add(p, new THREE.PlaneGeometry(sc.width, sc.height), mats.panel, ...swc, 0.12);
   }
 
-  // logic board: double-sided
   const BW = 57.4, BH = 96, BY = 0.25, BZ = -0.4, BB = BZ - 0.8;
   const chips = [[-9, 20, 13, 13, 1], [11, 27, 12, 9, 0.9], [11, 12, 12, 10, 1], [-15, 0, 7, 7, 0.8], [1, -1, 6, 6, 0.7]];
   const backChips = [[-9, 14, 11, 11, 0.8], [11, -6, 9, 7, 0.7], [-12, -20, 7, 7, 0.6]];
@@ -208,7 +198,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     add(p, chipGeo(backChips, BB, true, 5), chipMat, 0, BY);
     const [, sx, sy, sw2, sh2, sd] = others[0];
     add(p, ext(rr(sw2, sh2, 0.8, 0.25), sd, 0.25, 1, 4), std({ color: '#cdd1d6', metalness: 1, roughness: 0.28, roughnessMap: brush }), sx, sy + BY, BZ + sd);
-    const zifs = [box(12, 3, 1, 8, -34 + BY, BB - 0.5)], dark = [box(12, 1, 0.35, 8, -34.9 + BY, BB - 1.1)], metal = []; // J4: drive connector, back
+    const zifs = [box(12, 3, 1, 8, -34 + BY, BB - 0.5)], dark = [box(12, 1, 0.35, 8, -34.9 + BY, BB - 1.1)], metal = [];
     for (const [, x, y, w, h, d, kind] of others.slice(1)) {
       (kind === 'zif' ? zifs : metal).push(box(w, h, d, x, y + BY, BZ + d / 2));
       if (kind === 'zif') dark.push(box(w, h * 0.35, 0.35, x, y + BY - h * 0.32, BZ + d + 0.1));
@@ -227,14 +217,14 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     let n = 0;
     for (let guard = 0; n < 150 && guard < 5000; guard++) {
       const x = (r() - 0.5) * (BW - 6), y = (r() - 0.5) * (BH - 12);
-      if (busy.some((c) => Math.abs(x - c.x) < c.w / 2 + 2 && Math.abs(y - c.y) < c.h / 2 + 2)) continue;
+      if (busy.some((c) => abs(x - c.x) < c.w / 2 + 2 && abs(y - c.y) < c.h / 2 + 2)) continue;
       pas.setMatrixAt(n, m4.makeRotationZ(r() > 0.5 ? PI / 2 : 0).setPosition(x, y + BY, n >= 110 ? BB - 0.22 : BZ + 0.22));
       pas.setColorAt(n++, col.set(r() > 0.45 ? '#a9845a' : r() > 0.5 ? '#2e2f33' : '#cfc8b8'));
     }
     pas.count = n;
     p.group.add(pas);
   }
-  { // battery: dark Li-ion pouch, leads + solder tab
+  {
     const p = mk('battery'), bw = 50, bh = 21, cy = SY(88.5);
     add(p, ext(rr(bw, bh, 2.4, 0.6), 2.6, 0.6, 3), std({ color: '#fff', map: fit(T.batteryCanvas(bw, bh), bw - 1.2, bh - 1.2), metalness: 0.35, roughness: 0.36 }), 0, cy);
     [['#b3261e', -17], ['#151515', -15]].forEach(([c, x]) => add(p, new THREE.CylinderGeometry(0.4, 0.4, 7, 8), std({ color: c, roughness: 0.4 }), x, cy + bh / 2 + 3.2, -0.6));
@@ -248,7 +238,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     const bumps = [-1, 1].flatMap((sx) => [-1, 1].map((sy) => ext(rr(9, 12, 2.6, 0.9), 5.2, 0.9, 2, 4).translate(sx * (dw / 2 - 2.4), dcy + sy * (dh / 2 - 3.6), 0.2)));
     add(p, merge(bumps), phys({ color: '#1b1c1f', roughness: 0.85, sheen: 0.4, sheenColor: '#555', sheenRoughness: 0.6 }));
   }
-  { // internal mid-frame: thin dark stamped steel, two narrow ribs, spring clips
+  {
     const p = mk('midframe'), cr = IPOD.cornerRadius;
     const ring = ext(holed(rr(W - 1.8, H - 1.8, cr - 0.8, 0.1), rrHole(W - 5.8, H - 5.8, cr - 2.8, 0.1)), 2.2, 0.1, 1, 8);
     add(p, merge([ring, box(W - 5, 1.1, 0.7, 0, -6, -1.4), box(W - 5, 1.1, 0.7, 0, 26, -1.4)]), std({ color: '#5a5e63', metalness: 0.55, roughness: 0.6 }));
@@ -259,18 +249,16 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     p.group.add(clips);
   }
   let back;
-  { // back shell: mirror-polished stainless tub with the edge openings
+  {
     const p = mk('backShell'), w2 = W - 0.3, h2 = H - 0.3, cr = IPOD.cornerRadius - 0.15, bw = w2 - 1.8, bh = h2 - 1.8;
     const polish = { color: '#dfe1e3', metalness: 1, clearcoat: 0.6, clearcoatRoughness: 0.04 };
     mats.steel = phys({ ...polish, roughness: 0.06 });
-    // side wall a hair narrower: one continuous radius with the plate
     add(p, ext(holed(rr(w2 - 0.06, h2 - 0.06, cr - 0.03, 0.25), rrHole(w2 - 1.2, h2 - 1.2, cr - 0.6, 0.25)), 9.1, 0.25, 3, SEG), mats.steel, 0, 0, 8.6);
     const [cC, rC] = T.backCanvases(bw, bh, {}), cT = fit(cC, bw, bh), rT = fit(rC, bw, bh, { color: false });
     back = { cC, rC, cT, rT, bw, bh };
     mats.back = phys({ ...polish, map: cT, roughness: 1, roughnessMap: rT });
     add(p, ext(rr(w2, h2, cr, 0.9), 1.7, 0.9, 6, SEG), mats.back, 0, 0, 0.6);
     add(p, new THREE.ShapeGeometry(rr(w2 - 1.4, h2 - 1.4, cr - 0.7), 12), std({ map: fit(T.shellInnerCanvas(w2 - 1.4, h2 - 1.4), w2 - 1.4, h2 - 1.4), metalness: 0.55, roughness: 0.55 }), 0, 0, 0.62);
-    // edge openings (decals): hold slot + slider and jack on top, dock slot below
     const yT = (h2 - 0.06) / 2 + 0.015, zc = PARTS.at(-1).z - IPOD.depth / 2, hs = IPOD.holdSwitch, dc = IPOD.dockConnector;
     const jx = SX(IPOD.headphoneJack.x), hx = SX(hs.x + hs.width / 2), jr = IPOD.headphoneJack.diameter / 2;
     const top = (g, x, o = 0) => g.rotateX(-PI / 2).translate(x, yT + o, zc), bot = (g) => g.rotateX(PI / 2).translate(0, -yT, zc);
@@ -299,8 +287,8 @@ export function buildIpod({ maxAniso = 8 } = {}) {
   const list = PARTS.map((s) => parts[s.id]);
   for (const p of list) p.box = new THREE.Box3().setFromObject(p.group);
 
-  // live ribbons: wheel flex → J2, LCD → J1, drive → J4 (board back)
   const up = new V3(0, 1, 0), dn = new V3(0, -1, 0), L = parts.logicBoard;
+  // live kapton ribbons: wheel flex → J2, LCD → J1, drive → J4 (board back)
   const ribbons = [
     ribbon(mats.ribbon, parts.wheelFlex, new V3(whc[0] - 6, whc[1] - ro - 1.8, -0.08), dn, L, new V3(-15, BY - 39.5, BZ + 0.5), dn, 6.5),
     ribbon(mats.ribbon, parts.lcd, new V3(swc[0], swc[1] + fh / 2 - 1.5, -2.45), up, L, new V3(0, 41.7 + BY, BZ + 0.55), up, 13),
