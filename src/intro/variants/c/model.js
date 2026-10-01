@@ -56,6 +56,39 @@ function ext(shape, depth, b = 0, segs = 3, curveSegments = 14) {
   return out;
 }
 
+/** DOM hand-off tone: sRGB multipliers for the plate, top → bottom. */
+const FACE_TONE = [0.973, 0.965, 0.951, 0.950, 0.959, 0.968, 0.975, 0.980, 0.990, 0.998, 1, 0.994, 0.993];
+const FACE_COLOR = '#e1e4e7';
+
+/** Flat ring R-0.03…R+0.7 over the wheel well. Vertex colours replay the DOM wheel's outer
+ *  box-shadows (12 % dark seam ×2, one nudged up; 60 % white lip nudged down) with ~0.1 mm AA. */
+function recessLip(R, [cx, cy]) {
+  const radii = [-0.03, 0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.36, 0.42, 0.5, 0.7], n = 256;
+  const pos = [], uv = [], col = [], idx = [], f = 200;
+  const cov = (x, y, oy, rho) => clamp((rho - Math.hypot(x, y - oy)) / 0.1 + 0.5);
+  for (const dr of radii) for (let i = 0; i <= n; i++) {
+    const a = (i / n) * 2 * PI, x = (R + dr) * Math.cos(a), y = (R + dr) * Math.sin(a);
+    let v = f;
+    v += (255 - v) * 0.6 * cov(x, y, -0.22, R + 0.2);
+    v *= 1 - 0.11 * cov(x, y, 0, R + 0.2);
+    v *= 1 - 0.11 * cov(x, y, 0.06, R + 0.2);
+    const k = (v / f) ** 2.2;
+    pos.push(x + cx, y + cy, 0); uv.push(x + cx, y + cy); col.push(k, k, k);
+  }
+  for (let j = 0; j < radii.length - 1; j++) for (let i = 0; i < n; i++) {
+    const a = j * (n + 1) + i, b = a + n + 1;
+    idx.push(a, b, a + 1, a + 1, b, b + 1);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(pos.map((_, i) => (i % 3 === 2 ? 1 : 0)), 3));
+  g.setIndex(idx);
+  return g;
+}
+const clamp = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+
 export function buildIpod({ maxAniso = 8 } = {}) {
   const textures = [];
   const tx = (c, o = {}) => { const t = T.tex(c, { aniso: maxAniso, ...o }); textures.push(t); return t; };
@@ -97,15 +130,17 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     const s = rr(W, H, IPOD.cornerRadius, b);
     s.holes.push(rrHole(sw.width, sw.height, sw.radius, b, ...swc));
     s.holes.push(circle(R + 0.12 + b, true, ...whc));
-    // satin anodising keeps a diffuse floor: no grey card when the soft box leaves the cone
+    // satin anodising keeps a diffuse floor; the tone map carries the DOM plate's light falloff
+    const tone = T.capFit(tx(T.faceToneCanvas(FACE_TONE)), W, H);
     mats.face = phys({
-      color: '#dcdfe2', metalness: 0.62, roughness: 0.44, roughnessMap: fine,
+      color: FACE_COLOR, map: tone, metalness: 0.62, roughness: 0.44, roughnessMap: fine,
       anisotropy: 0.3, clearcoat: 0.25, clearcoatRoughness: 0.28,
     });
     add(p, ext(s, 0.8, b, 3, SEG), mats.face);
-    // flat lip over the hole bevel (a metal bevel there shows dark slivers at the diagonals)
-    const lip = circle(R + 0.6, false, ...whc); lip.holes.push(circle(R + 0.12, true, ...whc));
-    add(p, new THREE.ShapeGeometry(lip), mats.face, 0, 0, 0.002);
+    // flat lip over the hole bevel, shaded like the DOM wheel recess (seam + white lower lip)
+    const lipMat = mats.face.clone();
+    lipMat.vertexColors = true;
+    add(p, recessLip(R, whc), lipMat, 0, 0, 0.002);
   }
 
   // display window: tinted acrylic with printed black mask
@@ -123,14 +158,14 @@ export function buildIpod({ maxAniso = 8 } = {}) {
   // click wheel + centre button (hairline gaps, no visible well)
   {
     const p = mk('clickWheel');
-    const bw = 0.22;
-    const s = circle(R - bw);
-    s.holes.push(circle(CB + 0.1 + bw, true));
-    const map = T.capFit(tx(T.wheelCanvas(wh.diameter, IPOD.wheelLabels.radiusFactor)), wh.diameter, wh.diameter);
+    const s = circle(R);
+    s.holes.push(circle(CB - 0.03, true));
+    const map = T.capFit(tx(T.wheelCanvas(wh.diameter, IPOD.wheelLabels.radiusFactor, CB)), wh.diameter, wh.diameter);
     mats.wheel = phys({ color: '#ffffff', map, roughness: 0.42, metalness: 0, clearcoat: 0.3, clearcoatRoughness: 0.3, emissive: '#ffffff', emissiveMap: map, emissiveIntensity: 0 });
-    add(p, ext(s, 1.3, bw, 3, SEG), mats.wheel, whc[0], whc[1], 0);
-    mats.centre = phys({ color: '#e1e4e7', emissive: COLORS.centerButton, emissiveIntensity: 0, metalness: 0.3, roughness: 0.4, roughnessMap: brush, anisotropy: 0.4, clearcoat: 0.3, clearcoatRoughness: 0.3 });
-    add(p, ext(circle(CB - 0.2), 1.2, 0.2, 3, 14), mats.centre, whc[0], whc[1], -0.08);
+    add(p, ext(s, 1.3), mats.wheel, whc[0], whc[1], 0);
+    const cmap = T.capFit(tx(T.centreCanvas(2 * CB)), 2 * CB, 2 * CB);
+    mats.centre = phys({ color: '#ffffff', map: cmap, emissive: '#ffffff', emissiveMap: cmap, emissiveIntensity: 0, metalness: 0.3, roughness: 0.4, roughnessMap: brush, anisotropy: 0.4, clearcoat: 0.3, clearcoatRoughness: 0.3 });
+    add(p, ext(circle(CB - 0.1), 1.2, 0.1, 3, 14), mats.centre, whc[0], whc[1], -0.08);
     // sensor base: gap-shade grey, wide enough to veil the annulus while the plate seats
     const ws = circle(R + 2.5); ws.holes.push(circle(CB - 2, true));
     add(p, ext(ws, 0.2, 0, 1, SEG), std({ color: '#8a8d91', roughness: 0.8 }), whc[0], whc[1], -1.35);

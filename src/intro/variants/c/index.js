@@ -14,7 +14,7 @@ const FOV_HERO = 26, FOV_END = 20;
 const D = 6.5;
 const ENV_END = 0.25; // final room rotation
 const GLASS_FROM = 2.75, GLASS_END = 2.27, GLASS_Z = Math.PI / 4; // dark sector + diagonal glint
-const WHEEL_GLOW = 0.21, END_EXPOSURE = 0.9, KEY_END = 0.9; // hand-off tone = DOM iPod (±4 levels)
+const WHEEL_GLOW = 0.24, CENTRE_GLOW = 0.3, END_EXPOSURE = 0.9, KEY_END = 0.9; // hand-off tone = DOM iPod (±4 levels)
 const TL = {
   rise: 1.0,
   ex0: 1.2, exS: 0.07, exD: 1.25,
@@ -308,7 +308,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
       shadow.visible = false;
       scene.environmentRotation.set(0, ENV_END, 0);
       glass.envMapRotation.set(0, GLASS_END, GLASS_Z); panel.envMapRotation.copy(glass.envMapRotation);
-      wheel.emissiveIntensity = centre.emissiveIntensity = WHEEL_GLOW;
+      wheel.emissiveIntensity = WHEEL_GLOW; centre.emissiveIntensity = CENTRE_GLOW;
       renderer.toneMappingExposure = END_EXPOSURE; key.intensity = KEY_END;
       applyCamera(1, 0);
       camera.position.z = HALF_D + (camera.position.z - HALF_D) * (1 + 0.04 * (1 - p3out(u)));
@@ -363,7 +363,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     let closed = true;
     for (const i of SHELL) if (E[i] >= 1e-4) closed = false;
     // once the plate is nearly home the wheel annulus is the only window onto the flex/board
-    const veiled = t > reStart(0) && E[0] < 0.08;
+    const veiled = t > reStart(0) && E[0] < (L.portrait ? 0.42 : 0.08); // portrait looks down past the LCD
     for (const i of INTERNAL) parts[i].group.visible = !closed && !(veiled && (i === iFlex || i === iBoard));
     ipod.screws.visible = !closed;
 
@@ -377,7 +377,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     // framing guard: the live pose (partly exploded, close camera) must stay inside the margins
     const dReq = fitDistance(L.corners, rig.quaternion, FOV_HERO, L.vw / L.vh, L.mx, L.my, ox, oy, dzLive);
     applyCamera(b, smax(dHero * tHero, dReq * tHero, 0.04 * dHero * tHero));
-    wheel.emissiveIntensity = centre.emissiveIntensity = WHEEL_GLOW * b * b;
+    wheel.emissiveIntensity = WHEEL_GLOW * b * b; centre.emissiveIntensity = CENTRE_GLOW * b * b;
     renderer.toneMappingExposure = lerp(1, END_EXPOSURE, b * b);
     key.intensity = lerp(1.6, KEY_END, b * b);
 

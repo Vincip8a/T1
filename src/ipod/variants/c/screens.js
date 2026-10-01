@@ -4,18 +4,16 @@
 import { h, clamp, fmtTime, safeHref } from './util.js';
 import { CHEVRON, SPEAKER_LO, SPEAKER_HI, SPEAKER_NOW, previewIcon } from './art.js';
 
-export const ROW = 27;         // 8 rows per screen, like the 6G
-export const STAGE_H = 218;    // 240 minus the 22 px title bar
-const TEXT_STEP = 34;          // two text lines per wheel step on text pages
-const SETTLE_MS = 90;          // the preview pane waits for the highlight to come to rest
-const TRK_VIS = 3;             // rows of the compact track list on Now Playing
-const fileName = (p) => String(p ?? '').split(/[?#]/)[0].split('/').pop() || '';
+const ROW = 27;        // 8 rows per screen, like the 6G
+const TEXT_STEP = 34;  // two text lines per wheel step on text pages
+const TRK_VIS = 3;     // rows of the compact track list on Now Playing
 
 export function createScreens(ctx) {
   const { L, brand, nid, timers } = ctx;
+  const mono = brand.monogram ?? '';
 
-  /** One option row. A link row IS the real <a> (role=option), so there is no focusable element
-   *  nested inside an option; its link nature is given via aria-description and modifier clicks stay native. */
+  /** One option row. A link row IS the real <a> (role=option), so no focusable element is nested
+   *  inside an option; its link nature is given via aria-description and modifier clicks stay native. */
   function makeRow(spec) {
     const href = spec.href && safeHref(spec.href);
     const row = h(href ? 'a' : 'div', 'ipodc-row', { role: 'option', id: nid('o'), 'aria-selected': 'false' });
@@ -24,9 +22,6 @@ export function createScreens(ctx) {
       let desc = L.link;
       if (spec.download != null) { row.download = spec.download; desc = L.download; } else if (/^https?:/i.test(href)) { row.target = '_blank'; row.rel = 'noopener'; desc = L.newTab; } else if (/^mailto:/i.test(href)) desc = L.mail;
       row.setAttribute('aria-description', desc);
-    } else if (spec.href) { // rejected link: shown greyed out and inert
-      row.classList.add('is-dead');
-      row.setAttribute('aria-disabled', 'true');
     }
     row.append(h('span', 'ipodc-row-label', { text: spec.label ?? '' }));
     if (spec.detail) row.append(h('span', 'ipodc-row-detail', { text: spec.detail }));
@@ -35,9 +30,9 @@ export function createScreens(ctx) {
   }
 
   /** Generic scrolling list screen. `pre` is optional content above the rows (page text). */
-  function listScreen({ kind, id, title, rows: specs = [], pre = null, split = false }) {
+  function listScreen(kind, id, title, specs, pre) {
     specs = specs.filter(Boolean);
-    const node = h('div', `ipodc-screen ipodc-screen--${kind}${split ? ' is-split' : ''}`);
+    const node = h('div', `ipodc-screen ipodc-screen--${kind}`);
     const view = h('div', 'ipodc-view');
     const content = h('div', 'ipodc-content');
     const list = h('div', 'ipodc-list');
@@ -45,6 +40,7 @@ export function createScreens(ctx) {
     const sb = h('div', 'ipodc-sb');
     const thumb = h('div', 'ipodc-sb-thumb');
     const rows = specs.map(makeRow);
+    const css = (n, k, v) => n.style.setProperty(`--ipodc-${k}`, v);
     list.append(hl, ...rows);
     if (pre) content.append(pre);
     content.append(list);
@@ -54,20 +50,19 @@ export function createScreens(ctx) {
     if (!rows.length) {
       list.classList.add('is-empty');
       // nothing to select: the text itself is the active option, so AT reads it on focus
-      if (pre) Object.assign(pre, { id: nid('t') }).setAttribute('role', 'option');
-      pre?.setAttribute('aria-selected', 'true');
+      if (pre) for (const [k, v] of [['id', nid('t')], ['role', 'option'], ['aria-selected', 'true']]) pre.setAttribute(k, v);
     }
     let bumpAt = 0;
+    const page = kind === 'page';
 
     const s = {
-      kind, id, title: title ?? '', node, rows, specs, index: 0, off: 0, listTop: 0, contentH: 0, viewH: STAGE_H, enteredAt: 0,
+      kind, id, title: title ?? '', node, rows, specs, index: 0, off: 0, top: 0, contentH: 0, viewH: 218, enteredAt: 0,
       adId: () => (rows[s.index] ?? pre)?.id,
       measure() {
         const k = ctx.pxPer();
-        s.listTop = pre ? Math.round(pre.offsetHeight / k) : 0;
-        s.contentH = s.listTop + rows.length * ROW;
-        const vh = Math.round(view.clientHeight / k);
-        if (vh > 0) s.viewH = vh;
+        s.top = pre ? Math.round(pre.offsetHeight / k) : 0;
+        s.contentH = s.top + rows.length * ROW;
+        s.viewH = Math.round(view.clientHeight / k) || s.viewH;
       },
       layout() {
         // the scrollbar narrows the text column, which can re-wrap the text: measure twice
@@ -75,45 +70,40 @@ export function createScreens(ctx) {
         s.measure();
         if (s.contentH > s.viewH + 1) { node.classList.add('has-sb'); s.measure(); }
         s.off = clamp(s.off, 0, s.maxOff());
-        if (rows.length) s.setIndex(s.index, { instant: true, ensure: kind !== 'page' || s.index > 0 });
+        if (rows.length) s.setIndex(s.index, true, !page || s.index > 0);
         else s.paint(true);
       },
       maxOff: () => Math.max(0, s.contentH - s.viewH),
-      rowTop: (i) => s.listTop + i * ROW,
-      rowVisible(i) {
-        const t = s.rowTop(i);
-        return t >= s.off - 0.5 && t + ROW <= s.off + s.viewH + 0.5;
+      /** how far the text must scroll to show row i fully (0 when it is in view) */
+      need(i) {
+        const t = s.top + i * ROW;
+        const n = t < s.off ? t - s.off : Math.max(0, t + ROW - s.off - s.viewH);
+        return n < -0.5 || n > 0.5 ? n : 0;
       },
-      ensureVisible(i) {
-        const t = s.rowTop(i);
-        if (t < s.off) s.off = t;
-        else if (t + ROW > s.off + s.viewH) s.off = t + ROW - s.viewH;
-        s.off = clamp(s.off, 0, s.maxOff());
-      },
-      paint(instant = false) {
+      paint(instant) {
         if (instant) node.classList.add('is-instant');
-        content.style.setProperty('--ipodc-off', s.off);
-        hl.style.setProperty('--ipodc-i', s.index);
+        css(content, 'off', s.off);
+        css(hl, 'i', s.index);
         if (s.contentH > s.viewH + 1) {
           const th = Math.max(14, Math.round((s.viewH * s.viewH) / s.contentH));
-          thumb.style.setProperty('--ipodc-th', th);
-          thumb.style.setProperty('--ipodc-tt', Math.round((s.viewH - th) * (s.off / Math.max(1, s.maxOff()))));
+          css(thumb, 'th', th);
+          css(thumb, 'tt', Math.round(((s.viewH - th) * s.off) / s.maxOff()));
         }
         if (instant) {
           void node.offsetWidth; // commit the un-animated state before transitions come back
           node.classList.remove('is-instant');
         }
       },
-      setIndex(i, { instant = false, ensure = true } = {}) {
+      setIndex(i, instant, ensure = true) {
         if (!rows.length) return false;
         i = clamp(i, 0, rows.length - 1);
         const changed = i !== s.index;
-        rows[s.index].classList.remove('is-sel');
-        rows[s.index].setAttribute('aria-selected', 'false');
+        for (const [n, on] of [[rows[s.index], false], [rows[i], true]]) {
+          n.classList.toggle('is-sel', on);
+          n.setAttribute('aria-selected', on);
+        }
         s.index = i;
-        rows[i].classList.add('is-sel');
-        rows[i].setAttribute('aria-selected', 'true');
-        if (ensure) s.ensureVisible(i);
+        if (ensure) s.off = clamp(s.off + s.need(i), 0, s.maxOff());
         s.paint(instant);
         s.onIndex?.(i, changed);
         if (ctx.isCurrent(s)) ctx.syncAD();
@@ -121,18 +111,13 @@ export function createScreens(ctx) {
       },
       /** one wheel step; true when something moved */
       move(d) {
-        if (rows.length && kind === 'page') {
-          if (d > 0) {
-            // long text above the actions: scroll the text first, then walk the action rows
-            const t = s.rowTop(s.index);
-            if (t + ROW > s.off + s.viewH + 0.5) return s.scrollText(Math.min(s.off + TEXT_STEP, t + ROW - s.viewH));
-            return s.setIndex(s.index + 1);
-          }
-          if (s.index > 0) return s.setIndex(s.index - 1);
-          return s.scrollText(s.off - TEXT_STEP);
+        if (!rows.length) return s.scrollText(s.off + d * TEXT_STEP);
+        if (page) {
+          // long text above the actions: scroll the text first, then walk the action rows
+          if (d > 0 && s.need(s.index) > 0.5) return s.scrollText(s.off + Math.min(TEXT_STEP, s.need(s.index)));
+          if (d < 0 && !s.index) return s.scrollText(s.off - TEXT_STEP);
         }
-        if (rows.length) return s.setIndex(s.index + d);
-        return s.scrollText(s.off + d * TEXT_STEP);
+        return s.setIndex(s.index + d);
       },
       scrollText(off) {
         off = clamp(off, 0, s.maxOff());
@@ -144,10 +129,7 @@ export function createScreens(ctx) {
       /** Home / End / Page keys: jump straight to a row (or the text top / bottom) */
       jump(to) {
         if (!rows.length) return s.scrollText(Number.isFinite(to) ? s.off + Math.sign(to) * TEXT_STEP * 3 : to < 0 ? 0 : s.maxOff());
-        if (kind === 'page' && to <= 0) { // back to the top of the text, not just the first action
-          const moved = s.setIndex(0, { ensure: false });
-          return s.scrollText(0) || moved;
-        }
+        if (page && to <= 0) return s.setIndex(0, false, false) | s.scrollText(0); // back to the top of the text
         return s.setIndex(to);
       },
       bump(d) {
@@ -160,19 +142,16 @@ export function createScreens(ctx) {
       },
       activate() {
         const r = rows[s.index];
-        if (!r) { ctx.showToast('back', L.backHint); return false; }
+        if (!r) return ctx.showToast(L.backHint);
         // centre on an action scrolled out of view reveals it instead of firing blind
-        if (!s.rowVisible(s.index)) {
-          const t = s.rowTop(s.index);
-          return s.scrollText(t < s.off ? t : Math.min(s.off + TEXT_STEP, t + ROW - s.viewH));
-        }
+        const n = s.need(s.index);
+        if (n) return s.scrollText(s.off + (n < 0 ? n : Math.min(TEXT_STEP, n)));
         const spec = specs[s.index];
         if (spec.onActivate) spec.onActivate();
         else if (r.href) ctx.followLink(r, spec);
-        else { s.bump(1); return false; }
-        return true;
+        else s.bump(1);
       },
-      currentLabel: () => rows[s.index]?.querySelector('.ipodc-row-label').textContent ?? '',
+      currentLabel: () => specs[s.index]?.label ?? '',
     };
     view.addEventListener('animationend', () => view.classList.remove('bump-up', 'bump-down'));
     return s;
@@ -182,14 +161,12 @@ export function createScreens(ctx) {
   function coverArt(item, cls) {
     const box = h('div', `ipodc-art ${cls}`);
     const fb = h('div', 'ipodc-art-fb');
-    fb.append(h('b', null, { text: brand.monogram ?? '' }));
+    fb.append(h('b', null, { text: mono }));
     box.append(fb);
-    const src = item.cover ? safeHref(item.cover) : null;
+    const src = item.cover && safeHref(item.cover);
     if (src) {
-      const img = h('img', null, { alt: '', draggable: 'false', decoding: 'async' });
+      const img = h('img', null, { alt: '', draggable: 'false', src });
       img.onerror = () => img.remove();
-      img.onload = () => { if (!img.naturalWidth) img.remove(); };
-      img.src = src;
       box.append(img);
     }
     return box;
@@ -198,20 +175,18 @@ export function createScreens(ctx) {
   // ── main menu with the split-screen preview pane
   function menuScreen() {
     const { menu } = ctx;
-    const s = listScreen({
-      kind: 'menu', id: 'menu', title: brand.name || 'iPod', split: true,
-      rows: menu.map((item) => ({ label: item.label ?? item.title ?? '', sub: true, onActivate: () => ctx.open(item) })),
-    });
+    const s = listScreen('menu', 'menu', brand.name || 'iPod',
+      menu.map((item) => ({ label: item.label ?? item.title, sub: true, onActivate: () => ctx.open(item) })));
+    s.node.classList.add('is-split');
     const preview = h('div', 'ipodc-preview', { 'aria-hidden': 'true' });
     s.node.append(preview);
-    const panes = new Map();
+    const panes = [];
     let shown = null;
     let settleT = 0;
     const showPane = (i) => {
-      let pane = panes.get(i);
+      let pane = panes[i];
       if (!pane) {
-        panes.set(i, (pane = buildPreview(menu[i] ?? {})));
-        preview.append(pane);
+        preview.append((pane = panes[i] = buildPreview(menu[i] ?? {})));
         void pane.offsetWidth;
       }
       if (shown === pane) return;
@@ -220,60 +195,49 @@ export function createScreens(ctx) {
       pane.classList.add('is-on');
       shown = pane;
     };
+    // the preview pane waits for the highlight to come to rest
     s.onIndex = (i, changed) => {
       settleT = timers.cancel(settleT);
       if (!shown || !changed) showPane(i);
-      else settleT = timers.later(() => showPane(s.index), SETTLE_MS);
+      else settleT = timers.later(() => showPane(s.index), 90);
     };
     if (!menu.length) showPane(0);
     return s;
   }
 
   function buildPreview(item) {
+    const pane = h('div', 'ipodc-pv ipodc-pv--icon');
     if (item.type === 'nowplaying') {
-      const pane = h('div', 'ipodc-pv ipodc-pv--art');
+      pane.className = 'ipodc-pv ipodc-pv--art';
       pane.append(coverArt(item, 'ipodc-pv-cover'));
       return pane;
     }
-    const kind = item.type === 'list' ? 'contacts'
-      : item.type === 'downloads' ? 'download'
-        : item.type === 'page' && item.actions?.length ? 'chat' : 'monogram';
-    const icon = () => previewIcon(kind, nid('pv'), brand.monogram, `${ctx.P}s`);
-    const pane = h('div', 'ipodc-pv ipodc-pv--icon');
-    const ico = h('div', 'ipodc-pv-float');
-    ico.innerHTML = icon();
-    const refl = h('div', 'ipodc-pv-refl');
-    const reflIn = h('div', 'ipodc-pv-float-in');
-    reflIn.innerHTML = icon();
-    refl.append(reflIn);
-    pane.append(h('div', 'ipodc-pv-floor'), refl, ico);
+    const kind = { list: 'contacts', downloads: 'download' }[item.type] ?? (item.actions?.length ? 'chat' : 'monogram');
+    const icon = () => previewIcon(kind, mono, `${ctx.P}s`);
+    pane.innerHTML = `<div class="ipodc-pv-floor"></div><div class="ipodc-pv-refl"><div class="ipodc-pv-float-in">${icon()}</div></div><div class="ipodc-pv-float">${icon()}</div>`;
     return pane;
   }
 
   // ── sub screens
   function buildScreen(item) {
-    const title = item.title ?? item.label ?? '';
+    const title = item.title ?? item.label;
+    const id = item.id ?? item.type;
     const items = (a) => (Array.isArray(a) ? a : []).filter(Boolean);
+    const links = (a) => items(a).map(({ label, detail, href }) => ({ label, detail, href }));
     switch (item.type) {
       case 'list':
-        return listScreen({ kind: 'list', id: item.id ?? 'list', title, rows: items(item.items).map(({ label, detail, href }) => ({ label, detail, href })) });
+        return listScreen('list', id, title, links(item.items));
       case 'downloads':
-        return listScreen({
-          kind: 'downloads', id: item.id ?? 'downloads', title,
-          rows: items(item.items).map((it) => ({
-            label: it.label,
-            detail: [it.format, /^[–-]?$/.test(it.size ?? '') ? null : it.size].filter(Boolean).join(' · '),
-            href: it.file,
-            download: fileName(it.file),
-          })),
-        });
+        return listScreen('downloads', id, title, items(item.items).map((it) => ({
+          label: it.label,
+          detail: [it.format, /^[–-]?$/.test(it.size ?? '') ? 0 : it.size].filter(Boolean).join(' · '),
+          href: it.file,
+          download: String(it.file ?? '').split(/[?#]/)[0].split('/').pop(),
+        })));
       case 'nowplaying':
-        return nowPlayingScreen(item);
+        return nowPlayingScreen(item, id);
       default: {
-        const s = listScreen({
-          kind: 'page', id: item.id ?? 'page', title, pre: h('div', 'ipodc-text', { text: item.body ?? '' }),
-          rows: items(item.actions).map(({ label, detail, href }) => ({ label, detail, href })),
-        });
+        const s = listScreen('page', id, title, links(item.actions), h('div', 'ipodc-text', { text: item.body ?? '' }));
         s.summary = item.body;
         return s;
       }
@@ -282,53 +246,46 @@ export function createScreens(ctx) {
 
   // ── Now Playing: cover + reflection, count / title / artist / album / curator, a quiet track
   // list, the 6G progress capsule (volume bar while the wheel turns) and a quiet Spotify footer.
-  function nowPlayingScreen(item) {
-    const { player, L: S } = ctx;
+  function nowPlayingScreen(item, id) {
+    const { player } = ctx;
     const { tracks } = player;
-    const spot = item.spotifyUrl ? safeHref(item.spotifyUrl) : null;
-    const s = listScreen({
-      kind: 'nowplaying', id: item.id ?? 'nowplaying', title: S.nowPlaying,
-      rows: spot ? [{ label: S.openSpotify, href: spot, sub: true }] : [],
-    });
+    const spot = item.spotifyUrl && safeHref(item.spotifyUrl);
+    const s = listScreen('nowplaying', id, L.nowPlaying, spot ? [{ label: L.openSpotify, href: spot, sub: true }] : []);
     const { node } = s;
     const line = (cls, text) => h('div', `ipodc-np-${cls}`, { text });
-    const count = line('count');
-    const tTitle = line('title');
-    const tArtist = line('artist');
+    const [count, tTitle, tArtist] = ['count', 'title', 'artist'].map((c) => line(c));
     const info = h('div', 'ipodc-np-info');
     info.append(count, tTitle, tArtist, line('album', item.title ?? ''), line('by', item.artist ?? ''));
-    const meter = () => {
+    const meter = (wrap) => {
       const m = h('div', 'ipodc-meter');
       const f = h('div', 'ipodc-meter-fill');
       m.append(f);
-      return [m, f];
+      wrap.append(m);
+      return f;
     };
-    const [pMeter, fill] = meter();
-    const [vMeter, vFill] = meter();
+    const prog = h('div', 'ipodc-np-prog');
+    const fill = meter(prog);
+    const times = h('div', 'ipodc-np-times');
     const tEl = h('span');
     const tRem = h('span');
-    const times = h('div', 'ipodc-np-times');
     times.append(tEl, tRem);
-    const prog = h('div', 'ipodc-np-prog');
-    prog.append(pMeter, times);
+    prog.append(times);
     const vol = h('div', 'ipodc-np-vol');
     vol.innerHTML = SPEAKER_LO;
-    vol.append(vMeter);
+    const vFill = meter(vol);
     vol.insertAdjacentHTML('beforeend', SPEAKER_HI);
     const deco = h('div', 'ipodc-np-deco', { 'aria-hidden': 'true' });
     deco.append(coverArt(item, 'ipodc-np-art'), coverArt(item, 'ipodc-np-refl'), info, prog, vol);
     // compact track list under the meta: tap a title to play it; the playing one carries the blue speaker
-    const realTracks = Array.isArray(item.tracks) && item.tracks.length > 0;
     const tlIn = h('div', 'ipodc-np-tracks-in');
-    const trkRows = realTracks ? tracks.map((t, i) => {
+    const trkRows = item.tracks?.length ? tracks.map((t, i) => {
       const r = h('div', 'ipodc-trk', { 'data-i': i });
       r.innerHTML = SPEAKER_NOW;
-      r.append(h('span', 'ipodc-trk-t', { text: t.title ?? '' }));
-      if (t.duration) r.append(h('span', 'ipodc-trk-d', { text: t.duration }));
+      r.append(h('span', 'ipodc-trk-t', { text: t.title ?? '' }), h('span', 'ipodc-trk-d', { text: t.duration ?? '' }));
       return r;
     }) : [];
-    tlIn.append(...trkRows);
     if (trkRows.length) {
+      tlIn.append(...trkRows);
       const tl = h('div', 'ipodc-np-tracks');
       tl.append(tlIn);
       deco.append(tl);
@@ -338,17 +295,15 @@ export function createScreens(ctx) {
     let trkTop = 0;
     let volT = 0;
 
-    s.update = (instant = false) => {
+    s.update = (instant) => {
       const t = tracks[player.track] ?? {};
       const dur = player.duration;
       tTitle.textContent = t.title ?? '';
       tArtist.textContent = t.artist ?? '';
-      count.textContent = tracks.length ? `${player.track + 1} ${S.of} ${tracks.length}` : '';
+      count.textContent = tracks.length ? `${player.track + 1} ${L.of} ${tracks.length}` : '';
       trkRows.forEach((r, i) => r.classList.toggle('is-cur', i === player.track));
-      if (trkRows.length > TRK_VIS) {
-        trkTop = clamp(trkTop, player.track - TRK_VIS + 1, player.track); // keep the playing track in view
-        tlIn.style.setProperty('--ipodc-tt', trkTop);
-      }
+      trkTop = clamp(trkTop, player.track - TRK_VIS + 1, player.track); // keep the playing track in view
+      tlIn.style.setProperty('--ipodc-tt', trkTop);
       if (instant) node.classList.add('is-instant');
       fill.style.setProperty('--ipodc-f', clamp(player.elapsed / dur, 0, 1).toFixed(4));
       vFill.style.setProperty('--ipodc-f', player.volume);
@@ -356,25 +311,23 @@ export function createScreens(ctx) {
       tEl.textContent = fmtTime(player.elapsed);
       tRem.textContent = `-${fmtTime(dur - Math.floor(player.elapsed))}`;
     };
-    s.summary = () => {
-      const t = tracks[player.track] ?? {};
-      return [t.title, t.artist, item.title, count.textContent].filter(Boolean).join(', ');
-    };
+    s.summary = () => [tTitle.textContent, tArtist.textContent, item.title, count.textContent].filter(Boolean).join(', ');
     s.onShow = () => {
       if (!player.started) player.setPlaying(true);
       s.update(true);
     };
-    s.onHide = () => {
+    const volOff = () => {
       volT = timers.cancel(volT);
       node.classList.remove('is-vol');
     };
+    s.onHide = volOff;
     // the wheel sets the volume on Now Playing, like the real thing
     s.move = (d) => {
       node.classList.add('is-vol');
       timers.cancel(volT);
-      volT = timers.later(() => node.classList.remove('is-vol'), 1600);
+      volT = timers.later(volOff, 1600);
       const moved = player.nudge(d);
-      if (moved) ctx.announce(`${S.volume} ${Math.round(player.volume * 100)} %`);
+      if (moved) ctx.announce(`${L.volume} ${Math.round(player.volume * 100)} %`);
       return moved;
     };
     s.jump = () => false;
@@ -384,10 +337,7 @@ export function createScreens(ctx) {
       player.setPlaying(true);
     };
     const baseActivate = s.activate;
-    s.activate = () => {
-      if (!s.rows.length) { player.setPlaying(!player.playing); return true; }
-      return baseActivate();
-    };
+    s.activate = () => (s.rows.length ? baseActivate() : player.setPlaying(!player.playing));
     s.update(true);
     return s;
   }

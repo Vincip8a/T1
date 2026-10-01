@@ -93,15 +93,37 @@ export function stripCanvas(bands) {
   return c;
 }
 
-/** Click-wheel face: satin plastic with MENU / ⏮ / ⏭ / ⏯ glyphs. */
-export function wheelCanvas(dMm, labelFactor) {
-  const S = 1024, px = S / dMm, R = S / 2, lr = R * labelFactor;
+/** CSS-style inset shadow inside a circle (canvas y down = model down). */
+function inset(g, cx, cy, r, dy, blur, color) {
+  g.save();
+  g.beginPath(); g.arc(cx, cy, r, 0, 7); g.clip();
+  g.shadowColor = color; g.shadowBlur = blur; g.shadowOffsetY = dy;
+  g.beginPath(); g.rect(cx - 3 * r, cy - 3 * r, 6 * r, 6 * r); g.moveTo(cx + r, cy); g.arc(cx, cy, r, 0, 2 * Math.PI, true);
+  g.fillStyle = '#000'; g.fill();
+  g.restore();
+}
+/** Filled ring band r0..r1 around (cx, cy). */
+function band(g, cx, cy, r0, r1, color) {
+  g.beginPath(); g.arc(cx, cy, r1, 0, 2 * Math.PI); g.moveTo(cx + r0, cy); g.arc(cx, cy, r0, 0, 2 * Math.PI, true);
+  g.fillStyle = color; g.fill();
+}
+
+/** Click-wheel face: the DOM wheel's satin gradient, recess shading, the centre button's seam
+ *  and MENU / ⏮ / ⏭ / ⏯ glyphs (hand-off match). */
+export function wheelCanvas(dMm, labelFactor, cbMm) {
+  const S = 1024, px = S / dMm, R = S / 2, lr = R * labelFactor, u = px;
   const [c, g] = canvas(S, S);
-  const grd = g.createRadialGradient(R, R * 0.7, R * 0.1, R, R, R);
-  grd.addColorStop(0, '#f3f4f6');
-  grd.addColorStop(1, COLORS.wheel);
-  g.fillStyle = grd;
-  g.fillRect(0, 0, S, S);
+  g.save(); g.translate(R, S * 0.16); g.scale(1.3, 1.1);
+  const grd = g.createRadialGradient(0, 0, 0, 0, 0, S);
+  grd.addColorStop(0, '#f0f1f2'); grd.addColorStop(0.52, COLORS.wheel); grd.addColorStop(1, '#d9dbde');
+  g.fillStyle = grd; g.fillRect(-S, -S, 3 * S, 3 * S);
+  g.restore();
+  inset(g, R, R, R, 0.22 * u, 0.45 * u, 'rgba(0,0,0,.12)');
+  inset(g, R, R, R, -0.2 * u, 0.3 * u, 'rgba(255,255,255,.9)');
+  // centre-button seam: white lower lip, dark hairline (DOM box-shadows, top layer last)
+  const cb = cbMm * px;
+  band(g, R, R + 0.19 * u, 0, cb + 0.13 * u, 'rgba(255,255,255,.65)');
+  band(g, R, R, 0, cb + 0.15 * u, 'rgba(100,104,110,.5)');
   const col = COLORS.wheelLabel;
   text(g, 'MENU', R, R - lr, 2.35 * px, { weight: 700, color: col, align: 'center', spacing: 0.25 * px });
   g.fillStyle = col;
@@ -119,6 +141,28 @@ export function wheelCanvas(dMm, labelFactor) {
   tri(R - s * 0.55, y, s, 1);
   g.fillRect(R + s * 0.32, y - s * 0.55, bar, s * 1.1);
   g.fillRect(R + s * 0.32 + bar * 2, y - s * 0.55, bar, s * 1.1);
+  return c;
+}
+
+/** Centre button: matte aluminium tone, slightly concave (shadowed top, lit bottom). */
+export function centreCanvas(dMm) {
+  const S = 512, u = S / dMm, R = S / 2;
+  const [c, g] = canvas(S, S);
+  g.fillStyle = COLORS.centerButton; g.fillRect(0, 0, S, S);
+  const grd = g.createLinearGradient(0, 0, 0, S);
+  [[0, 'rgba(0,0,0,.1)'], [0.4, 'rgba(0,0,0,.024)'], [0.7, 'rgba(255,255,255,.08)'], [1, 'rgba(255,255,255,.24)']].forEach(([o, k]) => grd.addColorStop(o, k));
+  g.fillStyle = grd; g.fillRect(0, 0, S, S);
+  inset(g, R, R, R, 0.35 * u, 0.7 * u, 'rgba(0,0,0,.14)');
+  inset(g, R, R, R, -0.25 * u, 0.45 * u, 'rgba(255,255,255,.5)');
+  return c;
+}
+
+/** Front-plate tone curve (sRGB multiplier rows, top → bottom): the DOM plate's light falloff. */
+export function faceToneCanvas(stops) {
+  const [c, g] = canvas(4, 256);
+  const grd = g.createLinearGradient(0, 0, 0, 256);
+  stops.forEach((v, i) => { const k = Math.round(255 * v); grd.addColorStop(i / (stops.length - 1), `rgb(${k},${k},${k})`); });
+  g.fillStyle = grd; g.fillRect(0, 0, 4, 256);
   return c;
 }
 

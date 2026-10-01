@@ -1,7 +1,7 @@
 // Simulated playback for the Now Playing screen: elapsed time advances while playing, tracks
 // wrap, volume steps in 1/16. It lives for the whole mount, so it keeps playing across screens.
 // onChange(kind) receives 'state' | 'track' | 'time' | 'volume'.
-import { clamp, parseDuration } from './util.js';
+import { clamp } from './util.js';
 
 export function createPlayer(tracks, onChange) {
   let ticker = 0;
@@ -13,7 +13,10 @@ export function createPlayer(tracks, onChange) {
     playing: false,
     started: false,
     volume: 0.625,
-    get duration() { return parseDuration(tracks[p.track]?.duration); },
+    get duration() { // "m:ss" (or "h:mm:ss"); 3:30 when missing or invalid
+      const n = String(tracks[p.track]?.duration).split(':').reduce((a, x) => a * 60 + +x, 0);
+      return n > 0 ? n : 210;
+    },
     setPlaying(v) {
       if (!tracks.length || p.playing === v) return;
       p.playing = v;

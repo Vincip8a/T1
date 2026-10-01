@@ -9,7 +9,7 @@ import './ipodc.css';
 import { IPOD, COLORS } from '../../../shared/ipodSpec.js';
 import { prefersReducedMotion as isReduced } from '../../../shared/config.js';
 import { h, createTimers } from './util.js';
-import { NOISE_SVG, GLYPH, playIndicator, battery, TOAST_ICON, sharedDefs } from './art.js';
+import { GLYPH, playIndicator, battery, sharedDefs } from './art.js';
 import { createSound } from './sound.js';
 import { createPlayer } from './player.js';
 import { createWheel } from './wheel.js';
@@ -19,7 +19,7 @@ const SLIDE_MS = 260;
 const EASE = 'cubic-bezier(.32,.08,.24,1)';
 let seq = 0;
 
-// UI strings (not content): overridable per site via config.ui, German 6G firmware defaults.
+// UI strings (not content): German 6G firmware wording.
 const DEFAULT_UI = {
   nowPlaying: 'Sie hören',
   openSpotify: 'In Spotify öffnen',
@@ -32,18 +32,15 @@ const DEFAULT_UI = {
   mail: 'E-Mail-Link',
   download: 'Download',
   downloadStarted: 'Download gestartet',
-  mailOpening: 'E-Mail wird geöffnet',
-  linkOpening: 'Wird geöffnet …',
   backHint: 'Zurück mit MENU',
-  hint: 'Pfeiltasten oder Click Wheel blättern, Enter wählt, Escape geht zurück, Leertaste spielt oder pausiert.',
+  hint: 'Pfeiltasten blättern, Enter wählt, Escape zurück, Leertaste Wiedergabe.',
 };
 
 export function mountIpod(container, { config } = {}) {
   config ??= {};
   const brand = config.brand ?? {};
   const menu = (Array.isArray(config.menu) ? config.menu : []).filter((m) => m && typeof m === 'object');
-  const L = { ...DEFAULT_UI };
-  for (const [k, v] of Object.entries(config.ui ?? {})) if (k in L && typeof v === 'string') L[k] = v;
+  const L = DEFAULT_UI;
   const P = `ipodc${++seq}`;
   let uid = 0;
   const nid = (s) => `${P}-${s}${++uid}`;
@@ -73,40 +70,20 @@ export function mountIpod(container, { config } = {}) {
   const prop = (k, v) => el.style.setProperty(`--ipodc-${k}`, v);
   for (const k in mm) prop(`mm-${k}`, +mm[k].toFixed(4));
   for (const k in COLORS) prop(`c-${k}`, COLORS[k]);
-  prop('noise', `url("data:image/svg+xml,${encodeURIComponent(NOISE_SVG)}")`);
 
-  // ── screen
-  const hidden = { 'aria-hidden': 'true' };
-  const win = h('div', 'ipodc-window');
-  const lcd = h('div', 'ipodc-lcd');
-  const ui = h('div', 'ipodc-ui');
-  const bar = h('div', 'ipodc-bar', hidden);
-  const ind = h('span', 'ipodc-ind');
-  ind.innerHTML = playIndicator(P);
-  const titles = h('div', 'ipodc-titles');
-  let titleEl = h('span', 'ipodc-title');
-  titles.append(titleEl);
-  const batt = h('span', 'ipodc-batt');
-  batt.innerHTML = battery(P);
-  bar.append(ind, titles, batt);
-  const stage = h('div', 'ipodc-stage');
-  const toast = h('div', 'ipodc-toast', hidden);
-  const boot = h('div', 'ipodc-boot', hidden);
-  boot.append(h('div', 'ipodc-boot-mono', { text: brand.monogram ?? '' }));
-  ui.append(bar, stage, toast, boot);
-  lcd.append(ui);
-  win.append(lcd, h('div', 'ipodc-glare'));
-
-  // ── click wheel: pointer surface only (keyboard covers every button), hidden from AT
-  const wheel = h('div', 'ipodc-wheel', hidden);
-  wheel.innerHTML = `<span class="ipodc-wbtn ipodc-wbtn--menu">${IPOD.wheelLabels.menu ?? 'MENU'}</span>`
-    + ['next', 'prev', 'play'].map((n) => `<span class="ipodc-wbtn ipodc-wbtn--${n}">${GLYPH[n]}</span>`).join('');
-  const centerBtn = h('div', 'ipodc-center');
-  wheel.append(centerBtn);
-  const edge = h('div', 'ipodc-edge', hidden); // top edge: hold switch and headphone jack
-  edge.append(h('span', 'ipodc-hold'), h('span', 'ipodc-jack'));
-  el.append(edge, win, wheel, h('div', 'ipodc-sr', { id: hintId, text: L.hint }));
-  el.insertAdjacentHTML('beforeend', sharedDefs(`${P}s`));
+  // ── skeleton: top edge (hold switch, headphone jack), display window with the 320×240 UI, click
+  // wheel (a pointer surface only: the keyboard covers every button, so it is hidden from AT)
+  const hid = 'aria-hidden="true"';
+  el.innerHTML = `<div class="ipodc-edge" ${hid}><i class="ipodc-hold"></i><i class="ipodc-jack"></i></div>`
+    + '<div class="ipodc-window"><div class="ipodc-lcd"><div class="ipodc-ui">'
+    + `<div class="ipodc-bar" ${hid}><span class="ipodc-ind">${playIndicator(P)}</span><div class="ipodc-title"></div><span class="ipodc-batt">${battery(P)}</span></div>`
+    + `<div class="ipodc-stage"></div><div class="ipodc-toast" ${hid}></div><div class="ipodc-boot" ${hid}><div class="ipodc-boot-mono"></div></div>`
+    + `</div></div><div class="ipodc-glare"></div></div><div class="ipodc-wheel" ${hid}><span class="ipodc-wbtn ipodc-wbtn--menu">${IPOD.wheelLabels.menu ?? 'MENU'}</span>`
+    + ['next', 'prev', 'play'].map((n) => `<span class="ipodc-wbtn ipodc-wbtn--${n}">${GLYPH[n]}</span>`).join('')
+    + `<div class="ipodc-center"></div></div><div class="ipodc-sr" id="${hintId}">${L.hint}</div>${sharedDefs(`${P}s`)}`;
+  const [lcd, ind, titleEl, stage, toast, boot, wheel, centerBtn] = ['lcd', 'ind', 'title', 'stage', 'toast', 'boot', 'wheel', 'center']
+    .map((c) => el.querySelector(`.ipodc-${c}`));
+  boot.firstChild.textContent = brand.monogram ?? '';
   // a landmark around the body (display: contents, so it adds no box); the live region sits
   // beside the body because the listbox may only own options
   const live = h('div', 'ipodc-sr', { 'aria-live': 'polite', 'aria-atomic': 'true' });
@@ -141,9 +118,8 @@ export function mountIpod(container, { config } = {}) {
 
   // ── toast
   let toastT = 0;
-  function showToast(icon, text, sub) {
-    toast.innerHTML = TOAST_ICON[icon];
-    toast.append(h('b', null, { text }));
+  function showToast(text, sub) {
+    toast.replaceChildren(h('b', null, { text }));
     if (sub) toast.append(h('span', null, { text: sub }));
     toast.classList.add('is-on');
     announce(sub ? `${text} ${sub}` : text);
@@ -169,12 +145,7 @@ export function mountIpod(container, { config } = {}) {
     linkFeedback(a, spec);
   }
   function linkFeedback(a, spec) {
-    if (a.hasAttribute('download')) showToast('check', L.downloadStarted, spec.label);
-    else if (/^(https?|mailto):$/.test(a.protocol)) {
-      let to = a.hostname.replace(/^www\./, '') || a.pathname;
-      try { to = decodeURIComponent(to); } catch { /* keep it raw */ }
-      showToast('out', a.protocol === 'mailto:' ? L.mailOpening : L.linkOpening, to);
-    }
+    if (a.hasAttribute('download')) showToast(L.downloadStarted, spec.label);
   }
 
   // ── navigation
@@ -215,24 +186,12 @@ export function mountIpod(container, { config } = {}) {
     for (const a of [...anims.values()]) a.finish(); // any third screen still moving lands at once
     return Promise.all([slideNode(outN, from[0], -dir * 100), slideNode(inN, from[1], 0)]);
   }
-  /** title bar: the old title leaves before the new one arrives, so they never smudge together */
-  function setTitle(text, dir = 0) {
-    for (const t of [...titles.children]) if (t !== titleEl) t.remove();
-    if (titleEl.textContent === text) return;
-    const old = titleEl;
-    titleEl = h('span', 'ipodc-title', { text });
-    titles.append(titleEl);
+  /** title bar: centred title of the current screen (also names the listbox); on navigation the new
+   *  title glides in from the side the screen comes from */
+  function setTitle(text, dir) {
+    titleEl.textContent = text;
     el.setAttribute('aria-label', `${text} – iPod`);
-    if (!dir || isReduced() || !old.textContent || !old.animate) return old.remove();
-    const kf = (d, o0, at) => [
-      { opacity: o0, transform: `translateX(${d * 30 * (1 - o0)}%)` },
-      { opacity: 0, transform: `translateX(${d * 22}%)`, offset: at },
-      { opacity: 1 - o0, transform: `translateX(${d * 30 * o0}%)` },
-    ];
-    const o = { duration: SLIDE_MS, easing: EASE };
-    const rm = () => old.remove();
-    old.animate(kf(-dir, 1, 0.42), { ...o, fill: 'forwards' }).finished.then(rm, rm);
-    titleEl.animate(kf(dir, 0, 0.38), { ...o, fill: 'backwards' });
+    if (dir && !isReduced()) titleEl.animate?.({ opacity: [0, 1], transform: [`translateX(${dir * 14}%)`, 'none'] }, { duration: SLIDE_MS, easing: EASE });
   }
 
   function show(s) {
@@ -315,7 +274,6 @@ export function mountIpod(container, { config } = {}) {
   });
   cleanups.push(stopWheel);
   on(wheel, 'contextmenu', (e) => e.preventDefault());
-  on(wheel, 'touchmove', (e) => e.preventDefault(), { passive: false });
 
   // centre button: acts on pointerup inside it. It is not a <button> and has no click handler,
   // so a touch tap (whose click arrives with detail 0) can never fire a second activation.
@@ -360,8 +318,8 @@ export function mountIpod(container, { config } = {}) {
     if (!row) return;
     const i = ready ? s.rows.indexOf(row) : -1;
     const settling = !isReduced() && performance.now() - s.enteredAt < SLIDE_MS * 0.75;
-    // only rows of the screen in place, never the 2nd click of a double-click or an inert row
-    if (i < 0 || e.detail > 1 || settling || row.classList.contains('is-dead')) return prevent(e);
+    // only rows of the screen in place, never the 2nd click of a double-click
+    if (i < 0 || e.detail > 1 || settling) return prevent(e);
     s.setIndex(i);
     sound.play('press');
     const spec = s.specs[i];
@@ -379,9 +337,9 @@ export function mountIpod(container, { config } = {}) {
     const gap = now - wLast;
     wLast = now;
     const raw = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
-    // line/page mode, a big notch, or a separate notch after a pause (mice that report tiny deltas,
-    // ~4 px on macOS) is exactly one step; continuous trackpad streams (~16 ms apart) accumulate
-    if (raw && (e.deltaMode || Math.abs(raw) >= 50 || gap > 220 || (gap > 90 && Math.abs(raw) >= 3))) {
+    // line/page mode, a big notch, or a separate notch after a pause (mice that report tiny deltas)
+    // is exactly one step; continuous trackpad streams (~16 ms apart) accumulate
+    if (raw && (e.deltaMode || Math.abs(raw) >= 50 || gap > 150)) {
       wAcc = 0;
       return step(Math.sign(raw));
     }
@@ -393,8 +351,7 @@ export function mountIpod(container, { config } = {}) {
   // ── keyboard
   const KEYS = {
     ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1,
-    Enter: 'center', Escape: 'menu', Backspace: 'menu', ' ': 'play', Spacebar: 'play',
-    MediaPlayPause: 'play', MediaTrackNext: 'next', MediaTrackPrevious: 'prev',
+    Enter: 'center', Escape: 'menu', Backspace: 'menu', ' ': 'play',
   };
   function onKey(e) {
     if (phase !== 'ready' || destroyed || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
@@ -411,31 +368,15 @@ export function mountIpod(container, { config } = {}) {
     e.preventDefault();
   }
   on(el, 'keydown', onKey);
-  // With nothing else focused (e.g. right after the intro) the iPod is the obvious keyboard target,
-  // but only while it is really on screen and on top (not minimised, hidden or covered).
-  on(document, 'keydown', (e) => {
-    if (e.key === 'Tab') el.dataset.input = 'key'; // keyboard navigation: show the focus ring
-    if ((e.target !== document.body && e.target !== document.documentElement) || phase !== 'ready') return;
-    const r = centerBtn.getBoundingClientRect();
-    const x = r.left + r.width / 2;
-    const y = r.top + r.height / 2;
-    if (!r.width || !el.contains(document.elementFromPoint(x, y))) return;
-    const se = document.scrollingElement;
-    if (se && se.scrollHeight > se.clientHeight + 2 && /^(Arrow|Spacebar$| $|Page|Home$|End$)/.test(e.key)) return; // leave page scrolling alone
-    onKey(e);
-  });
+  on(document, 'keydown', (e) => { if (e.key === 'Tab') el.dataset.input = 'key'; }); // keyboard navigation: show the focus ring
   // pointer users get no focus ring (focus still moves to the iPod so the keys work afterwards);
   // touch pointerdown is not a user activation for audio: unlock on pointerup / click as well
   on(el, 'pointerdown', () => { el.dataset.input = 'pointer'; sound.ensure(); });
   on(el, 'pointerup', sound.ensure);
   on(el, 'click', sound.ensure);
 
-  // ── resize
-  let lastW = 0;
-  const ro = new ResizeObserver(() => {
-    const w = lcd.clientWidth;
-    if (w && Math.abs(w - lastW) >= 0.5) { lastW = w; current().layout(); }
-  });
+  // ── resize: re-measure (text wrapping) whenever the LCD changes size
+  const ro = new ResizeObserver(() => current().layout());
   ro.observe(lcd);
 
   // ── boot / reveal

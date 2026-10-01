@@ -2,8 +2,7 @@
    Hardware: every size is calc(var(--ipodc-u) * <mm>) with --ipodc-u = var(--ipod-h) / 103.5;
    the mm values are copied from IPOD (ipodSpec.js) into --ipodc-mm-* by index.js.
    Screen UI: logical 320×240 px. One logical px = --ipodc-p = 100cqw / 320 of the LCD container.
-   Motion: every transition / animation lives in the prefers-reduced-motion: no-preference block
-   at the end, so reduced motion holds before any JS runs. */
+   Motion: see the block near the end. */
 
 .ipodc-host { display: contents; }
 .ipodc {
@@ -28,8 +27,10 @@
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   font-family: var(--ipodc-font);
-  /* satin anodised aluminium: soft vertical light falloff + gentle cylindrical side shading */
+  /* anodised aluminium: very fine, faint horizontal brushing (irregular light and dark hairlines),
+     soft vertical light falloff and gentle cylindrical side shading */
   background:
+    repeating-linear-gradient(#ffffff0f 0 .5px, #fff0 0 1.5px, #00000009 0 2px, #0000 0 3.5px, #ffffff0f 0 4px, #fff0 0 6.5px),
     linear-gradient(#ffffff57, #ffffff24 20%, #ffffff08 46%, #00000005 72%, #00000013),
     linear-gradient(90deg, #0000000f, #ffffff17 7%, transparent 26% 74%, #ffffff12 93%, #00000012),
     var(--ipodc-c-aluminium);
@@ -38,27 +39,12 @@
     inset 0 0 0 calc(var(--ipodc-u) * .14) #54585e80,
     inset 0 0 0 calc(var(--ipodc-u) * .34) #ffffff80,
     inset 0 calc(var(--ipodc-u) * .45) calc(var(--ipodc-u) * .55) calc(var(--ipodc-u) * -.1) #ffffff80,
-    inset 0 calc(var(--ipodc-u) * -.5) calc(var(--ipodc-u) * .8) calc(var(--ipodc-u) * -.1) #00000017,
-    0 calc(var(--ipodc-u) * .5) calc(var(--ipodc-u) * 1.4) #0003,
-    0 calc(var(--ipodc-u) * 2.2) calc(var(--ipodc-u) * 6) #00000026;
+    0 calc(var(--ipodc-u) * 1.2) calc(var(--ipodc-u) * 4) #00000040;
 }
 .ipodc.is-revealed { visibility: inherit; }
 /* keyboard focus only: a pointer press focuses the iPod too, but must not draw the ring */
 .ipodc:focus-visible { outline: 3px solid #0b4fc4; outline-offset: 4px; } /* ≥ 4.5:1 on window and desktop */
 .ipodc[data-input="pointer"] { outline: none; }
-
-/* fine satin grain (procedural, near-isotropic SVG noise set from JS) */
-.ipodc::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  background: var(--ipodc-noise) 0 0 / calc(var(--ipodc-u) * 52);
-  mix-blend-mode: soft-light;
-  opacity: .08;
-  pointer-events: none;
-}
 
 .ipodc-defs, .ipodc-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
@@ -79,7 +65,7 @@
   width: calc(var(--ipodc-u) * var(--ipodc-mm-jack-d));
   height: calc(var(--ipodc-u) * .7);
   border-radius: 0 0 50% 50% / 0 0 100% 100%;
-  background: radial-gradient(70% 120% at 50% 0, #050506, #1b1c1e 55%, #3c3f43);
+  background: linear-gradient(#050506, #2c2e31);
 }
 
 /* ───────────── display window ───────────── */
@@ -109,9 +95,7 @@
   inset: 0;
   z-index: 3;
   pointer-events: none;
-  background:
-    linear-gradient(121deg, #ffffff1f, #ffffff11 30%, #ffffff0a 46.6%, transparent 47%),
-    linear-gradient(#ffffff0d, transparent 12%);
+  background: linear-gradient(121deg, #ffffff1f, #ffffff11 30%, #ffffff0a 46.6%, transparent 47%);
 }
 
 /* ───────────── logical 320×240 UI ───────────── */
@@ -134,14 +118,9 @@
   background: linear-gradient(#fdfdfd, #eceef0 42%, #dadde0 58%, #c9cdd2);
   border-bottom: calc(var(--ipodc-p) * 1) solid #7b8086;
 }
-.ipodc-titles {
-  position: absolute;
-  inset: 0 calc(var(--ipodc-p) * 38);
-  overflow: hidden;
-}
 .ipodc-title {
   position: absolute;
-  inset: 0;
+  inset: 0 calc(var(--ipodc-p) * 38);
   font: 700 calc(var(--ipodc-p) * 14)/calc(var(--ipodc-p) * 21) var(--ipodc-font);
   letter-spacing: -.01em;
   text-align: center;
@@ -227,8 +206,6 @@
 .ipodc-row.is-sel .ipodc-row-label { text-shadow: 0 calc(var(--ipodc-p) * -1) #001e5a4d; }
 .ipodc-row.is-sel .ipodc-row-detail { color: #ffffffeb; }
 .ipodc-row.is-sel .ipodc-chev { visibility: inherit; }
-/* a link the config rejected (see console): visibly inert */
-.ipodc-row.is-dead { cursor: default; color: #a4a7ab; }
 
 /* scrollbar (only when the content overflows) */
 .ipodc-sb {
@@ -267,7 +244,7 @@
 }
 .ipodc-pv { position: absolute; inset: 0; opacity: 0; overflow: hidden; }
 .ipodc-pv.is-on { opacity: 1; }
-.ipodc-pv--icon { background: radial-gradient(120% 70% at 50% 28%, #fff, #f4f5f7 45%, #f4f5f700 70%), linear-gradient(#fbfbfc, #eceef1); }
+.ipodc-pv--icon { background: radial-gradient(120% 70% at 50% 28%, #fff, #eceef1 70%); }
 .ipodc-pv-floor {
   position: absolute;
   inset: calc(var(--ipodc-p) * 124) 0 0;
@@ -307,16 +284,12 @@
 .ipodc-art-fb {
   display: grid;
   place-items: center;
-  background:
-    radial-gradient(circle, transparent 30%, #ffffff12 30.5% 31%, transparent 31.5% 44%, #ffffff0f 44.5% 45%, transparent 45.5%),
-    radial-gradient(120% 90% at 20% 10%, #8fd3ff, #8fd3ff00 55%),
-    linear-gradient(145deg, #2c82d6, #164f8f 55%, #07305c);
+  background: radial-gradient(120% 90% at 20% 10%, #8fd3ff, #8fd3ff00 55%), linear-gradient(145deg, #2c82d6, #164f8f 55%, #07305c);
 }
 .ipodc-art-fb b {
   font: 800 calc(var(--ipodc-p) * var(--ipodc-cs) * .34)/1 var(--ipodc-font);
   color: #fffffff2;
   letter-spacing: -.04em;
-  text-shadow: 0 .02em .06em #0000005a;
 }
 
 /* text page */
@@ -435,13 +408,12 @@
   transform: translate(-50%, -42%) scale(.96);
   border-radius: calc(var(--ipodc-p) * 9);
   background: linear-gradient(#3a3c40ed, #141517f2);
-  box-shadow: inset 0 0 0 calc(var(--ipodc-p) * 1) #ffffff2e, 0 calc(var(--ipodc-p) * 4) calc(var(--ipodc-p) * 14) #0000005a;
+  box-shadow: 0 calc(var(--ipodc-p) * 4) calc(var(--ipodc-p) * 14) #0000005a;
   color: #fff;
   text-align: center;
   opacity: 0;
   pointer-events: none;
 }
-.ipodc-toast svg { display: block; width: calc(var(--ipodc-p) * 26); height: calc(var(--ipodc-p) * 26); margin: 0 auto calc(var(--ipodc-p) * 6); }
 .ipodc-toast b { display: block; font: 700 calc(var(--ipodc-p) * 14)/calc(var(--ipodc-p) * 18) var(--ipodc-font); }
 .ipodc-toast span {
   display: block;
@@ -467,10 +439,7 @@
   font: 700 calc(var(--ipodc-p) * 80)/1 var(--ipodc-font);
   letter-spacing: -.05em;
   padding: 0 .06em;
-  color: transparent;
-  background: linear-gradient(#fff, #eef0f2 46%, #b9bdc3 52%, #e9ebee);
-  -webkit-background-clip: text;
-  background-clip: text;
+  color: #e6e8eb;
 }
 .ipodc-boot.show-mono .ipodc-boot-mono { opacity: 1; }
 
@@ -494,9 +463,7 @@
     inset 0 calc(var(--ipodc-u) * -.15) calc(var(--ipodc-u) * .3) #ffffffb3;
 }
 .ipodc-wheel.is-spinning { cursor: grabbing; }
-/* pressed button: the wheel rocks very slightly towards it, like the real switch plate, and a soft
-   shade is masked to the 90° sector under the finger (below labels and centre) */
-.ipodc-wheel[data-press] { transform: perspective(calc(var(--ipodc-u) * 140)) rotate3d(calc(cos(var(--ipodc-q))), calc(sin(var(--ipodc-q))), 0, 1.4deg); }
+/* pressed button: a soft shade masked to the 90° sector under the finger (below labels and centre) */
 .ipodc-wheel[data-press="next"] { --ipodc-q: 90deg; }
 .ipodc-wheel[data-press="play"] { --ipodc-q: 180deg; }
 .ipodc-wheel[data-press="prev"] { --ipodc-q: 270deg; }
@@ -529,50 +496,44 @@
 
 /* centre button: smooth matte aluminium tone, slightly concave (shadowed top, lit bottom) */
 .ipodc-center {
-  --ipodc-s1: .35;
-  --ipodc-s2: .7;
-  --ipodc-sa: .14;
   position: absolute;
   inset: calc(50% - var(--ipodc-u) * var(--ipodc-mm-cb-d) / 2);
   border-radius: 50%;
   touch-action: none;
-  background:
-    radial-gradient(90% 90% at 50% 70%, #ffffff38, #fff0 60%),
-    linear-gradient(#0000001a, #00000006 40%, #ffffff14 70%, #ffffff3d),
-    var(--ipodc-c-centerButton);
+  background: linear-gradient(#0000001a, #00000006 40%, #ffffff14 70%, #ffffff3d), var(--ipodc-c-centerButton);
   box-shadow:
     0 0 0 calc(var(--ipodc-u) * .15) #64686e80,
     0 calc(var(--ipodc-u) * .19) 0 calc(var(--ipodc-u) * .13) #ffffffa6,
-    inset 0 calc(var(--ipodc-u) * var(--ipodc-s1)) calc(var(--ipodc-u) * var(--ipodc-s2)) rgba(0, 0, 0, var(--ipodc-sa)),
+    inset 0 calc(var(--ipodc-u) * .35) calc(var(--ipodc-u) * .7) #00000024,
     inset 0 calc(var(--ipodc-u) * -.25) calc(var(--ipodc-u) * .45) #ffffff80;
 }
-.ipodc-center.is-pressed { --ipodc-s1: .55; --ipodc-s2: 1; --ipodc-sa: .22; filter: brightness(.94); transform: scale(.992); }
+.ipodc-center.is-pressed { filter: brightness(.92); transform: scale(.99); }
 
-/* ───────────── motion (opt-in) ─────────────
-   .is-instant suspends the list transitions for one frame while a screen is laid out.
-   The WAAPI screen slides check the same query in JS. */
-@media (prefers-reduced-motion: no-preference) {
-  .ipodc-screen:not(.is-instant) :is(.ipodc-content, .ipodc-sb-thumb) { transition: transform .12s cubic-bezier(.25, .7, .3, 1); }
-  .ipodc-screen:not(.is-instant) .ipodc-hl { transition: transform .085s cubic-bezier(.25, .7, .3, 1); }
-  .ipodc-screen:not(.is-instant) :is(.ipodc-row, .ipodc-row-detail) { transition: color .07s linear; }
-  .ipodc-screen:not(.is-instant) .ipodc-meter-fill { transition: width .25s linear; }
-  .ipodc-screen:not(.is-instant) .ipodc-np-tracks-in { transition: transform .2s; }
-  .ipodc-np-prog, .ipodc-np-vol { transition: opacity .18s; }
-  .ipodc-view[class*=bump] { animation: ipodc-bump .22s ease-out; }
-  .ipodc-pv { transition: opacity .45s; }
-  .ipodc-pv.is-on :is(.ipodc-pv-float, .ipodc-pv-float-in) { animation: ipodc-float 7s ease-in-out infinite alternate; }
-  .ipodc-pv.is-on .ipodc-pv-cover { animation: ipodc-pan 16s ease-in-out infinite alternate; }
-  .ipodc-toast { transition: .18s; transition-property: opacity, transform; }
-  .ipodc-toast.is-on { transform: translate(-50%, -50%) scale(1); }
-  .ipodc-boot { transition: opacity .32s; }
-  .ipodc-boot-mono { transform: scale(.985); transition: opacity .34s, transform 1.2s ease-out; }
-  .ipodc-boot.show-mono .ipodc-boot-mono { transform: none; }
-  .ipodc-wheel, .ipodc-wheel::before, .ipodc-center { transition: .14s; transition-property: transform, opacity, filter, box-shadow; }
-  .ipodc-wheel[data-press], .ipodc-wheel[data-press]::before, .ipodc-center.is-pressed { transition-duration: .03s; }
-}
-/* reduced motion: nothing moves, rocks or scales */
+/* ───────────── motion ─────────────
+   .is-instant suspends the list transitions for one frame while a screen is laid out. Reduced
+   motion switches every transition and animation off before any JS runs (the WAAPI screen and
+   title slides check the same query in JS); nothing moves, rocks or scales then. */
+.ipodc-content, .ipodc-sb-thumb { transition: transform .12s cubic-bezier(.25, .7, .3, 1); }
+.ipodc-hl { transition: transform .085s cubic-bezier(.25, .7, .3, 1); }
+.ipodc-row, .ipodc-row-detail { transition: color .07s linear; }
+.ipodc-meter-fill { transition: width .25s linear; }
+.ipodc-np-tracks-in { transition: transform .2s; }
+.ipodc-np-prog, .ipodc-np-vol { transition: opacity .18s; }
+.ipodc-view[class*=bump] { animation: ipodc-bump .22s ease-out; }
+.ipodc-pv { transition: opacity .45s; }
+.ipodc-pv.is-on :is(.ipodc-pv-float, .ipodc-pv-float-in) { animation: ipodc-float 7s ease-in-out infinite alternate; }
+.ipodc-pv.is-on .ipodc-pv-cover { animation: ipodc-pan 16s ease-in-out infinite alternate; }
+.ipodc-toast { transition: .18s; transition-property: opacity, transform; }
+.ipodc-toast.is-on { transform: translate(-50%, -50%) scale(1); }
+.ipodc-boot { transition: opacity .32s; }
+.ipodc-boot-mono { transform: scale(.985); transition: opacity .34s, transform 1.2s ease-out; }
+.ipodc-boot.show-mono .ipodc-boot-mono { transform: none; }
+.ipodc-wheel::before, .ipodc-center { transition: .14s; transition-property: opacity, filter, transform; }
+.ipodc-wheel[data-press]::before, .ipodc-center.is-pressed { transition-duration: .03s; }
+.ipodc-screen.is-instant * { transition: none !important; }
 @media (prefers-reduced-motion: reduce) {
-  .ipodc-wheel[data-press], .ipodc-center.is-pressed { transform: none; }
+  .ipodc *, .ipodc ::before { transition: none !important; animation: none !important; }
+  .ipodc-center.is-pressed { transform: none; }
 }
 
 /* ───────────── forced colours / high contrast ───────────── */
