@@ -440,12 +440,12 @@ export function mountIpod(container, { config } = {}) {
     e.preventDefault(); // also during boot: the page behind must never scroll under the iPod
     if (phase !== 'ready') return;
     const now = performance.now();
-    const fresh = now - wLast > 220;
+    const gap = now - wLast;
     wLast = now;
     const raw = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
-    // line/page mode, a big notch, or the first event after a pause (slow notches of mice that
-    // report tiny deltas, e.g. ~4 px on macOS) is exactly one step
-    if (raw && (e.deltaMode || Math.abs(raw) >= 50 || fresh)) { wAcc = 0; step(Math.sign(raw), 'wheel'); return; }
+    // line/page mode, a big notch, or a separate notch after a pause (mice that report tiny deltas,
+    // ~4 px on macOS) is exactly one step; continuous trackpad streams (~16 ms apart) accumulate
+    if (raw && (e.deltaMode || Math.abs(raw) >= 50 || gap > 220 || (gap > 90 && Math.abs(raw) >= 3))) { wAcc = 0; step(Math.sign(raw), 'wheel'); return; }
     wAcc += raw;
     while (wAcc >= 34) { wAcc -= 34; step(1, 'wheel'); }
     while (wAcc <= -34) { wAcc += 34; step(-1, 'wheel'); }

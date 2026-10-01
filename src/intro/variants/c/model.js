@@ -12,7 +12,7 @@ const SX = (x) => x - W / 2;
 const SY = (y) => H / 2 - y;
 /** Front-plate edge bevel: the full W×H outline is reached at z = -FACE_BEVEL. */
 export const FACE_BEVEL = 0.25;
-const SEG = 16; // per 45° arc: hole, wheel and sensor base share one tessellation (even gap)
+const SEG = 16; // per corner arc
 
 function rrPath(p, w, h, r, cx = 0, cy = 0) {
   r = Math.max(0.05, Math.min(r, w / 2 - 0.01, h / 2 - 0.01));
@@ -27,10 +27,11 @@ function rrPath(p, w, h, r, cx = 0, cy = 0) {
 /** Rounded rect whose bevelled (widest) outline is w×h. Holes grow by b so their wall is w×h. */
 const rr = (w, h, r, b = 0, cx = 0, cy = 0) => rrPath(new THREE.Shape(), w - 2 * b, h - 2 * b, r - b, cx, cy);
 const rrHole = (w, h, r, b = 0, cx = 0, cy = 0) => rrPath(new THREE.Path(), w + 2 * b, h + 2 * b, r + b, cx, cy);
-/** Circle as 8 arcs, so curveSegments (per arc) stays low for corners but circles stay round. */
+/** Circle as a 128-gon of plain lines: no arc joints (whose duplicate points crease the bevel
+ *  normals into dark slivers), identical tessellation for hole, wheel and sensor base. */
 const circle = (r, hole = false, cx = 0, cy = 0) => {
   const p = hole ? new THREE.Path() : new THREE.Shape();
-  for (let i = 0; i < 8; i++) p.absarc(cx, cy, r, (i * PI) / 4, ((i + 1) * PI) / 4, false);
+  for (let i = 0; i < 128; i++) p[i ? 'lineTo' : 'moveTo'](cx + r * Math.cos((i * PI) / 64), cy + r * Math.sin((i * PI) / 64));
   return p;
 };
 
@@ -105,8 +106,11 @@ export function buildIpod({ maxAniso = 8 } = {}) {
       emissive: '#ffffff', emissiveIntensity: 0,
       emissiveMap: T.capFit(tx(T.faceGlowCanvas(), { color: false }), W, H),
     });
-    const g = ext(s, 0.8, b, 3, SEG);
-    add(p, g, mats.face);
+    add(p, ext(s, 0.8, b, 3, SEG), mats.face);
+    // flat lip over the wheel hole's bevel: a crisp, evenly lit edge round the gap (a metallic
+    // bevel there catches dark studio corners as slivers at the diagonals)
+    const lip = circle(R + 0.6, false, ...whc); lip.holes.push(circle(R + 0.12, true, ...whc));
+    add(p, new THREE.ShapeGeometry(lip), mats.face, 0, 0, 0.002);
   }
 
   // ---------- display window: tinted acrylic with printed black mask ----------
@@ -128,9 +132,9 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     const s = circle(R - bw);
     s.holes.push(circle(CB + 0.1 + bw, true));
     const map = T.capFit(tx(T.wheelCanvas(wh.diameter, IPOD.wheelLabels.radiusFactor)), wh.diameter, wh.diameter);
-    mats.wheel = phys({ color: '#e4e4e4', map, roughness: 0.42, metalness: 0, clearcoat: 0.3, clearcoatRoughness: 0.3 });
+    mats.wheel = phys({ color: '#ffffff', map, roughness: 0.42, metalness: 0, clearcoat: 0.3, clearcoatRoughness: 0.3, emissive: '#ffffff', emissiveMap: map, emissiveIntensity: 0 });
     add(p, ext(s, 1.3, bw, 3, SEG), mats.wheel, whc[0], whc[1], 0);
-    mats.centre = phys({ color: COLORS.centerButton, metalness: 0.45, roughness: 0.4, roughnessMap: brush, anisotropy: 0.4, clearcoat: 0.3, clearcoatRoughness: 0.3 });
+    mats.centre = phys({ color: '#d9dcdf', emissive: COLORS.centerButton, emissiveIntensity: 0, metalness: 0.3, roughness: 0.4, roughnessMap: brush, anisotropy: 0.4, clearcoat: 0.3, clearcoatRoughness: 0.3 });
     add(p, ext(circle(CB - 0.2), 1.2, 0.2, 3, 14), mats.centre, whc[0], whc[1], -0.08);
     // sensor base behind the wheel: mid grey like the gap shade, and wide enough to cover the
     // annulus while the front plate seats, so no board colour flashes through it

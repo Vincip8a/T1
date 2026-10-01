@@ -16,8 +16,8 @@ const HALF_D = IPOD.depth / 2;
 const FOV_HERO = 26, FOV_END = 20;
 const D = 6.5;
 const ENV_END = 0.25; // final room rotation (fixes the hand-off look)
-const GLASS_FROM = 0.55, GLASS_END = 0.0, GLASS_Z = Math.PI / 4; // diagonal glint on the display glass
-const FACE_GLOW = 0.05; // hand-off fill on the front plate (matches the DOM iPod's tone)
+const GLASS_FROM = 2.75, GLASS_END = 2.27, GLASS_Z = Math.PI / 4; // diagonal glint on the display glass
+const FACE_GLOW = 0.05, WHEEL_GLOW = 0.1; // hand-off fill (matches the DOM iPod's tone)
 const END_EXPOSURE = 0.94;
 const TL = {
   rise: 1.0,
@@ -99,7 +99,7 @@ function studios(stripTex) {
   box(room, 14.8, 2, 7, 0.2, 9, 8, 0.03);         // right flag
   box(room, -14.8, 2, -8, 0.2, 9, 9, 0.03);       // left-back flag
   const con = new THREE.Scene();
-  const cyl = new THREE.Mesh(new THREE.CylinderGeometry(12, 12, 26, 96, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 2.4, 2.4), map: stripTex, side: THREE.DoubleSide }));
+  const cyl = new THREE.Mesh(new THREE.CylinderGeometry(12, 12, 26, 96, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.7, 1.7, 1.7), map: stripTex, side: THREE.DoubleSide }));
   mats.push(cyl.material);
   con.add(cyl);
   box(con, 0, 12.5, 0, 26, 0.2, 26, 1.1);  // ceiling soft box
@@ -112,9 +112,10 @@ function studios(stripTex) {
 // horizon bands for the contrast studio (deg from +Z towards +X, value): the polished back
 // sweeps 60°→180° while it faces the camera, crossing two hot strips and a black flag.
 const BANDS = [
-  [0, 16, 0.5], [16, 24, 1], [24, 40, 0.42], [40, 58, 0.015], [58, 75, 0.45], [75, 83, 1], [83, 108, 0.62],
-  [108, 133, 0.012], [133, 140, 1], [140, 180, 0.5], [180, 219, 0.006], [219, 223, 0.4], [223, 226, 0.006],
-  [226, 227.5, 0.16], [227.5, 268, 0.006], [268, 300, 0.4], [300, 309, 1], [309, 330, 0.03], [330, 360, 0.5],
+  [0, 12, 0.6, 0.4], [12, 14.5, 1], [14.5, 26, 0.5], [26, 32, 0.02], [32, 46, 0.75, 0.4], [46, 49, 1], [49, 60, 0.55],
+  [60, 72, 0.7, 0.35], [72, 75, 1], [75, 86, 0.55], [86, 92, 0.02], [92, 104, 0.75, 0.4], [104, 107, 1], [107, 118, 0.6],
+  [118, 126, 0.015], [126, 140, 0.7, 0.45], [140, 143, 1], [143, 180, 0.5, 0.3], [180, 219, 0.006], [219, 223, 0.4],
+  [223, 226, 0.006], [226, 227.5, 0.16], [227.5, 268, 0.006], [268, 300, 0.4], [300, 309, 1], [309, 330, 0.03], [330, 360, 0.5, 0.6],
 ];
 
 const NOOP = { duration: 0, done: Promise.resolve(), skip() {}, seek() {}, pause() {}, play() {}, dispose() {} };
@@ -158,7 +159,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
   const rig = new THREE.Group();
   scene.add(rig);
   const ipod = buildIpod({ maxAniso: Math.min(8, renderer.capabilities.getMaxAnisotropy()) });
-  const { glass, panel, face } = ipod.mats;
+  const { glass, panel, face, wheel, centre } = ipod.mats;
   for (const m of [glass, panel, ipod.mats.steel, ipod.mats.back]) m.envMap = conRT.texture;
   const chassis = new THREE.Group(); // receives the landing nudges
   chassis.position.z = HALF_D;        // rotate about the device centre
@@ -317,7 +318,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
       shadow.visible = false;
       scene.environmentRotation.set(0, ENV_END, 0);
       glass.envMapRotation.set(0, GLASS_END, GLASS_Z); panel.envMapRotation.copy(glass.envMapRotation);
-      face.emissiveIntensity = FACE_GLOW;
+      face.emissiveIntensity = FACE_GLOW; wheel.emissiveIntensity = centre.emissiveIntensity = WHEEL_GLOW;
       renderer.toneMappingExposure = END_EXPOSURE;
       applyCamera(1, 0);
       camera.position.z = HALF_D + (camera.position.z - HALF_D) * (1 + 0.04 * (1 - p3out(u)));
@@ -387,6 +388,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     const dReq = fitDistance(L.corners, rig.quaternion, FOV_HERO, L.vw / L.vh, L.mx, L.my, ox, oy, dzLive);
     applyCamera(b, smax(dHero * tHero, dReq * tHero, 0.04 * dHero * tHero));
     face.emissiveIntensity = FACE_GLOW * b * b;
+    wheel.emissiveIntensity = centre.emissiveIntensity = WHEEL_GLOW * b * b;
     renderer.toneMappingExposure = lerp(1, END_EXPOSURE, b * b);
 
     shadow.visible = b < 1;
@@ -518,6 +520,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
       return { left: ext[0], top: ext[1], right: ext[2], bottom: ext[3], target: { left: r.left, top: r.top, width: r.width, height: r.height }, err };
     };
     controller._three = { scene, renderer, ipod, key, rim };
+    controller._render = () => renderer.render(scene, camera); // draw without re-posing (probes)
   }
   controller.play();
   return controller;

@@ -86,14 +86,12 @@ export function brushed(seed, base, spread, S = 512, h = [0.5, 0.9], n = S * 3) 
 }
 
 /** Contrast studio wrap (linear): [startDeg, endDeg, value] bands around the horizon,
- *  darkening towards the floor. Soft boxes, hot strips and black flags for polished steel. */
+ *  optionally ramping from v to w, darkening towards the floor. Soft boxes, hot strips and black flags for polished steel. */
 export function stripCanvas(bands) {
   const [c, g] = canvas(1024, 64);
   const grd = g.createLinearGradient(0, 0, 1024, 0);
-  for (const [a, b, v] of bands) {
-    const k = `rgb(${(v * 255) | 0},${(v * 255) | 0},${(v * 255) | 0})`;
-    grd.addColorStop(a / 360 + 0.0015, k); grd.addColorStop(b / 360 - 0.0015, k);
-  }
+  const k = (v) => `rgb(${(v * 255) | 0},${(v * 255) | 0},${(v * 255) | 0})`;
+  for (const [a, b, v, w = v] of bands) { grd.addColorStop(a / 360 + 0.001, k(v)); grd.addColorStop(b / 360 - 0.001, k(w)); }
   g.fillStyle = grd; g.fillRect(0, 0, 1024, 64);
   g.globalCompositeOperation = 'multiply';
   const vg = g.createLinearGradient(0, 0, 0, 64);
