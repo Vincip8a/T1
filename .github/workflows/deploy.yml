@@ -29,13 +29,19 @@ jobs:
           cache: npm
 
       - name: Pages konfigurieren
+        id: pages
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - name: Abhängigkeiten installieren
         run: npm ci
 
       - name: Projekt bauen
         run: npm run build
+        env:
+          # Absolute Adresse für og:image / og:url (funktioniert auch mit eigener Domain)
+          SITE_URL: ${{ steps.pages.outputs.base_url }}/
 
       - name: Build-Ergebnis hochladen
         uses: actions/upload-pages-artifact@v3
