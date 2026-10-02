@@ -13,6 +13,8 @@
   <meta property="og:description" content="Design · Creative Direction · Musik" />
   <meta property="og:image" content="og-image.png" />
   <meta name="twitter:card" content="summary_large_image" />
+  <!-- config.json starts loading with the page, not after the entry script (src/main.js picks it up) -->
+  <script>window.__configP = fetch('config.json', { cache: 'no-cache' }).catch(() => null);</script>
 </head>
 <body>
   <div id="app"></div>

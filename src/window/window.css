@@ -29,12 +29,13 @@
       rgba(255,255,255,0) 130deg, rgba(160,225,255,.30) 168deg, rgba(255,255,255,0) 210deg,
       rgba(255,255,255,0) 360deg),
     radial-gradient(130% 100% at 50% 118%, #6cc0f7 0%, #3f9bea 36%, #1f6fd0 62%, #12489f 100%);
-  animation: dt-drift 70s ease-in-out infinite alternate;
-  will-change: transform;
+  /* two slow sweeps (there and back, 140 s), then the wallpaper rests: an idle page must not keep the
+     compositor redrawing the full screen forever */
+  animation: dt-drift 70s ease-in-out 2 alternate both; /* (both: it rests on its first frame, no jump) */
 }
 .dt-wall-grain {
   position: absolute; inset: 0; opacity: .5; mix-blend-mode: soft-light;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n' x='0' y='0' width='1' height='1'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 .dt-wall::after { /* soft vignette */
   content: ''; position: absolute; inset: 0;
@@ -56,16 +57,21 @@
   box-shadow: 0 1px 4px rgba(0,30,90,.28), inset 0 -1px 0 rgba(255,255,255,.35);
   font-size: 13px; line-height: 1;
 }
-.dt-bar-left { display: flex; align-items: center; height: 100%; min-width: 0; }
+/* a long name gives way first (ellipsis): the monogram, Links, Kontakt, the legal links and the clock
+   keep their room at any width and text spacing */
+.dt-bar-left { display: flex; align-items: center; height: 100%; min-width: 0; flex: 0 1 auto; }
 .dt-mono {
-  font-weight: 800; font-size: 12px; letter-spacing: -.02em; padding: 0 9px 0 6px;
+  flex: none; font-weight: 800; font-size: 12px; letter-spacing: -.02em; padding: 0 9px 0 6px;
   text-shadow: 0 1px 0 rgba(255,255,255,.7);
 }
-.dt-brand { font-weight: 700; padding: 0 9px; white-space: nowrap; text-shadow: 0 1px 0 rgba(255,255,255,.6); }
+.dt-brand {
+  flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  font-weight: 700; padding: 0 9px; white-space: nowrap; text-shadow: 0 1px 0 rgba(255,255,255,.6);
+}
 .dt-bar-item {
   appearance: none; background: none; border: 0; margin: 0; font: inherit; color: inherit;
   height: calc(var(--bar-h) - 2px); display: inline-flex; align-items: center;
-  padding: 0 9px; border-radius: 4px; text-decoration: none; cursor: default;
+  padding: 0 9px; border-radius: 4px; text-decoration: none; cursor: default; flex: none; white-space: nowrap;
   text-shadow: 0 1px 0 rgba(255,255,255,.6);
 }
 @media (hover: hover) {
@@ -73,7 +79,7 @@
 }
 .dt-bar-item:active { background: linear-gradient(#2a64d8, #1846a8); color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.4); }
 .dt-bar-item:focus-visible { outline: 2px solid #2a64d8; outline-offset: -2px; }
-.dt-bar-right { display: flex; align-items: center; height: 100%; min-width: 0; }
+.dt-bar-right { display: flex; align-items: center; height: 100%; flex: none; margin-left: 8px; }
 .dt-legal { display: flex; align-items: center; height: 100%; gap: 2px; }
 .dt-legal-link {
   font-size: 11px; color: #3a3a3a; text-decoration: none; white-space: nowrap;
@@ -112,17 +118,18 @@
 .dt.is-dragging, .dt.is-dragging * { cursor: grabbing !important; }
 .dt[data-state="minimised"] .dt-win { visibility: hidden; }
 
-/* brushed-metal grain */
+/* brushed-metal grain (the noise filter region is exactly the 360 px tile, so stitchTiles makes it
+   seamless: no vertical seam where the tile repeats) */
 .dt-win::before, .dt-win::after {
   content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
   background-size: 360px 360px;
 }
 .dt-win::before {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='360'%3E%3Cfilter id='b'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.003 .9' numOctaves='2' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 1.6 0 0 0 -.62'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23b)'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='360'%3E%3Cfilter id='b' x='0' y='0' width='1' height='1'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.003 .9' numOctaves='2' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 1.6 0 0 0 -.62'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23b)'/%3E%3C/svg%3E");
   opacity: .55;
 }
 .dt-win::after {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='360'%3E%3Cfilter id='d'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.004 .8' numOctaves='2' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.5 0 0 0 .55'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23d)'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='360'%3E%3Cfilter id='d' x='0' y='0' width='1' height='1'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.004 .8' numOctaves='2' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.5 0 0 0 .55'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23d)'/%3E%3C/svg%3E");
   opacity: .16;
 }
 
@@ -137,7 +144,8 @@
   box-shadow: 0 1px 0 rgba(255,255,255,.35);
 }
 .dt-title {
-  margin: 0; font-family: inherit; font-size: 13px; font-weight: 400; line-height: 1; text-align: center;
+  /* a 16 px line box: descenders and underscores stay inside the overflow clip (the grid centres it) */
+  margin: 0; font-family: inherit; font-size: 13px; font-weight: 400; line-height: 16px; text-align: center;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 100%;
   color: #1c1c1c; text-shadow: 0 1px 0 rgba(255,255,255,.75);
 }
@@ -174,7 +182,7 @@
 .dt-tl:active { filter: brightness(.82); }
 .dt-tl:focus-visible { outline: 2px solid #fff; outline-offset: 1px; box-shadow: 0 0 0 4px rgba(20,90,220,.8); }
 .dt.is-locked .dt-tl { filter: saturate(.55) brightness(1.05); }
-/* phone: zoom has nothing to do, the light is a clear grey gel without its glyph (Aqua's disabled light) */
+/* phone or short screen: zoom has nothing to do, the light is a clear grey gel without its glyph (Aqua's disabled light) */
 .dt.is-zoom-off .dt-tl-zoom { filter: grayscale(1) brightness(1.18); opacity: .7; }
 .dt.is-zoom-off .dt-tl-zoom svg { display: none; }
 .dt.is-locked .dt-titlebar, .dt.is-locked .dt-lights { pointer-events: none; }
@@ -198,6 +206,11 @@
   .dt.is-zoomed .dt-content { --ipod-h: max(var(--ipod-floor), min(calc(100svh - 150px), 780px)); }
 }
 @media (pointer: fine) { .dt-content { --ipod-floor: 500px; } }
+/* a narrow window (400 % zoom on a 1280 px screen is 320 CSS px): the floor never makes the iPod wider
+   than the sheet, so the page scrolls only vertically (WCAG 1.4.10) */
+@media (pointer: fine) and (max-width: 639.98px) {
+  .dt-content { --ipod-floor: min(500px, calc((100vw - 38px) / var(--ipod-aspect))); }
+}
 
 .dt-status {
   /* a block, not a flex box: text-overflow only ellipsizes a block's own text (a long tagline) */
@@ -251,7 +264,15 @@
     background: linear-gradient(#4a8fe8, #1e56c8); box-shadow: 0 1px 2px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.35);
   }
 }
-.dt-icon:focus-visible { outline: 2px solid rgba(255,255,255,.85); outline-offset: 1px; }
+/* keyboard focus: a soft white halo that follows the icon (no box around the whole button, like the
+   Dock); a pointer user (data-input="pointer") gets none. The transparent outline shows in forced colours. */
+.dt-icon:focus-visible { outline: 2px solid transparent; }
+.dt-icon:focus-visible .dt-icon-art {
+  box-shadow: 0 6px 12px rgba(0,20,70,.5), inset 0 1px 0 #fff, inset 0 -1px 1px rgba(0,0,0,.2),
+    0 0 0 2px rgba(255,255,255,.95), 0 0 7px 4px rgba(255,255,255,.55);
+}
+.dt[data-input="pointer"] .dt-icon:focus-visible .dt-icon-art { box-shadow: 0 6px 12px rgba(0,20,70,.5), inset 0 1px 0 #fff, inset 0 -1px 1px rgba(0,0,0,.2); }
+.dt[data-input="pointer"] .dt-icon:focus-visible:not(:active, :hover) .dt-icon-label { background: none; box-shadow: none; }
 
 /* ---------- mobile sheet ----------
    The window spans the width and hugs the iPod vertically (centred on the wallpaper), so there is
@@ -277,6 +298,10 @@
   .dt-clock { padding-left: 6px; }
 }
 
+/* phones under 400 px: the name never fits next to Kontakt, the legal links and the clock (at any
+   text spacing), so the monogram stands for it, as on the legal pages; the window title still names
+   it. Without a monogram the name stays and ellipsizes. */
+@media (max-width: 399.98px) { .dt-mono + .dt-brand { display: none; } }
 /* the narrowest phones (320 px): the clock gives way, so Kontakt and the legal links keep their room */
 @media (max-width: 359.98px) { .dt-clock { display: none; } }
 
@@ -317,4 +342,11 @@
   .dt-wall-drift { animation: none; }
   .dt.is-waiting .dt-content::after { animation: dt-wait-in .3s .6s forwards; }
   .dt-icon.is-arriving .dt-icon-art { animation: none; }
+}
+
+/* forced colours (Windows High Contrast): the noise textures would paint grey static over the system
+   colours; the flat Canvas colour shows instead */
+@media (forced-colors: active) {
+  .dt-wall-drift, .dt-wall-grain, .dt-wall::after { display: none; }
+  .dt-win::before, .dt-win::after { background-image: none; }
 }

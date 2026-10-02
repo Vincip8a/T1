@@ -11,6 +11,11 @@ const { PI, abs, cos, exp, max, min, sign, sin, sqrt, tan } = Math;
 const DEG = PI / 180, HALF_D = IPOD.depth / 2;
 const FOV_HERO = 26, FOV_END = 20, tHero = tan(13 * DEG);
 const STILL = 6.32, D = STILL + 0.22, FADE_MS = 220; // static tail: aligned and still from STILL to D
+// frame-time watch: a median frame slower than SLOW_MS (under 20 fps) first drops the pixel ratio to 1,
+// then hands off to the DOM iPod; a slow frame advances the intro by at most MAX_STEP (it skips frames
+// rather than playing in slow motion)
+const SLOW_MS = 50, WATCH_N = 6, MAX_STEP = 0.25;
+const SHADOW_FEATHER = 24; // css px: the floor shadow fades out towards the window edges
 const ENV_END = 0.25, GLASS_FROM = 2.75, GLASS_END = 2.27, GLASS_Z = PI / 4;
 const WHEEL_GLOW = 0.24, CENTRE_GLOW = 0.3, END_EXPOSURE = 0.9, KEY_END = 0.9; // = DOM iPod tone
 const KEY_HOLD = 1.1, FACE_HOLD = 0.72; // hero: plate silver, not white
@@ -107,20 +112,59 @@ const BANDS = [
   [223, 226, 0.006], [226, 227.5, 0.16], [227.5, 268, 0.006], [268, 300, 0.4], [300, 309, 1], [309, 330, 0.03], [330, 360, 0.5, 0.6],
 ];
 
-const NOOP = { duration: 0, done: Promise.resolve(), ready: Promise.resolve(), skip() {}, seek() {}, pause() {}, play() {}, dispose() {}, measure() {}, info() {} };
 
-export function runIntro({ getTargetRect, reducedMotion = false, config = null } = {}) {
-  const duration = reducedMotion ? 1.0 : D;
-  const canvas = document.createElement('canvas');
-  let renderer;
-  try {
-    const attrs = { alpha: true, antialias: true, stencil: false, powerPreference: 'high-performance' };
-    const gl = canvas.getContext('webgl2', attrs);
-    if (!gl) return NOOP;
-    renderer = new THREE.WebGLRenderer({ canvas, context: gl, ...attrs });
-  } catch {
-    return NOOP;
-  }
+const nextTask = () => new Promise((r) => setTimeout(r, 0));
+
+/** getFrameRect (optional): the window's rect; the floor shadow stays on its metal, never on the wallpaper.
+ *  The WebGL context, the renderer and the model are each created in a task of their own (a skip or
+ *  dispose() in between stops it there), then start() builds the scene and runs the setup chain; this
+ *  controller forwards to start()'s once it exists. Without a WebGL 2 context `done` resolves at once. */
+export function runIntro(opts = {}) {
+  const duration = opts.reducedMotion ? 1.0 : D;
+  let real = null, stopped = false, pausedEarly = false, seekTo = null, resolveDone, resolveReady;
+  const done = new Promise((r) => { resolveDone = r; }), ready = new Promise((r) => { resolveReady = r; });
+  (async () => {
+    let renderer = null;
+    try {
+      const canvas = document.createElement('canvas');
+      const attrs = { alpha: true, antialias: true, stencil: false, powerPreference: 'high-performance' };
+      const gl = canvas.getContext('webgl2', attrs);
+      if (!gl) throw new Error('no WebGL 2');
+      await nextTask();
+      if (stopped) throw new Error('stopped');
+      renderer = new THREE.WebGLRenderer({ canvas, context: gl, ...attrs });
+      await nextTask();
+      if (stopped) throw new Error('stopped');
+      const ipod = buildIpod({ maxAniso: min(8, renderer.capabilities.getMaxAnisotropy()) });
+      await nextTask();
+      if (stopped) throw new Error('stopped');
+      real = start({ ...opts, duration, canvas, renderer, ipod });
+      if (pausedEarly) real.pause();
+      if (seekTo != null) real.seek(seekTo);
+      real.done.then(resolveDone);
+      real.ready.then(resolveReady);
+    } catch {
+      try { renderer?.dispose(); renderer?.forceContextLoss(); } catch { /* already gone */ }
+      resolveDone();
+      resolveReady();
+    }
+  })();
+  const stop = () => { if (real) real.dispose(); else stopped = true; };
+  return {
+    duration, done, ready,
+    get paused() { return real ? real.paused : pausedEarly; },
+    skip() { if (real) real.skip(); else stopped = true; },
+    dispose: stop,
+    seek(t) { if (real) real.seek(t); else seekTo = t; },
+    pause() { if (real) real.pause(); else pausedEarly = true; },
+    play() { if (real) real.play(); else pausedEarly = false; },
+    measure: () => real?.measure() ?? null,
+    info: () => real?.info(),
+    get _three() { return real?._three; }, // dev only (start() sets it in dev)
+  };
+}
+
+function start({ getTargetRect, getFrameRect, reducedMotion = false, config = null, duration, canvas, renderer, ipod }) {
   canvas.setAttribute('aria-hidden', 'true');
   canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none;z-index:50;opacity:0';
   document.body.append(canvas);
@@ -133,7 +177,6 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
   const rim = new THREE.DirectionalLight(0xdce8ff, 2.2); rim.position.set(1.0, 0.45, -0.9);
   const camera = new THREE.PerspectiveCamera(FOV_HERO, 1, 20, 8000);
   const rig = new THREE.Group(), chassis = new THREE.Group();
-  const ipod = buildIpod({ maxAniso: min(8, renderer.capabilities.getMaxAnisotropy()) });
   const { glass, panel, wheel, centre, face, lip } = ipod.mats;
   chassis.position.z = HALF_D;
   chassis.add(ipod.model);
@@ -141,6 +184,24 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
   const shadowTex = new THREE.CanvasTexture(shadowCanvas());
   const shadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false, toneMapped: false }));
   shadow.renderOrder = -1;
+  // the shadow lies on the window's floor: masked in screen space to the window rect (device px, origin
+  // bottom left: left, bottom, right, top) with a soft edge, so it never smears onto the desktop
+  const frameU = { value: new THREE.Vector4(-1e6, -1e6, 1e6, 1e6) }, featherU = { value: 1 };
+  shadow.material.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, { uFrame: frameU, uFeather: featherU });
+    sh.fragmentShader = `uniform vec4 uFrame;\nuniform float uFeather;\n${sh.fragmentShader.replace('#include <dithering_fragment>', `#include <dithering_fragment>
+      vec2 fq = gl_FragCoord.xy;
+      gl_FragColor.a *= smoothstep(uFrame.x, uFrame.x + uFeather, fq.x) * (1.0 - smoothstep(uFrame.z - uFeather, uFrame.z, fq.x))
+        * smoothstep(uFrame.y, uFrame.y + uFeather, fq.y) * (1.0 - smoothstep(uFrame.w - uFeather, uFrame.w, fq.y));`)}`;
+  };
+  const clipShadow = () => {
+    let r = null;
+    try { r = getFrameRect?.(); } catch {}
+    if (!r?.width) return;
+    const k = renderer.getPixelRatio();
+    frameU.value.set(r.left * k, (L.vh - r.bottom) * k, r.right * k, (L.vh - r.top) * k);
+    featherU.value = SHADOW_FEATHER * k;
+  };
   scene.add(key, rim, rig, shadow);
 
   const parts = ipod.parts, N = parts.length, ids = parts.map((p) => p.id), iOf = (id) => ids.indexOf(id);
@@ -173,9 +234,8 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
       for (const m of gM) m.envMap = CON.includes(m) ? conRT.texture : envRT.texture;
     },
   ];
-  const buildEnv = () => bakes.forEach((b) => b());
 
-  const L = { vw: 0, vh: 0, dpr: 0, dz: [], o: ORBIT.land };
+  const L = { vw: 0, vh: 0, dpr: 0, maxDpr: 2, dz: [], o: ORBIT.land };
   const tmpV = new V3(), tmpE = new THREE.Euler(), tmpQ = new THREE.Quaternion();
 
   function computeExplode(gap) {
@@ -204,7 +264,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
   };
 
   function layout() {
-    const vw = innerWidth, vh = innerHeight, dpr = min(devicePixelRatio || 1, 2), aspect = vw / vh;
+    const vw = innerWidth, vh = innerHeight, dpr = min(devicePixelRatio || 1, L.maxDpr), aspect = vw / vh;
     if (vw === L.vw && vh === L.vh && dpr === L.dpr) return;
     if (dpr !== L.dpr) renderer.setPixelRatio(dpr);
     Object.assign(L, { vw, vh, dpr, portrait: aspect < 0.9 });
@@ -330,6 +390,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     key.intensity = lerp(KEY_HOLD, KEY_END, b2);
 
     shadow.visible = b < 1;
+    if (shadow.visible) clipShadow();
     shadow.position.set(0, -IPOD.height / 2 - 9 - 7 * env + rise, -12);
     shadow.scale.set(lerp(84, 175 * L.spread, env), lerp(13, 24, env), 1);
     shadow.material.opacity = (0.55 - (L.portrait ? 0.45 : 0.17) * env) * TRK.shadow(t) * (1 - b);
@@ -369,17 +430,39 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     };
     tick();
   }
+  // frame times since `ready` (or since the last play()): see SLOW_MS
+  let frameMs = [];
+  function watchFrames(dt) {
+    frameMs.push(dt);
+    if (frameMs.length < WATCH_N) return;
+    const median = frameMs.sort((a, b) => a - b)[WATCH_N >> 1];
+    frameMs = [];
+    if (median <= SLOW_MS) return;
+    if (L.dpr > 1) L.maxDpr = 1; // layout() applies it on the next pose
+    else finish(); // still too slow: the aligned final frame, then the DOM iPod
+  }
   function frame(now) {
     if (!playing || disposed) return;
-    t = min(duration, t + (last ? min((now - last) / 1000, 0.1) : 0));
+    const dt = last ? now - last : 0;
     last = now;
+    if (dt) watchFrames(dt);
+    if (finished) return;
+    t = min(duration, t + min(dt / 1000, MAX_STEP));
     if (t >= duration) return finish();
     render();
     raf = requestAnimationFrame(frame);
   }
   const onResize = () => { if (!playing) render(); };
+  // the intro is decoration: a setup that throws or a restored context (whose rebuild would be one long
+  // task) ends it, and the DOM iPod takes over at once
+  const drop = () => {
+    finished = handedOff = true; playing = false;
+    cancelAnimationFrame(raf);
+    canvas.remove();
+    resolveDone();
+  };
   const onLost = (e) => { e.preventDefault(); lost = true; };
-  const onRestored = () => { if (disposed) return; lost = false; if (ready) { buildEnv(); render(); } };
+  const onRestored = () => { if (!disposed && !finished) drop(); };
   const listen = (on) => {
     const f = on ? 'addEventListener' : 'removeEventListener';
     window[f]('resize', onResize);
@@ -398,7 +481,6 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
   // a skip or dispose stops it: the environment bakes, the drawing buffer, the shaders (compiled at
   // once, then first used, i.e. link-checked, per part on a 1 px viewport), the texture uploads,
   // then the first frame and play. `ready` settles when it ends either way.
-  const nextTask = () => new Promise((r) => setTimeout(r, 0));
   const units = [...ipod.model.children, shadow];
   const warmUp = (u) => () => {
     const vis = units.map((x) => x.visible);
@@ -410,10 +492,11 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
   };
   const steps = [
     ...bakes,
+    // one canvas texture drawn and uploaded per task (before the warm-up renders would upload them)
+    ...ipod.paints.map((paint) => () => renderer.initTexture(paint())),
     layout,
     () => { pose(3.4); INTERNAL.forEach((i) => { parts[i].group.visible = true; }); renderer.compile(scene, camera); },
     ...units.map(warmUp),
-    ...ipod.textures.map((x) => () => renderer.initTexture(x)),
   ];
   const settled = (async () => {
     try {
@@ -426,10 +509,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
       render();
       if (playing) { last = 0; raf = requestAnimationFrame(frame); }
     } catch {
-      // a setup that throws (driver / GPU failure) never keeps the iPod hidden
-      finished = handedOff = true; playing = false;
-      canvas.remove();
-      resolveDone();
+      drop(); // a setup that throws (driver / GPU failure) never keeps the iPod hidden
     }
   })();
 
@@ -439,6 +519,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     done,
     ready: settled,
     skip: finish,
+    get paused() { return !playing && !finished && !disposed; }, // test hook paused it (seek / pause)
     seek(s) {
       if (disposed) return;
       t = max(0, min(duration, Number(s) || 0));
@@ -449,7 +530,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     play() {
       if (playing || finished || disposed) return;
       if (t >= duration) return finish();
-      playing = true; last = 0;
+      playing = true; last = 0; frameMs = [];
       if (ready) raf = requestAnimationFrame(frame); // else the setup starts the loop
     },
     dispose() {

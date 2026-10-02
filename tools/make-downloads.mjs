@@ -410,7 +410,7 @@ async function main() {
   for (const doc of documents) {
     const target = join(outDir, doc.file)
     const bytes = await htmlToPdf(doc.html, target)
-    console.log(`public/downloads/${doc.file.padEnd(26)} ${formatSize(bytes)}`)
+    console.log(`public/downloads/${doc.file.padEnd(26)} "size": "${formatSize(bytes)}"`) // zum Einfügen in config.json
   }
 }
 

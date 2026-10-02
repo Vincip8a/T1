@@ -2,6 +2,8 @@
 // presses on the four printed zones. Like the capacitive wheel there is no inertia: the list stops
 // the moment the finger lifts. Faster spins need less arc per step (the authentic acceleration).
 const SLOP = 7; // arc (degrees) below this still counts as a press
+const PRESS_SLIDE = 0.15; // a press slid further than this (x wheel radius) from where it began is cancelled
+const CENTRE = 0.4; // centre button radius / wheel radius (ipodSpec: 15.4 / 38.6): lifting there presses nothing
 const ZONES = ['next', 'play', 'prev', 'menu']; // clockwise from 3 o'clock
 
 /**
@@ -32,7 +34,7 @@ export function createWheel(wheel, on, { onStep, onPress, onDown }) {
     if (e.button || g || e.target.closest('.ipodc-center')) return;
     const r = wheel.getBoundingClientRect();
     const R = r.width / 2;
-    g = { id: e.pointerId, cx: r.left + R, cy: r.top + R, R, acc: 0, rev: 0, total: 0, v: 0, t: e.timeStamp, drag: false };
+    g = { id: e.pointerId, cx: r.left + R, cy: r.top + R, R, sx: e.clientX, sy: e.clientY, acc: 0, rev: 0, total: 0, v: 0, t: e.timeStamp, drag: false };
     const a = angle(e);
     if (Math.hypot(e.clientX - g.cx, e.clientY - g.cy) > R + 2) return void (g = null);
     e.preventDefault();
@@ -45,6 +47,13 @@ export function createWheel(wheel, on, { onStep, onPress, onDown }) {
 
   on(wheel, 'pointermove', (e) => {
     if (e.pointerId !== g?.id) return;
+    // a finger that slides off its zone (inwards onto the centre button, or anywhere far enough) presses
+    // nothing on lift, like the real wheel; turning it is still possible
+    if (g.zone && (Math.hypot(e.clientX - g.sx, e.clientY - g.sy) > g.R * PRESS_SLIDE
+      || Math.hypot(e.clientX - g.cx, e.clientY - g.cy) < g.R * CENTRE)) {
+      g.zone = null;
+      if (!g.drag) setPress();
+    }
     const a = angle(e);
     const d = g.last == null || a == null ? 0 : ((a - g.last + 540) % 360) - 180;
     g.last = a;
@@ -81,7 +90,7 @@ export function createWheel(wheel, on, { onStep, onPress, onDown }) {
     if (e.pointerId !== g?.id) return;
     const { drag, zone } = g;
     stop();
-    if (e.type === 'pointerup' && !drag) onPress(zone);
+    if (e.type === 'pointerup' && !drag && zone) onPress(zone);
   };
   for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) on(wheel, t, up);
   return stop;

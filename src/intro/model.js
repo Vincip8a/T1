@@ -118,12 +118,19 @@ function ribbon(mat, from, a, ta, to, b, tb, w, N = 28) {
 }
 
 export function buildIpod({ maxAniso = 8 } = {}) {
-  const textures = [];
-  const tx = (c, o = {}) => { const t = T.tex(c, { aniso: maxAniso, ...o }); textures.push(t); return t; };
+  // canvas textures are drawn later, one per setup task (runIntro's step chain, before the first upload),
+  // so building the model stays one short task: `paint` is a function that returns the drawn canvas
+  const textures = [], paints = [];
+  const tx = (paint, o = {}) => {
+    const t = T.tex(T.blank(), { aniso: maxAniso, ...o });
+    paints.push(() => { t.image = paint(); t.needsUpdate = true; return t; });
+    textures.push(t);
+    return t;
+  };
   const fit = (c, w, h = w, o) => T.capFit(tx(c, o), w, h);
-  const brush = tx(T.brushed(3, 128, 16), { color: false, wrap: true });
+  const brush = tx(() => T.brushed(3, 128, 16), { color: false, wrap: true });
   brush.repeat.set(1 / 40, 1 / 40);
-  const fine = tx(T.brushed(4, 190, 36, 1024, [0.3, 0.3], 9000, 0.5), { color: false, wrap: true });
+  const fine = tx(() => T.brushed(4, 190, 36, 1024, [0.3, 0.3], 9000, 0.5), { color: false, wrap: true });
   fine.repeat.set(1 / 20, 1 / 20);
 
   const model = new THREE.Group(), parts = {}, mats = {};
@@ -147,7 +154,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
 
   { // front plate: brushed anodised aluminium, tone = DOM plate
     const p = mk('faceplate'), b = FACE_BEVEL;
-    mats.face = phys({ color: '#e1e4e7', map: fit(T.faceToneCanvas(FACE_TONE), W, H), metalness: 0.62, roughness: 0.44, roughnessMap: fine, anisotropy: 0.4, clearcoat: 0.25, clearcoatRoughness: 0.28 });
+    mats.face = phys({ color: '#e1e4e7', map: fit(() => T.faceToneCanvas(FACE_TONE), W, H), metalness: 0.62, roughness: 0.44, roughnessMap: fine, anisotropy: 0.4, clearcoat: 0.25, clearcoatRoughness: 0.28 });
     add(p, ext(holed(rr(W, H, IPOD.cornerRadius, b), rrHole(sw.width, sw.height, sw.radius, b, ...swc), circle(R + 0.12 + b, true, 128, ...whc)), 0.8, b, 3, SEG), mats.face);
     mats.lip = mats.face.clone();
     mats.lip.vertexColors = true;
@@ -155,11 +162,11 @@ export function buildIpod({ maxAniso = 8 } = {}) {
   }
   {
     const p = mk('screenGlass'), gw = sw.width - 0.1, gh = sw.height - 0.1;
-    mats.glass = phys({ color: '#030303', roughness: 0.04, clearcoat: 1, clearcoatRoughness: 0.03, transparent: true, alphaMap: fit(T.glassAlphaCanvas(gw, gh, sc.width + 0.6, sc.height + 0.6), gw, gh, { color: false }), ior: 1.49 });
+    mats.glass = phys({ color: '#030303', roughness: 0.04, clearcoat: 1, clearcoatRoughness: 0.03, transparent: true, alphaMap: fit(() => T.glassAlphaCanvas(gw, gh, sc.width + 0.6, sc.height + 0.6), gw, gh, { color: false }), ior: 1.49 });
     add(p, ext(rr(gw, gh, sw.radius, 0.1), 0.6, 0.1, 2, 8), mats.glass, ...swc);
   }
   {
-    const p = mk('clickWheel'), map = fit(T.wheelCanvas(wh.diameter, IPOD.wheelLabels.radiusFactor, CB), wh.diameter), cmap = fit(T.centreCanvas(2 * CB), 2 * CB);
+    const p = mk('clickWheel'), map = fit(() => T.wheelCanvas(wh.diameter, IPOD.wheelLabels.radiusFactor, CB), wh.diameter), cmap = fit(() => T.centreCanvas(2 * CB), 2 * CB);
     const glow = { color: '#fff', emissive: '#fff', emissiveIntensity: 0, clearcoat: 0.3, clearcoatRoughness: 0.3 };
     mats.wheel = phys({ ...glow, map, emissiveMap: map, roughness: 0.42 });
     mats.centre = phys({ ...glow, map: cmap, emissiveMap: cmap, metalness: 0.3, roughness: 0.4, roughnessMap: brush, anisotropy: 0.4 });
@@ -168,12 +175,12 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     add(p, ext(holed(circle(R + 2.5, false, 96), circle(CB - 2, true, 48)), 0.2), std({ color: '#8a8d91', roughness: 0.8 }), ...whc, -1.35);
   }
   {
-    const p = mk('wheelFlex'), ft = tx(T.flexCanvas(), { wrap: true });
+    const p = mk('wheelFlex'), ft = tx(() => T.flexCanvas(), { wrap: true });
     ft.repeat.set(1 / 10, 1 / 10);
     const kap = (map, o) => phys({ color: '#fff', map, metalness: 0.2, roughness: 0.34, clearcoat: 0.85, clearcoatRoughness: 0.14, side: THREE.DoubleSide, ...o });
     mats.flex = kap(ft);
     mats.ribbon = kap(ft, { metalness: 0.1, roughness: 0.5, clearcoat: 0.35, clearcoatRoughness: 0.25 });
-    add(p, ext(holed(circle(ro, false, 96), circle(9.5, true, 48)), 0.15), kap(fit(T.flexRingCanvas(2 * ro, 9.5, ro), 2 * ro)), ...whc);
+    add(p, ext(holed(circle(ro, false, 96), circle(9.5, true, 48)), 0.15), kap(fit(() => T.flexRingCanvas(2 * ro, 9.5, ro), 2 * ro)), ...whc);
     add(p, ext(rr(7, 4.5, 0.6), 0.15), mats.flex, whc[0] - 6, whc[1] - ro + 0.2);
   }
   const fh = sw.height + 3;
@@ -192,8 +199,8 @@ export function buildIpod({ maxAniso = 8 } = {}) {
   const prints = [...chips.map(([x, y, w, h], i) => ({ ref: 'U' + (i + 1), x, y, w, h })), ...others.map(([ref, x, y, w, h]) => ({ ref, x, y, w, h }))];
   {
     const p = mk('logicBoard');
-    add(p, ext(rr(BW, BH, 3, 0.1), 0.8, 0.1, 1, 6), phys({ color: '#fff', map: fit(T.pcbCanvas(BW, BH, prints, [[-25, 42], [25, 42], [-25, -42], [25, -42], [0, 3]]), BW, BH), roughness: 0.5, metalness: 0.05, clearcoat: 0.55, clearcoatRoughness: 0.22 }), 0, BY, BZ);
-    const chipMat = std({ map: tx(T.chipAtlas([['DN8702', '0726 K4B', 'TAIWAN'], ['K4M513', 'PE-DG75'], ['NAND 32G', 'E3 BB2'], ['CS42L', 'CNZ'], ['PMU', '1723'], ['PP5022C', 'TBDG 0734'], ['WM8758', 'BG 07'], ['ATA', '1611']])), roughness: 0.5 });
+    add(p, ext(rr(BW, BH, 3, 0.1), 0.8, 0.1, 1, 6), phys({ color: '#fff', map: fit(() => T.pcbCanvas(BW, BH, prints, [[-25, 42], [25, 42], [-25, -42], [25, -42], [0, 3]]), BW, BH), roughness: 0.5, metalness: 0.05, clearcoat: 0.55, clearcoatRoughness: 0.22 }), 0, BY, BZ);
+    const chipMat = std({ map: tx(() => T.chipAtlas([['DN8702', '0726 K4B', 'TAIWAN'], ['K4M513', 'PE-DG75'], ['NAND 32G', 'E3 BB2'], ['CS42L', 'CNZ'], ['PMU', '1723'], ['PP5022C', 'TBDG 0734'], ['WM8758', 'BG 07'], ['ATA', '1611']])), roughness: 0.5 });
     add(p, chipGeo(chips, BZ, false, 0), chipMat, 0, BY);
     add(p, chipGeo(backChips, BB, true, 5), chipMat, 0, BY);
     const [, sx, sy, sw2, sh2, sd] = others[0];
@@ -226,7 +233,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
   }
   {
     const p = mk('battery'), bw = 50, bh = 21, cy = SY(88.5);
-    add(p, ext(rr(bw, bh, 2.4, 0.6), 2.6, 0.6, 3), std({ color: '#fff', map: fit(T.batteryCanvas(bw, bh), bw - 1.2, bh - 1.2), metalness: 0.35, roughness: 0.36 }), 0, cy);
+    add(p, ext(rr(bw, bh, 2.4, 0.6), 2.6, 0.6, 3), std({ color: '#fff', map: fit(() => T.batteryCanvas(bw, bh), bw - 1.2, bh - 1.2), metalness: 0.35, roughness: 0.36 }), 0, cy);
     [['#b3261e', -17], ['#151515', -15]].forEach(([c, x]) => add(p, new THREE.CylinderGeometry(0.4, 0.4, 7, 8), std({ color: c, roughness: 0.4 }), x, cy + bh / 2 + 3.2, -0.6));
     add(p, ext(rr(9, 5, 0.6), 0.15), mats.flex, 12, cy + bh / 2 + 1.5, -0.4);
   }
@@ -234,7 +241,7 @@ export function buildIpod({ maxAniso = 8 } = {}) {
   { // 1.8" hard drive + rubber bumpers
     const p = mk('storage');
     add(p, ext(rr(dw, dh, 2.2, 0.3), 4.3, 0.3, 1), std({ color: '#5a5f66', metalness: 0.7, roughness: 0.5 }), 0, dcy, -0.5);
-    add(p, ext(rr(dw - 0.6, dh - 0.6, 2, 0.1), 0.5, 0.1, 1), std({ color: '#fff', map: fit(T.driveCanvas(dw - 0.6, dh - 0.6), dw - 0.8, dh - 0.8), metalness: 0.75, roughness: 0.34, roughnessMap: brush }), 0, dcy);
+    add(p, ext(rr(dw - 0.6, dh - 0.6, 2, 0.1), 0.5, 0.1, 1), std({ color: '#fff', map: fit(() => T.driveCanvas(dw - 0.6, dh - 0.6), dw - 0.8, dh - 0.8), metalness: 0.75, roughness: 0.34, roughnessMap: brush }), 0, dcy);
     const bumps = [-1, 1].flatMap((sx) => [-1, 1].map((sy) => ext(rr(9, 12, 2.6, 0.9), 5.2, 0.9, 2, 4).translate(sx * (dw / 2 - 2.4), dcy + sy * (dh / 2 - 3.6), 0.2)));
     add(p, merge(bumps), phys({ color: '#1b1c1f', roughness: 0.85, sheen: 0.4, sheenColor: '#555', sheenRoughness: 0.6 }));
   }
@@ -254,11 +261,13 @@ export function buildIpod({ maxAniso = 8 } = {}) {
     const polish = { color: '#dfe1e3', metalness: 1, clearcoat: 0.6, clearcoatRoughness: 0.04 };
     mats.steel = phys({ ...polish, roughness: 0.06 });
     add(p, ext(holed(rr(w2 - 0.06, h2 - 0.06, cr - 0.03, 0.25), rrHole(w2 - 1.2, h2 - 1.2, cr - 0.6, 0.25)), 9.1, 0.25, 3, SEG), mats.steel, 0, 0, 8.6);
-    const [cC, rC] = T.backCanvases(bw, bh, {}), cT = fit(cC, bw, bh), rT = fit(rC, bw, bh, { color: false });
-    back = { cC, rC, cT, rT, bw, bh };
+    // both back canvases are drawn in one go, with the brand known by then (setBrand)
+    const pair = () => (back.pair ??= T.backCanvases(bw, bh, back.brand));
+    const cT = fit(() => pair()[0], bw, bh), rT = fit(() => pair()[1], bw, bh, { color: false });
+    back = { pair: null, brand: {}, cT, rT, bw, bh };
     mats.back = phys({ ...polish, map: cT, roughness: 1, roughnessMap: rT });
     add(p, ext(rr(w2, h2, cr, 0.9), 1.7, 0.9, 6, SEG), mats.back, 0, 0, 0.6);
-    add(p, new THREE.ShapeGeometry(rr(w2 - 1.4, h2 - 1.4, cr - 0.7), 12), std({ map: fit(T.shellInnerCanvas(w2 - 1.4, h2 - 1.4), w2 - 1.4, h2 - 1.4), metalness: 0.55, roughness: 0.55 }), 0, 0, 0.62);
+    add(p, new THREE.ShapeGeometry(rr(w2 - 1.4, h2 - 1.4, cr - 0.7), 12), std({ map: fit(() => T.shellInnerCanvas(w2 - 1.4, h2 - 1.4), w2 - 1.4, h2 - 1.4), metalness: 0.55, roughness: 0.55 }), 0, 0, 0.62);
     const yT = (h2 - 0.06) / 2 + 0.015, zc = PARTS.at(-1).z - IPOD.depth / 2, hs = IPOD.holdSwitch, dc = IPOD.dockConnector;
     const jx = SX(IPOD.headphoneJack.x), hx = SX(hs.x + hs.width / 2), jr = IPOD.headphoneJack.diameter / 2;
     const top = (g, x, o = 0) => g.rotateX(-PI / 2).translate(x, yT + o, zc), bot = (g) => g.rotateX(PI / 2).translate(0, -yT, zc);
@@ -297,13 +306,15 @@ export function buildIpod({ maxAniso = 8 } = {}) {
   ribbons.forEach((r) => model.add(r.mesh));
 
   function setBrand({ monogram = '', name = '', tagline = '' } = {}) {
-    T.backCanvases(back.bw, back.bh, { monogram, name, line: tagline }).forEach((c, i) => {
-      const g = [back.cC, back.rC][i].getContext('2d');
+    back.brand = { monogram, name, line: tagline };
+    if (!back.pair) return; // not drawn yet: its paint uses the brand
+    T.backCanvases(back.bw, back.bh, back.brand).forEach((c, i) => {
+      const g = back.pair[i].getContext('2d');
       g.setTransform(1, 0, 0, 1, 0, 0); // the canvas keeps its mirror/scale transform: copy 1:1
       g.drawImage(c, 0, 0);
     });
     back.cT.needsUpdate = back.rT.needsUpdate = true;
   }
 
-  return { model, parts: list, screws, screwBase, textures, mats, ribbons, setBrand };
+  return { model, parts: list, screws, screwBase, textures, paints, mats, ribbons, setBrand };
 }

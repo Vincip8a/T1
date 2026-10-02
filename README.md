@@ -38,8 +38,10 @@ bauen (das erledigt der Deploy-Workflow bei jedem Push).
 **Pfade** zu eigenen Dateien (Cover, Downloads, Rechtliches) relativ angeben, ohne `/` am Anfang,
 z. B. `"downloads/media-kit.pdf"`. Sie gelten relativ zur Seite und funktionieren so auch unter
 `https://<nutzer>.github.io/<repo>/`. Ein führendes `/` wird genauso behandelt. Erlaubt sind
-außerdem `https://`, `http://`, `mailto:` und `tel:`; andere Adressen (z. B. `javascript:`)
-werden ignoriert, die Zeile erscheint dann ohne Link.
+außerdem vollständige `https://`-, `http://`-, `mailto:`- und `tel:`-Adressen; andere Adressen
+(z. B. `javascript:`) und unvollständige (z. B. nur `"https://"`) werden mit einem Hinweis in der
+Browser-Konsole ignoriert, die Zeile erscheint dann ohne Link (auf dem iPod und in der Linkliste
+ohne JavaScript).
 
 ### `brand`
 
@@ -47,23 +49,27 @@ Steht für Kopfzeile, Fenstertitel und Absender.
 
 | Feld          | Typ    | Bedeutung                                                   |
 | ------------- | ------ | ----------------------------------------------------------- |
-| `name`        | String | Dein Name, erscheint prominent auf der Seite                 |
-| `monogram`    | String | Zwei Buchstaben für Icon und Cover, z. B. `"DN"`             |
-| `tagline`     | String | Einzeiler unter dem Namen                                    |
+| `name`        | String | Dein Name: Menüleiste, Tab-Titel, Kopf des iPod-Hauptmenüs  |
+| `monogram`    | String | Zwei Buchstaben für Icon, Cover und die Menüleiste auf schmalen Handys (dort statt des Namens), z. B. `"DN"` |
+| `tagline`     | String | Einzeiler: Statuszeile unter dem iPod, Meta-Beschreibung und Text der Social-Media-Vorschau |
 | `windowTitle` | String | Text in der Titelleiste des Aqua-Fensters                    |
-| `email`       | String | Kontaktadresse, wird für `mailto:`-Links verwendet           |
+| `email`       | String | Kontaktadresse für „Kontakt“ in der Menüleiste (ohne sie entfällt der Punkt) |
 
 ### `siteUrl`
 
 Optional: die öffentliche Adresse der Seite, z. B. `"https://<nutzer>.github.io/<repo>/"`.
-Social-Media-Vorschauen (LinkedIn, X, WhatsApp, Slack) brauchen eine absolute Bild-URL. Ist
-`siteUrl` gesetzt, schreibt der Build `og:image` und `og:url` absolut; ohne sie bleibt das
-Vorschaubild relativ und wird von den meisten Diensten nicht angezeigt.
+Social-Media-Vorschauen (LinkedIn, X, WhatsApp, Slack) brauchen eine absolute Bild-URL; der Build
+schreibt `og:image` und `og:url` deshalb absolut, sobald er die Adresse kennt. Im
+GitHub-Pages-Workflow ermittelt er sie selbst aus dem Repository
+(`https://<nutzer>.github.io/<repo>/`). `siteUrl` ist also nur nötig für eine eigene Domain oder
+einen anderen Host (alternativ die Umgebungsvariable `SITE_URL` beim Build). Ohne bekannte Adresse
+(z. B. bei einem lokalen Build) bleibt das Vorschaubild relativ und wird von den meisten Diensten
+nicht angezeigt.
 
 ### `menu[]`
 
 Die Liste der Einträge im Hauptmenü: eine Zeile pro Eintrag, in genau dieser Reihenfolge.
-Jeder Eintrag hat vier gemeinsame Felder:
+Jeder Eintrag hat vier gemeinsame Felder und ein optionales fünftes:
 
 | Feld    | Typ    | Bedeutung                                                              |
 | ------- | ------ | ---------------------------------------------------------------------- |
@@ -71,8 +77,11 @@ Jeder Eintrag hat vier gemeinsame Felder:
 | `label` | String | Beschriftung im Menü                                                    |
 | `type`  | String | Bauart der Unterseite: `list`, `page`, `nowplaying` oder `downloads`   |
 | `title` | String | Überschrift der Unterseite                                              |
+| `lang`  | String | Optional: Sprache von `label` und `title`, wenn sie nicht Deutsch ist, z. B. `"en"` für „Work Together“ (Screenreader sprechen sie dann richtig aus) |
 
-Je nach `type` kommen weitere Felder dazu:
+Je nach `type` kommen weitere Felder dazu. Zeilen (`items[]`, `actions[]`) können ebenfalls ein
+`lang` haben. Fehlt einer Zeile das `label`, zeigt sie ihr `detail`, die Adresse oder den
+Dateinamen; eine Zeile ganz ohne Angaben wird mit einem Hinweis in der Browser-Konsole übersprungen.
 
 #### `type: "list"`: eine Liste von Links
 
@@ -96,7 +105,7 @@ Je nach `type` kommen weitere Felder dazu:
 | ------------------- | ------ | ------------------------------------------------------- |
 | `artist`            | String | Name über der Titelliste                                |
 | `cover`             | String | Pfad zum Cover, z. B. `"assets/playlist-cover.svg"`     |
-| `spotifyUrl`        | String | Link zur Playlist beim Streamingdienst                  |
+| `spotifyUrl`        | String | Link zur Playlist bei einem Streamingdienst (Spotify, Apple Music, YouTube Music, SoundCloud, Deezer, Tidal, Amazon Music); die Schaltfläche heißt passend „In Spotify öffnen“, „In Apple Music öffnen“ usw., bei anderen Adressen „Playlist öffnen“ |
 | `tracks[].title`    | String | Titel des Stücks                                        |
 | `tracks[].artist`   | String | Interpret                                               |
 | `tracks[].duration` | String | Länge als Text, z. B. `"3:48"`                          |
@@ -108,7 +117,7 @@ Je nach `type` kommen weitere Felder dazu:
 | `items[].label`   | String | Beschriftung des Eintrags                               |
 | `items[].file`    | String | Pfad zur Datei, z. B. `"downloads/media-kit.pdf"`       |
 | `items[].format`  | String | Dateiformat als Text, z. B. `"PDF"`                     |
-| `items[].size`    | String | Dateigröße als Text, z. B. `"292 kB"`                   |
+| `items[].size`    | String | Dateigröße als Text, z. B. `"292 kB"` (1 kB = 1000 Byte) |
 
 Die Datei am besten in `public/downloads/` ablegen. Eine Datei auf einem anderen Server (z. B.
 einem Cloud-Speicher) öffnet sich in einem neuen Tab, weil Browser dort nicht direkt
@@ -116,8 +125,11 @@ herunterladen.
 
 ### `legal`
 
-Die Links rechts in der Menüleiste und unter der Linkliste ohne JavaScript. In Deutschland
-Pflicht für geschäftsmäßige Seiten: die beiden Platzhalter-Seiten durch eigene Texte ersetzen.
+Die Links rechts in der Menüleiste (auch auf `impressum.html`, `datenschutz.html` und der
+Fehlerseite `404.html`) und unter der Linkliste ohne JavaScript. In Deutschland Pflicht für
+geschäftsmäßige Seiten: die beiden Platzhalter-Seiten durch eigene Texte ersetzen oder hier auf
+die eigenen Seiten verweisen. Die Platzhalter tragen `<meta name="robots" content="noindex">`,
+damit Suchmaschinen sie nicht aufnehmen; nach dem Ersetzen dort `index, follow` eintragen.
 
 | Feld          | Typ    | Bedeutung                                                    |
 | ------------- | ------ | ------------------------------------------------------------ |
@@ -134,7 +146,10 @@ Fehlt ein Feld, fehlt auch der Link.
 | `intro`      | Boolean | `true` zeigt die 3D-Einstiegsanimation bei jedem Aufruf, `false` nie |
 
 Für `intro` werden auch `"off"` und `"never"` als „aus“ verstanden. Die Animation lässt sich
-jederzeit mit „Intro überspringen“ oder Esc abbrechen; ohne WebGL entfällt sie automatisch.
+jederzeit mit „Intro überspringen“, Esc oder „Links“ in der Menüleiste abbrechen; ohne WebGL
+entfällt sie automatisch, auf einem zu langsamen Gerät endet sie früher. Wer sie nur in der
+veröffentlichten `config.json` abschaltet, ohne neu zu bauen, spart die Animation, aber nicht den
+Download ihres Skripts: dafür neu bauen.
 
 ### Beispiel
 
@@ -162,6 +177,7 @@ jederzeit mit „Intro überspringen“ oder Esc abbrechen; ohne WebGL entfällt
     {
       "id": "work-together",
       "label": "Work Together",
+      "lang": "en",
       "type": "page",
       "title": "Zusammenarbeiten",
       "body": "Kurz beschreiben, woran du arbeitest und wofür dich Leute anfragen können.",
@@ -217,7 +233,10 @@ So ersetzt du sie durch eigene:
 1. Eigenes PDF nach `public/downloads/` legen.
 2. In `public/config.json` im `downloads`-Eintrag `file`, `label`, `format` und `size`
    auf die neue Datei anpassen.
-3. Dateigröße ermitteln: `ls -lh public/downloads/`
+3. Dateigröße ermitteln: `node tools/file-sizes.mjs` gibt für jede Datei in
+   `public/downloads/` die fertige Zeile zum Einfügen aus, z. B. `"size": "308 kB"`
+   (1 kB = 1000 Byte, auf ganze kB gerundet; ab 1 MB z. B. `"1,2 MB"`). Bitte nicht `du`
+   nehmen: es rundet auf und zeigt dann oft 1 kB mehr.
 
 Alternativ die Platzhalter weiterverwenden und nur die Texte austauschen: Die Inhalte stehen
 als HTML-Vorlagen in [`tools/make-downloads.mjs`](tools/make-downloads.mjs). Nach dem Ändern
@@ -226,7 +245,8 @@ als HTML-Vorlagen in [`tools/make-downloads.mjs`](tools/make-downloads.mjs). Nac
 node tools/make-downloads.mjs
 ```
 
-ausführen. Das überschreibt die drei PDFs und gibt die neuen Dateigrößen aus.
+ausführen. Das überschreibt die drei PDFs und gibt die neuen Dateigrößen schon in der Form für
+`config.json` aus (`"size": "308 kB"`).
 
 ---
 
@@ -285,8 +305,8 @@ nötigen Rechte (`pages: write`, `id-token: write`) sind darin bereits gesetzt.
 
 > **Hinweis bei Projekt-Seiten:** `vite.config.js` nutzt `base: './'` (relative Pfade). Die Seite
 > funktioniert damit ohne Anpassung sowohl unter `https://<nutzer>.github.io/<repo>/` als auch auf
-> einer eigenen Domain: Config, Assets und Downloads werden relativ zur Seite geladen. Nur für
-> Social-Media-Vorschauen `siteUrl` in `config.json` setzen (siehe oben).
+> einer eigenen Domain: Config, Assets und Downloads werden relativ zur Seite geladen. Nur bei
+> einer eigenen Domain für Social-Media-Vorschauen `siteUrl` in `config.json` setzen (siehe oben).
 
 ---
 
@@ -302,6 +322,7 @@ Aufbau, Ablauf und Modul-Schnittstellen im Detail: [`ARCHITECTURE.md`](ARCHITECT
 │  ├─ impressum.html             Impressum (Platzhalter, bitte ersetzen)
 │  ├─ datenschutz.html           Datenschutzerklärung (Platzhalter, bitte ersetzen)
 │  ├─ 404.html                   eigene Fehlerseite für GitHub Pages
+│  ├─ static.css, static.js      gemeinsamer Desktop-Look und Menüleiste dieser drei Seiten
 │  ├─ favicon.svg                Player-Silhouette, auch bei 16 px lesbar
 │  ├─ apple-touch-icon.png       180x180, für den Homescreen
 │  ├─ og-image.png               1200x630, Social-Media-Vorschau
@@ -313,6 +334,8 @@ Aufbau, Ablauf und Modul-Schnittstellen im Detail: [`ARCHITECTURE.md`](ARCHITECT
 │  ├─ base.css                   Grundstil, Button „Intro überspringen“
 │  ├─ shared/ipodSpec.js         Maße und Farben des iPods (eine Quelle für 3D und DOM)
 │  ├─ shared/config.js           lädt config.json
+│  ├─ shared/href.js             die Link-Regeln (iPod, Menüleiste, Linkliste ohne JavaScript)
+│  ├─ shared/dom.js              DOM-Helfer h()
 │  ├─ window/                    Aqua-Desktop, Menüleiste und Fenster
 │  ├─ ipod/                      die iPod-Oberfläche (Click Wheel, Menüs, Now Playing)
 │  └─ intro/                     3D-Intro mit Three.js (wird nachgeladen)
@@ -325,7 +348,8 @@ Aufbau, Ablauf und Modul-Schnittstellen im Detail: [`ARCHITECTURE.md`](ARCHITECT
 │  ├─ make-all.mjs               erzeugt alles
 │  ├─ make-icons.mjs             Icons und Playlist-Cover
 │  ├─ make-og.mjs                Social-Media-Bild
-│  └─ make-downloads.mjs         die drei PDFs
+│  ├─ make-downloads.mjs         die drei PDFs
+│  └─ file-sizes.mjs             Dateigrößen für "size" in config.json
 ├─ index.html                    Einstiegspunkt
 ├─ vite.config.js                Build-Konfiguration (füllt Meta-Tags und <noscript> aus config.json)
 ├─ ARCHITECTURE.md               Architektur für Entwickler

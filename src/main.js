@@ -2,7 +2,7 @@
 // The intro (three.js) is a lazily loaded chunk: the desktop and the hidden iPod mount without
 // waiting for it. Without WebGL, or if the intro fails in any way, the iPod is revealed directly.
 import './base.css';
-import { loadConfig, prefersReducedMotion } from './shared/config.js';
+import { loadConfig, prefersReducedMotion, introEnabled } from './shared/config.js';
 import { createDesktop } from './window/index.js';
 import { mountIpod } from './ipod/index.js';
 
@@ -24,7 +24,10 @@ function hasWebGL2() {
 }
 
 function showConfigError() {
-  const desktop = createDesktop(app, { config: { brand: { windowTitle: 'iPod' } } });
+  // the Impressum and Datenschutz links must stay reachable: config.legal as it was at build time
+  // (vite.config.js defines __LEGAL__), else the static pages next to this one
+  const legal = typeof __LEGAL__ === 'object' && __LEGAL__ ? __LEGAL__ : { impressum: 'impressum.html', datenschutz: 'datenschutz.html' };
+  const desktop = createDesktop(app, { config: { brand: { windowTitle: 'iPod' }, legal } });
   const box = document.createElement('div');
   box.className = 'app-error';
   box.setAttribute('role', 'alert');
@@ -69,7 +72,7 @@ async function main() {
   // once config.json says the intro plays: no download or evaluation for nothing.
   let config;
   try {
-    config = await loadConfig();
+    config = await loadConfig(undefined, window.__configP); // index.html starts the fetch early
     if (!config || typeof config !== 'object') throw new Error('config.json: no object');
   } catch (err) {
     // the visitor sees the short note; the site owner gets the reason (HTTP status, JSON syntax error)
@@ -80,13 +83,18 @@ async function main() {
 
   const brand = config.brand ?? {};
   if (brand.name) document.title = `${brand.name} · Links`;
-  const introOff = [false, 'never', 'off'].includes(config.settings?.intro);
-  const introModP = !introOff && hasWebGL2() ? import('./intro/index.js') : null;
+  const introModP = introEnabled(config) && hasWebGL2() ? import('./intro/index.js') : null;
   introModP?.catch(() => {}); // handled where it is awaited
 
-  // "Links" in the menu bar brings the main menu up, and restoring or a press on the metal focuses the
-  // iPod's key target (ipod is assigned before any click can happen)
-  const desktop = createDesktop(app, { config, onLinks: () => ipod.home(), onFocus: () => ipod.focus() });
+  // "Links" in the menu bar brings the main menu up (while the intro runs it skips it: the iPod with its
+  // links comes next), and restoring or a press on the metal focuses the iPod's key target (ipod and
+  // skipIntro are assigned before any click can happen)
+  let skipIntro = null;
+  const onLinks = (e) => {
+    skipIntro?.();
+    ipod.home({ keyboard: e?.detail === 0 }); // (before the reveal it waits for it)
+  };
+  const desktop = createDesktop(app, { config, onLinks, onFocus: () => ipod.focus() });
   const ipod = mountIpod(desktop.contentEl, { config });
   if (DEBUG) window.__ipod = ipod;
 
@@ -96,7 +104,8 @@ async function main() {
     let skipped = false;
     let onSkipped;
     const skipP = new Promise((r) => { onSkipped = r; });
-    const removeSkip = createSkipControl(() => { skipped = true; onSkipped(); intro?.skip(); });
+    skipIntro = () => { skipped = true; onSkipped(); intro?.skip(); };
+    const removeSkip = createSkipControl(skipIntro);
     // a quiet Aqua spinner in the empty window if the chunk takes a moment (CSS shows it after 600 ms)
     desktop.el.classList.add('is-waiting');
     try {
@@ -105,7 +114,11 @@ async function main() {
       const mod = await Promise.race([introModP, skipP, new Promise((r) => setTimeout(r, INTRO_CHUNK_MS))]);
       if (!skipped && mod?.runIntro) {
         const { runIntro } = mod;
-        intro = runIntro({ getTargetRect: () => ipod.getShellRect(), reducedMotion: prefersReducedMotion(), config });
+        const win = desktop.contentEl.closest('.dt-win');
+        intro = runIntro({
+          getTargetRect: () => ipod.getShellRect(), getFrameRect: () => win?.getBoundingClientRect(),
+          reducedMotion: prefersReducedMotion(), config,
+        });
         // its setup runs as short tasks (the skip button keeps working, the spinner keeps turning);
         // the test hook and the watchdog below start once it has settled
         await Promise.race([intro.ready, intro.done]);
@@ -114,8 +127,13 @@ async function main() {
         // safety net: a render loop that died must never leave the iPod hidden. The race does not
         // rely on the intro at all; a late skip() only asks for the aligned frame (the canvas goes
         // with dispose() below either way)
+        // (the intro watches its own frame rate and skips frames or hands off early, so its length plus a
+        // margin is enough; a test hook that paused it on purpose keeps it)
         let watchdog = 0;
-        const late = new Promise((r) => { watchdog = setTimeout(r, ((intro.duration || 0) * 3 + 12) * 1000, 'late'); });
+        const late = new Promise((r) => {
+          const arm = () => { watchdog = setTimeout(() => (intro.paused ? arm() : r('late')), ((intro.duration || 0) + 6) * 1000); };
+          arm();
+        });
         if (await Promise.race([intro.done, late]) === 'late') {
           try { intro.skip(); } catch { /* render loop already broken */ }
         }
@@ -128,6 +146,7 @@ async function main() {
     }
     desktop.el.classList.remove('is-waiting');
     removeSkip();
+    skipIntro = null;
   }
 
   await ipod.reveal({ boot: true });

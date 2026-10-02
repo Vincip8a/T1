@@ -40,6 +40,7 @@
     {
       "id": "work",
       "label": "Work Together",
+      "lang": "en",
       "type": "page",
       "title": "Work Together",
       "body": "Du planst ein Projekt? Branding, Websites, Content: lass uns sprechen. Antwort meist innerhalb von 48 Stunden.",
@@ -90,19 +91,19 @@
           "label": "Portfolio 2026",
           "file": "downloads/portfolio-2026.pdf",
           "format": "PDF",
-          "size": "308 KB"
+          "size": "308 kB"
         },
         {
           "label": "Case Study: Projekt X",
           "file": "downloads/case-study-projekt-x.pdf",
           "format": "PDF",
-          "size": "289 KB"
+          "size": "289 kB"
         },
         {
           "label": "Media Kit",
           "file": "downloads/media-kit.pdf",
           "format": "PDF",
-          "size": "292 KB"
+          "size": "292 kB"
         }
       ]
     },

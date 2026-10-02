@@ -26,7 +26,9 @@ let seq = 0;
 // UI strings (not content): German 6G firmware wording.
 const DEFAULT_UI = {
   nowPlaying: 'Sie hören',
-  openSpotify: 'In Spotify öffnen',
+  openIn: 'In {service} öffnen', // {service}: Spotify, Apple Music, … (serviceName in src/shared/href.js)
+  openPlaylist: 'Playlist öffnen',
+  tracklist: 'Titelliste',
   of: 'von',
   volume: 'Lautstärke',
   playing: 'Wiedergabe',
@@ -126,7 +128,8 @@ export function mountIpod(container, { config } = {}) {
     ind.classList.toggle('is-on', player.started);
     ind.classList.toggle('is-paused', !player.playing);
     current()?.update?.(kind === 'track');
-    if (kind === 'track') {
+    // track changes are news only on Now Playing: the silent player keeps running behind other screens
+    if (kind === 'track' && current()?.kind === 'nowplaying') {
       const t = tracks[player.track];
       announce([t.title, t.artist].filter(Boolean).join(', '));
     }
@@ -217,8 +220,9 @@ export function mountIpod(container, { config } = {}) {
   }
   /** title bar: centred title of the current screen (also names the listbox); on navigation the new
    *  title glides in from the side the screen comes from */
-  function setTitle(text, dir) {
+  function setTitle(text, dir, lang = null) {
     titleEl.textContent = text;
+    if (lang) titleEl.lang = lang; else titleEl.removeAttribute('lang');
     el.setAttribute('aria-label', `${text}, iPod`);
     if (dir && !isReduced()) titleEl.animate?.({ opacity: [0, 1], transform: [`translateX(${dir * 14}%)`, 'none'] }, { duration: SLIDE_MS, easing: EASE });
   }
@@ -236,12 +240,13 @@ export function mountIpod(container, { config } = {}) {
     const from = current();
     if (dir > 0) stack.push(buildScreen(item)); else stack.pop();
     const to = current();
+    passDir = 0;
     from.onHide?.();
     from.node.setAttribute('aria-hidden', 'true');
     for (const r of from.rows) r.tabIndex = -1;
     to.opened = dir > 0;
     show(to);
-    setTitle(to.title, dir);
+    setTitle(to.title, dir, to.lang);
     backBtn.hidden = stack.length < 2;
     slide(from.node, to.node, dir).then(() => { if (!isCurrent(from)) from.node.remove(); });
     const extra = dir > 0 && (typeof to.summary === 'function' ? to.summary() : to.summary);
@@ -280,11 +285,12 @@ export function mountIpod(container, { config } = {}) {
   }
   const tap = (btn, at) => { flash(btn); press(btn, at); };
 
-  function step(dir) {
+  /** quiet: at a list end, no bump (the mouse wheel then scrolls the page instead) */
+  function step(dir, quiet = false) {
     if (phase !== 'ready' || destroyed || !dir) return false;
     const s = current();
     const moved = s.move(dir);
-    if (moved) sound.play('tick'); else s.bump(dir);
+    if (moved) sound.play('tick'); else if (!quiet) s.bump(dir);
     return moved;
   }
   function scroll(steps) {
@@ -367,24 +373,45 @@ export function mountIpod(container, { config } = {}) {
   });
 
   // ── mouse wheel / trackpad
+  // The page behind never scrolls under the iPod, except when browser zoom made the window larger than
+  // the screen (the stage scrolls then): once the list is at its end in that direction, the wheel
+  // scrolls the page, so the click wheel below the fold can be reached.
   let wAcc = 0;
   let wLast = 0;
+  let passDir = 0; // the list is at its end this way and the page can scroll: the wheel scrolls the page
+  const pageCanScroll = (dir) => {
+    for (let n = host.parentElement; n && n !== document.body; n = n.parentElement) {
+      if (!/(auto|scroll)/.test(getComputedStyle(n).overflowY)) continue;
+      const max = n.scrollHeight - n.clientHeight;
+      if (max > 1) return dir > 0 ? n.scrollTop < max - 1 : n.scrollTop > 0;
+    }
+    return false;
+  };
   on(el, 'wheel', (e) => {
     if (phase === 'off' || destroyed) return;
-    e.preventDefault(); // also during boot: the page behind must never scroll under the iPod
+    const raw = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+    const dir = Math.sign(raw);
+    const page = phase === 'ready' && dir !== 0 && Math.abs(e.deltaY) >= Math.abs(e.deltaX) && pageCanScroll(dir);
+    if (page && passDir === dir) return; // native page scroll
+    passDir = 0;
+    e.preventDefault(); // also during boot
     const now = performance.now();
     const gap = now - wLast;
     wLast = now;
-    const raw = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+    const stepOrPass = (d) => {
+      const moved = step(d, page);
+      if (!moved && page) { passDir = d; wAcc = 0; }
+      return moved;
+    };
     // line/page mode, a big notch, or a separate notch after a pause (mice that report tiny deltas)
     // is exactly one step; continuous trackpad streams (~16 ms apart) accumulate
     if (raw && (e.deltaMode || Math.abs(raw) >= 50 || gap > 150)) {
       wAcc = 0;
-      return step(Math.sign(raw));
+      return stepOrPass(dir);
     }
     wAcc += raw;
-    for (; wAcc >= 34; wAcc -= 34) step(1);
-    for (; wAcc <= -34; wAcc += 34) step(-1);
+    for (; wAcc >= 34; wAcc -= 34) if (!stepOrPass(1)) break;
+    for (; wAcc <= -34; wAcc += 34) if (!stepOrPass(-1)) break;
   }, { passive: false });
 
   // ── keyboard
@@ -407,13 +434,16 @@ export function mountIpod(container, { config } = {}) {
     e.preventDefault();
   }
   on(el, 'keydown', onKey);
-  // keyboard navigation (Tab, or a key on another control such as the Dock icon): show the focus ring
+  // the focus ring follows the last input, like :focus-visible: any key except a lone modifier or a
+  // shortcut shows it (arrows inside the iPod too), any pointer press anywhere hides it again (capture
+  // phase: it runs before handlers that move focus, and also for keys on rows that are detached next)
   on(document, 'keydown', (e) => {
-    if (e.key === 'Tab' || (!el.contains(e.target) && !e.metaKey && !e.ctrlKey && !/^(Shift|Control|Alt|Meta)$/.test(e.key))) el.dataset.input = 'key';
-  });
+    if (!e.metaKey && !e.ctrlKey && !/^(Shift|Control|Alt|Meta)$/.test(e.key)) el.dataset.input = 'key';
+  }, true);
+  on(document, 'pointerdown', () => { el.dataset.input = 'pointer'; }, true);
   // pointer users get no focus ring (focus still moves to the iPod so the keys work afterwards);
   // touch pointerdown is not a user activation for audio: unlock on pointerup / click as well
-  on(el, 'pointerdown', () => { el.dataset.input = 'pointer'; sound.ensure(); });
+  on(el, 'pointerdown', sound.ensure);
   on(el, 'pointerup', sound.ensure);
   on(el, 'click', sound.ensure);
 
@@ -427,15 +457,19 @@ export function mountIpod(container, { config } = {}) {
   show(menuScr);
   setTitle(menuScr.title);
 
-  /** "Links" in the menu bar: back to the main menu in one slide, MENU flashes, focus with its ring */
-  function home() {
-    if (phase !== 'ready' || destroyed) return;
+  /** "Links" in the menu bar: back to the main menu in one slide, MENU flashes, focus (with its ring when
+   *  "Links" was activated from the keyboard). Pressed before the iPod is ready (intro, boot screen), it
+   *  runs once it is. */
+  let homeAfterBoot = null;
+  function home({ keyboard = el.dataset.input === 'key' } = {}) {
+    if (destroyed) return;
+    if (phase !== 'ready') { homeAfterBoot = { keyboard }; return; }
     flash('menu');
     sound.play('press');
     if (stack.length > 2) stack.splice(1, stack.length - 2); // slide straight from the top screen
     back();
-    el.dataset.input = 'key';
-    keyTarget().focus({ preventScroll: true, focusVisible: true });
+    el.dataset.input = keyboard ? 'key' : 'pointer';
+    keyTarget().focus({ preventScroll: true, focusVisible: keyboard });
   }
 
   // destroy() clears the timers, so it also settles every pending wait: reveal() then returns early
@@ -464,6 +498,7 @@ export function mountIpod(container, { config } = {}) {
       boot.hidden = true;
       current().layout();
       phase = 'ready';
+      if (homeAfterBoot) { const o = homeAfterBoot; homeAfterBoot = null; home(o); }
       // focus moving onto the iPod (main.js does that next) already reads the selected row
       timers.later(() => { if (!el.contains(document.activeElement)) announce(`${menuScr.title}: ${menuScr.currentLabel()}`); }, 60);
     })();

@@ -1,5 +1,7 @@
 node_modules/
 dist/
 .shots/
+# screenshots from test runs belong in .shots/, never in the repository root
+/*.png
 *.log
 .DS_Store

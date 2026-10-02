@@ -1,46 +1,65 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
-import { safeHref as sharedSafeHref } from './src/shared/href.js';
+import { linkAttrs, fileName, rowLabel, langOf, safeHref, serviceName } from './src/shared/href.js';
+import { introEnabled } from './src/shared/config.js';
 
 const CONFIG_PATH = fileURLToPath(new URL('./public/config.json', import.meta.url));
-
-/** The runtime href rule (src/shared/href.js): relative paths stay page-relative ('./x'), base './'. */
-const safeHref = (href) => sharedSafeHref(href, './');
+const readConfig = () => JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+const langAttr = (x) => (langOf(x) ? ` lang="${esc(langOf(x))}"` : '');
 
-const link = (label, href, extra = '') => {
-  const h = safeHref(href);
-  if (!h) return '';
-  const ext = /^https?:/i.test(h) ? ' rel="noopener"' : '';
-  return `<li><a href="${esc(h)}"${ext}${extra}>${esc(label)}</a></li>`;
-};
+/** The public address: config.siteUrl, else SITE_URL, else (in the GitHub Pages workflow) the Pages
+ *  address of the repository (a custom domain redirects from there). '' when unknown. */
+function siteUrlOf(config) {
+  if (config.siteUrl) return String(config.siteUrl);
+  if (process.env.SITE_URL) return process.env.SITE_URL;
+  const [owner, repo] = (process.env.GITHUB_ACTIONS && process.env.GITHUB_REPOSITORY || '').split('/');
+  if (!owner || !repo) return '';
+  const host = `${owner.toLowerCase()}.github.io`;
+  return repo.toLowerCase() === host ? `https://${host}/` : `https://${host}/${repo}/`;
+}
 
-/** Plain HTML linktree for crawlers and visitors without JavaScript. */
-function noscriptHtml(config) {
+/** Plain HTML linktree for crawlers and visitors without JavaScript. Rows follow the iPod's rules
+ *  (src/shared/href.js): the same labels, links, new tabs and downloads, and a row without a usable
+ *  link is plain text, as on the iPod. `origin`: the site's origin, when known. */
+function noscriptHtml(config, origin = null) {
   const brand = config.brand ?? {};
+  const row = (label, href, { download = null, lang = '' } = {}) => {
+    const a = href ? linkAttrs(href, { download, base: './', origin }) : null;
+    if (!a) return label ? `<li${lang}>${esc(label)}</li>` : '';
+    const attrs = (a.newTab ? ' target="_blank" rel="noopener"' : '') + (a.download != null ? ` download="${esc(a.download)}"` : '');
+    return `<li${lang}><a href="${esc(a.href)}"${attrs}>${esc(label)}</a></li>`;
+  };
+  const items = (a) => (Array.isArray(a) ? a : []).filter((x) => x && typeof x === 'object');
   const sections = [];
   for (const item of Array.isArray(config.menu) ? config.menu : []) {
     if (!item || typeof item !== 'object') continue;
     let rows = [];
-    if (item.type === 'list') rows = (item.items ?? []).map((i) => link(i.detail ? `${i.label}: ${i.detail}` : i.label, i.href));
-    else if (item.type === 'page') rows = (item.actions ?? []).map((a) => link(a.label, a.href));
-    else if (item.type === 'nowplaying') rows = [link(item.title ? `${item.title} auf Spotify` : 'Playlist auf Spotify', item.spotifyUrl)];
-    else if (item.type === 'downloads') {
-      rows = (item.items ?? []).map((d) => {
+    if (item.type === 'list' || item.type === 'page') {
+      rows = items(item.type === 'list' ? item.items : item.actions).map((i) => {
+        const label = rowLabel(i);
+        return row(i.detail && i.detail !== label ? `${label}: ${i.detail}` : label, i.href, { lang: langAttr(i) });
+      });
+    } else if (item.type === 'nowplaying') {
+      const url = safeHref(item.spotifyUrl, './');
+      const service = url && serviceName(url);
+      rows = [row(service ? `${item.title ?? 'Playlist'} auf ${service}` : (item.title ?? 'Playlist'), url)];
+    } else if (item.type === 'downloads') {
+      rows = items(item.items).map((d) => {
+        const label = rowLabel({ label: d.label, file: d.file });
         const meta = [d.format, d.size].filter(Boolean).join(', ');
-        const name = String(d.file ?? '').split(/[?#]/)[0].split('/').pop();
-        return link(meta ? `${d.label} (${meta})` : d.label, d.file, ` download="${esc(name)}"`);
+        return label && row(meta ? `${label} (${meta})` : label, d.file, { download: fileName(d.file), lang: langAttr(d) });
       });
     }
     rows = rows.filter(Boolean);
     const body = item.type === 'page' && item.body ? `<p>${esc(item.body)}</p>` : '';
     if (!rows.length && !body) continue;
-    sections.push(`<section><h2>${esc(item.title ?? item.label)}</h2>${body}${rows.length ? `<ul>${rows.join('')}</ul>` : ''}</section>`);
+    sections.push(`<section><h2${langAttr(item)}>${esc(item.title ?? item.label)}</h2>${body}${rows.length ? `<ul>${rows.join('')}</ul>` : ''}</section>`);
   }
   const legal = config.legal ?? {};
-  const legalLinks = [link('Impressum', legal.impressum), link('Datenschutz', legal.datenschutz)].filter(Boolean);
+  const legalLinks = [legal.impressum && row('Impressum', legal.impressum), legal.datenschutz && row('Datenschutz', legal.datenschutz)].filter(Boolean);
   return `
     <style>
       .nojs { position: relative; z-index: 1; max-width: 560px; margin: 0 auto; padding: 32px 20px 48px; color: #111;
@@ -70,15 +89,17 @@ function configHtml() {
       order: 'pre',
       handler(html, ctx) {
         if (ctx?.path && !/(^|\/)index\.html$/.test(ctx.path)) return html; // dev/*.html stay as they are
-        const config = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
+        const config = readConfig();
         const brand = config.brand ?? {};
         const title = esc(brand.name ? `${brand.name} · Links` : 'Links');
         const desc = esc(brand.tagline ?? '');
-        // link previews need absolute URLs: with config.siteUrl set, og:image and og:url are absolute
+        // link previews need absolute URLs: with a known site address (siteUrlOf) og:image and og:url are absolute
+        const siteUrl = siteUrlOf(config);
         let site = null;
-        try { site = /^https?:\/\//i.test(config.siteUrl ?? '') ? new URL(String(config.siteUrl).replace(/\/?$/, '/')) : null; } catch { /* invalid: stay relative */ }
+        try { site = /^https?:\/\//i.test(siteUrl) ? new URL(siteUrl.replace(/\/?$/, '/')) : null; } catch { /* invalid: stay relative */ }
         const ogImage = esc(site ? new URL('og-image.png', site).href : 'og-image.png');
-        const ogUrl = site ? `\n  <meta property="og:url" content="${esc(site.href)}" />` : '';
+        const ogUrl = (site ? `\n  <meta property="og:url" content="${esc(site.href)}" />` : '')
+          + '\n  <meta property="og:image:width" content="1200" />\n  <meta property="og:image:height" content="630" />';
         // function replacements: a '$' in the content is never read as a replacement pattern
         const meta = (attr) => new RegExp(`(<meta ${attr} content=")[^"]*(")`);
         return html
@@ -88,15 +109,17 @@ function configHtml() {
           .replace(meta('property="og:description"'), (_, a, b) => a + desc + b)
           .replace(meta('property="og:image"'), (_, a, b) => a + ogImage + b)
           .replace(/<meta property="og:image"[^>]*>/, (m) => m + ogUrl)
-          .replace(/<noscript>[\s\S]*?<\/noscript>/, () => `<noscript>${noscriptHtml(config)}</noscript>`);
+          .replace(/<noscript>[\s\S]*?<\/noscript>/, () => `<noscript>${noscriptHtml(config, site?.origin)}</noscript>`);
       },
     },
   };
 }
 
-/** <link rel="modulepreload"> for the lazily imported intro chunk: its download starts while the HTML
- *  is parsed, not after the entry ran and config.json arrived (main.js imports it only then).
- *  Left out when config.json turns the intro off. */
+/** Preload for the lazily imported intro chunk: its download starts while the HTML is parsed, not after
+ *  the entry ran and config.json arrived (main.js imports it only then). A tiny inline script adds the
+ *  <link rel="modulepreload"> only where WebGL 2 exists, so browsers that cannot play the intro never
+ *  download it. Left out when config.json turns the intro off at build time (turning it off in a deployed
+ *  config.json without a rebuild still skips the intro, but the chunk is still preloaded). */
 function introPreload() {
   return {
     name: 'intro-preload',
@@ -104,13 +127,14 @@ function introPreload() {
     transformIndexHtml: {
       order: 'post',
       handler(html, ctx) {
-        const config = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
-        if ([false, 'never', 'off'].includes(config.settings?.intro) || !ctx.bundle) return html;
+        if (!introEnabled(readConfig()) || !ctx.bundle) return html;
         const chunks = Object.values(ctx.bundle);
         const intro = chunks.find((c) => c.type === 'chunk' && c.isDynamicEntry && /\/src\/intro\/index\.js$/.test(c.facadeModuleId ?? ''));
         if (!intro) return html;
-        const files = [intro.fileName, ...intro.imports.filter((f) => !html.includes(f))];
-        return html.replace('</head>', () => `${files.map((f) => `  <link rel="modulepreload" crossorigin href="./${esc(f)}">\n`).join('')}</head>`);
+        const files = JSON.stringify([intro.fileName, ...intro.imports.filter((f) => !html.includes(f))].map((f) => `./${f}`));
+        const script = `if (window.WebGL2RenderingContext) for (const f of ${files}) { const l = document.createElement('link'); l.rel = 'modulepreload'; l.crossOrigin = ''; l.href = f; document.head.append(l); }`;
+        // before the entry script and the stylesheet (an inline script after a stylesheet waits for it)
+        return html.replace(/(\s*)<script type="module"/, (m, ws) => `${ws}<script>${script}</script>${m}`);
       },
     },
   };
@@ -122,8 +146,10 @@ export default defineConfig({
   // the lazily loaded intro chunk carries three.js (~610 kB minified, ~160 kB gzip) by design
   build: { target: 'es2022', chunkSizeWarningLimit: 700 },
   plugins: [configHtml(), introPreload()],
+  // config.legal at build time: the config error window still links the Impressum and Datenschutz
+  define: { __LEGAL__: JSON.stringify(readConfig().legal ?? null) },
   server: {
-    // agents and QA write screenshots there; reloads on those writes broke test runs
-    watch: { ignored: ['**/.shots/**', '**/qa/**'] },
+    // test runs write screenshots there; reloads on those writes broke them
+    watch: { ignored: ['**/.shots/**'] },
   },
 });

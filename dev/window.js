@@ -4,7 +4,7 @@ import { loadConfig } from '../src/shared/config.js';
 import { createDesktop } from '../src/window/index.js';
 import { aspect } from '../src/shared/ipodSpec.js';
 const config = await loadConfig(new URL('../config.json', location.href).href);
-const desktop = createDesktop(document.getElementById('app'), { config });
+const desktop = createDesktop(document.getElementById('app'), { config, onLinks() {} });
 const ph = document.createElement('div');
 ph.style.cssText = `height:var(--ipod-h);aspect-ratio:${aspect};background:#c8cbcf;border-radius:12px`;
 desktop.contentEl.append(ph);

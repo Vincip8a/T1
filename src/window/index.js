@@ -7,6 +7,8 @@ import { aspect } from '../shared/ipodSpec.js';
 import { h } from '../shared/dom.js';
 
 const MOBILE_MQ = '(max-width: 639.98px)';
+// zoom that would grow the iPod by less than this (px) is no zoom: the light is disabled instead
+const ZOOM_MIN_GAIN = 12;
 const MENUBAR_H = 22;
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -49,14 +51,14 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
   // menu bar
   const bar = h('header', 'dt-bar');
   const barLeft = h('nav', 'dt-bar-left', { 'aria-label': 'Menüleiste' });
-  barLeft.append(h('span', 'dt-mono', { 'aria-hidden': 'true', text: brand.monogram ?? '' }));
-  barLeft.append(h('strong', 'dt-brand', { text: brand.name ?? '' }));
+  // only what has something to show or do: no empty name slot, no "Links" without an iPod (the
+  // config error window), no "Kontakt" without brand.email
+  if (brand.monogram) barLeft.append(h('span', 'dt-mono', { 'aria-hidden': 'true', text: brand.monogram }));
+  if (brand.name) barLeft.append(h('strong', 'dt-brand', { text: brand.name }));
   const linksBtn = h('button', 'dt-bar-item dt-bar-links', { type: 'button', text: 'Links' });
-  const mailHref = brand.email ? `mailto:${brand.email}` : null;
-  const contact = mailHref
-    ? h('a', 'dt-bar-item', { href: mailHref, text: 'Kontakt' })
-    : h('span', 'dt-bar-item', { text: 'Kontakt' });
-  barLeft.append(linksBtn, contact);
+  if (onLinks) barLeft.append(linksBtn);
+  const mailHref = brand.email ? safeHref(`mailto:${brand.email}`) : null;
+  if (mailHref) barLeft.append(h('a', 'dt-bar-item', { href: mailHref, text: 'Kontakt' }));
   const clock = h('time', 'dt-clock');
   // right side: small legal links (config.legal), then the clock
   const barRight = h('div', 'dt-bar-right');
@@ -100,7 +102,19 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
   icon.append(iconArt, h('span', 'dt-icon-label', { text: 'iPod' }));
 
   el.append(wall, bar, stage, icon);
-  host.append(el);
+  // two hidden copies of the content box (outside the window, so its own .is-zoomed never applies):
+  // window.css resolves --ipod-h for the normal and the zoomed window, whatever media rule is active
+  const probes = h('div', 'dt-zoom-probe', { hidden: '', 'aria-hidden': 'true' });
+  const probeZoomed = h('div', 'dt is-zoomed');
+  const probeN = h('div', 'dt-content'), probeZ = h('div', 'dt-content');
+  for (const p of [probeN, probeZ]) p.style.setProperty('--ipod-aspect', String(aspect));
+  probeZoomed.append(probeZ);
+  probes.append(probeN, probeZoomed);
+  host.append(el, probes);
+  const ipodH = (n) => parseFloat(getComputedStyle(n).getPropertyValue('--ipod-h')) || 0;
+  // zoom has nothing to do on a phone (the window spans the screen) or wherever both sizes come out
+  // (nearly) the same: a short screen, or one just tall enough that both hit the 500 px floor
+  const zoomOff = () => isMobile() || ipodH(probeZ) - ipodH(probeN) < ZOOM_MIN_GAIN;
 
   /* ---------- clock ---------- */
   const fmt = new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' });
@@ -120,6 +134,7 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
   let zoomed = false;
   let ox = 0; // drag offset (px) relative to the centred position
   let oy = 0;
+  let userFrame = null; // the offset before zooming in, restored on zoom out (like Aqua's user frame)
   let zoomAnim = null;
   let tl = null;
   let destroyed = false;
@@ -147,13 +162,15 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
 
   // FLIP: the layout jumps to the new size once (the iPod re-measures its text once), and the frame
   // glides from the old rect with a transform only, instead of animating --ipod-h every frame
-  const setZoomed = (z) => {
+  const setZoomed = (z, animate = true) => {
     const from = win.getBoundingClientRect();
+    if (z) userFrame = { ox, oy };
+    else if (userFrame) { ({ ox, oy } = userFrame); userFrame = null; }
     zoomed = z;
     el.classList.toggle('is-zoomed', z);
     btnZoom.setAttribute('aria-pressed', String(z));
-    clampOffset(); // final size and position, at once
-    if (prefersReducedMotion() || !win.animate) return;
+    clampOffset(); // final size and position, at once (the clamp only moves a restored frame that no longer fits)
+    if (!animate || prefersReducedMotion() || !win.animate) return;
     const to = win.getBoundingClientRect();
     if (!to.width || !to.height) return;
     const flip = `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width}, ${from.height / to.height})`;
@@ -166,7 +183,9 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
     setTimeout(() => { if (anim.playState === 'running') anim.finish(); }, 340 + 180);
   };
   const toggleZoom = () => {
-    if (!interactive || minimised || busy || isMobile()) return;
+    if (!interactive || minimised || busy) return;
+    syncZoomLight(); // measured afresh: a click never zooms to the same size (or acts on a stale light)
+    if (zoomOff()) return;
     setZoomed(!zoomed);
   };
 
@@ -190,6 +209,12 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
     target.focus({ preventScroll: true });
   };
 
+  // the Dock icon shows its focus ring to keyboard users only (a click on the yellow light must not
+  // leave a ring around it): data-input mirrors the last input, as on the iPod
+  on(document, 'pointerdown', () => { el.dataset.input = 'pointer'; }, true);
+  on(document, 'keydown', (e) => { if (!/^(Shift|Control|Alt|Meta)$/.test(e.key)) el.dataset.input = 'key'; }, true);
+  const focusIcon = () => icon.focus({ preventScroll: true, focusVisible: el.dataset.input !== 'pointer' });
+
   const setMinimisedState = (m) => {
     minimised = m;
     el.dataset.state = m ? 'minimised' : 'open';
@@ -203,7 +228,7 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
       busy = false;
       if (destroyed) return;
       setMinimisedState(true);
-      icon.focus({ preventScroll: true });
+      focusIcon();
       return;
     }
     const { dx, dy } = iconTarget();
@@ -215,7 +240,7 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
         gsap.set(win, { clearProps: 'all' });
         el.classList.remove('is-genie');
         busy = false;
-        icon.focus({ preventScroll: true });
+        focusIcon();
       },
     });
     tl.fromTo(win, { clipPath: FUNNEL_FROM }, { clipPath: FUNNEL_MID, duration: 0.2, ease: 'sine.in' })
@@ -266,9 +291,9 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
   on(icon, 'keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); restore(); }
   });
-  on(linksBtn, 'click', () => {
+  on(linksBtn, 'click', (e) => {
     if (minimised) { restore(); return; }
-    if (onLinks) onLinks(); else focusContent();
+    onLinks?.(e); // e.detail === 0: activated from the keyboard
   });
   // a press on the metal, the title bar, the status bar or a traffic light keeps keyboard focus on
   // the iPod (the window itself would otherwise take it, and the iPod keys would stop working)
@@ -296,7 +321,7 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
     if (!drag || e.pointerId !== drag.id) return;
     const vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
     if (!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 3) return;
-    if (!drag.moved) { drag.moved = true; el.classList.add('is-dragging'); }
+    if (!drag.moved) { drag.moved = true; userFrame = null; el.classList.add('is-dragging'); }
     ox = clampLo(drag.ox + e.clientX - drag.sx, -drag.baseL, vw - (drag.baseL + drag.w));
     oy = clampLo(drag.oy + e.clientY - drag.sy, MENUBAR_H - drag.baseT, vh - (drag.baseT + drag.h));
     applyOffset();
@@ -315,12 +340,16 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
   });
 
   /* ---------- public API ---------- */
-  // on a phone the window always spans the screen, so the zoom light is disabled there (and looks it)
+  // where zoom cannot change the size (a phone, a short screen) the zoom light is disabled (and looks
+  // it); re-checked on every resize, since the two sizes converge at different heights
   const syncZoomLight = () => {
-    el.classList.toggle('is-zoom-off', isMobile());
-    btnZoom.setAttribute('aria-disabled', String(!interactive || isMobile()));
+    const off = zoomOff();
+    if (off && zoomed) setZoomed(false, false);
+    el.classList.toggle('is-zoom-off', off);
+    btnZoom.setAttribute('aria-disabled', String(!interactive || off));
   };
   on(mobileMq, 'change', syncZoomLight);
+  on(window, 'resize', syncZoomLight);
   const applyInteractive = (v) => {
     interactive = !!v;
     el.classList.toggle('is-locked', !interactive);
@@ -343,6 +372,7 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
     gsap?.killTweensOf(win);
     cleanups.forEach((fn) => fn());
     el.remove();
+    probes.remove();
   };
 
   applyInteractive(true);

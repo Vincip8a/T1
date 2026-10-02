@@ -46,11 +46,23 @@
 /* keyboard focus only: a pointer press focuses the iPod too, but must not draw the ring */
 /* data-input="key": the last input was the keyboard (or "Links" in the menu bar), so any focus shows it.
    On a screen of links the focused row is the key view: the ring still goes around the iPod. */
+/* The ring is Aqua's focus halo: a blue core (#1a5fd0, ≥ 3:1 on the window metal) fading into a soft
+   glow, following the body's rounded corners. The transparent outline is what forced colours show. */
+.ipodc::after {
+  content: ''; position: absolute; inset: -3px; z-index: 10; pointer-events: none;
+  border-radius: calc(var(--ipodc-u) * var(--ipodc-mm-r) + 3px);
+  box-shadow: 0 0 0 2px #1a5fd0, 0 0 5px 4px rgba(59,153,252,.6);
+  opacity: 0;
+}
 .ipodc:focus-visible, .ipodc[data-input="key"]:focus,
 .ipodc:not([data-input="pointer"]):has(.ipodc-row:focus-visible), .ipodc[data-input="key"]:has(.ipodc-row:focus) {
-  outline: 3px solid #0b4fc4; outline-offset: 4px; /* ≥ 4.5:1 on window and desktop */
+  outline: 2px solid transparent; outline-offset: 4px;
 }
+/* (separate selectors, not :is(): the pointer rule below must win over a plain :focus-visible) */
+.ipodc:focus-visible::after, .ipodc[data-input="key"]:focus::after,
+.ipodc:not([data-input="pointer"]):has(.ipodc-row:focus-visible)::after, .ipodc[data-input="key"]:has(.ipodc-row:focus)::after { opacity: 1; }
 .ipodc[data-input="pointer"] { outline: none; }
+.ipodc[data-input="pointer"]::after { opacity: 0; }
 
 .ipodc-defs, .ipodc-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
@@ -532,8 +544,10 @@
 .ipodc-np-prog, .ipodc-np-vol { transition: opacity .18s; }
 .ipodc-view[class*=bump] { animation: ipodc-bump .22s ease-out; }
 .ipodc-pv { transition: opacity .45s; }
-.ipodc-pv.is-on :is(.ipodc-pv-float, .ipodc-pv-float-in) { animation: ipodc-float 7s ease-in-out infinite alternate; }
-.ipodc-pv.is-on .ipodc-pv-cover { animation: ipodc-pan 16s ease-in-out infinite alternate; }
+/* the preview pane drifts for a while after each change of selection, then rests (an idle page must not
+   repaint forever): 6 x 7 s and 4 x 16 s, and they hold their last frame */
+.ipodc-pv.is-on :is(.ipodc-pv-float, .ipodc-pv-float-in) { animation: ipodc-float 7s ease-in-out 6 alternate both; }
+.ipodc-pv.is-on .ipodc-pv-cover { animation: ipodc-pan 16s ease-in-out 4 alternate both; }
 .ipodc-toast { transition: .18s; transition-property: opacity, transform; }
 .ipodc-toast.is-on { transform: translate(-50%, -50%) scale(1); }
 /* handoff: the intro canvas fades out over 220 ms; what its frontal last frame does not show (the drop

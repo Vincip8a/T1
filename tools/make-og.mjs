@@ -18,7 +18,9 @@ const HEIGHT = 630
 
 // Name und Menuepunkte aus public/config.json (ueber lib/brand.mjs, bereits maskiert)
 const title = brand.name
-const subtitle = brand.menuLabels.join(' · ')
+// a label never breaks inside; each label but the first starts with its dot, and the dot of a label that
+// starts a line falls into the clipped margin (see .sub-in), so no line starts or ends with a separator
+const subtitle = `<span class="sub-in">${brand.menuLabels.map((l) => `<span class="item">${l}</span>`).join(' ')}</span>`
 
 const html = `<!doctype html>
 <html lang="de"><head><meta charset="utf-8"><style>
@@ -66,6 +68,9 @@ const html = `<!doctype html>
     color: rgba(255,255,255,.93); text-shadow: 0 2px 10px rgba(4,32,60,.3);
     text-wrap: balance; /* viele Menuepunkte: zwei gleich lange Zeilen */
   }
+  .sub-in { display: block; margin-left: -.62em; clip-path: inset(-40px -40px -40px .62em); }
+  .sub .item { display: inline-block; white-space: nowrap; }
+  .sub .item::before { content: '·'; display: inline-block; width: .62em; }
   .rule { margin-top: 34px; width: 232px; height: 4px; border-radius: 2px;
           background: linear-gradient(90deg, rgba(255,255,255,.95), rgba(255,255,255,.1)); }
   .device { width: 330px; display: flex; justify-content: flex-end; }

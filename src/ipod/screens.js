@@ -2,6 +2,7 @@
 // for text pages and the Now Playing footer), the split main menu with its preview pane, and the
 // Now Playing layout. All geometry is in logical px; `ctx` is supplied by index.js.
 import { h, clamp, fmtTime, safeHref } from './util.js';
+import { linkAttrs, fileName, rowLabel, langOf, serviceName } from '../shared/href.js';
 import { CHEVRON, SPEAKER_LO, SPEAKER_HI, SPEAKER_NOW, previewIcon } from './art.js';
 
 const ROW = 27;        // 8 rows per screen, like the 6G
@@ -16,20 +17,21 @@ export function createScreens(ctx) {
    *  tabindex, see listScreen), so screen readers meet a real link; modifier clicks stay native.
    *  Other rows are options of the iPod listbox. */
   function makeRow(spec) {
-    const href = spec.href && safeHref(spec.href);
-    const row = h(href ? 'a' : 'div', 'ipodc-row', { role: 'option', id: nid('o'), 'aria-selected': 'false' });
-    if (href) {
-      Object.assign(row, { href, tabIndex: -1, draggable: false });
+    // the link rule is shared with the <noscript> list (src/shared/href.js): a file hosted elsewhere opens
+    // in a new tab like any web link (browsers ignore `download` there) and gets no "Download gestartet"
+    const link = spec.href ? linkAttrs(spec.href, { download: spec.download, origin: location.origin }) : null;
+    const row = h(link ? 'a' : 'div', 'ipodc-row', { role: 'option', id: nid('o'), 'aria-selected': 'false', lang: spec.lang });
+    if (link) {
+      Object.assign(row, { href: link.href, tabIndex: -1, draggable: false });
       let desc = L.link;
-      const web = /^https?:/i.test(href);
-      const newTab = () => { row.target = '_blank'; row.rel = 'noopener'; };
-      // browsers ignore `download` on other origins and would navigate the page away: a file hosted
-      // elsewhere opens in a new tab like any web link (and gets no "Download gestartet" toast)
-      const foreign = web && new URL(href, location.href).origin !== location.origin;
-      if (spec.download != null && !foreign) {
-        row.download = spec.download;
+      if (link.download != null) {
+        row.download = link.download;
         desc = L.download;
-      } else if (web) { newTab(); desc = L.newTab; } else if (/^mailto:/i.test(href)) desc = L.mail;
+      } else if (link.newTab) {
+        row.target = '_blank';
+        row.rel = 'noopener';
+        desc = L.newTab;
+      } else if (link.mail) desc = L.mail;
       row.setAttribute('aria-description', desc);
     }
     row.append(h('span', 'ipodc-row-label', { text: spec.label ?? '' }));
@@ -191,7 +193,7 @@ export function createScreens(ctx) {
   function menuScreen() {
     const { menu } = ctx;
     const s = listScreen('menu', 'menu', brand.name || 'iPod',
-      menu.map((item) => ({ label: item.label ?? item.title, sub: true, onActivate: () => ctx.open(item) })));
+      menu.map((item) => ({ label: item.label ?? item.title, lang: langOf(item), sub: true, onActivate: () => ctx.open(item) })));
     s.node.classList.add('is-split');
     const preview = h('div', 'ipodc-preview', { 'aria-hidden': 'true' });
     s.node.append(preview);
@@ -235,20 +237,31 @@ export function createScreens(ctx) {
 
   // ── sub screens
   function buildScreen(item) {
+    const s = buildScreenOf(item);
+    s.lang = langOf(item); // of the label and title (the screen title gets it, see go() in index.js)
+    return s;
+  }
+  function buildScreenOf(item) {
     const title = item.title ?? item.label;
     const id = item.id ?? item.type;
-    const items = (a) => (Array.isArray(a) ? a : []).filter(Boolean);
-    const links = (a) => items(a).map(({ label, detail, href }) => ({ label, detail, href }));
+    const items = (a) => (Array.isArray(a) ? a : []).filter((x) => x && typeof x === 'object');
+    // a row without a label shows its detail, host, e-mail or file name (rowLabel); one with nothing to
+    // show is skipped with a hint, like a broken menu entry
+    const named = (row, src) => {
+      const label = rowLabel(src);
+      if (!label) console.warn(`[ipod] config.json: row in "${title}" skipped (needs a label or an address):`, src);
+      return label && { ...row, label, detail: label === row.detail ? null : row.detail, lang: langOf(src) };
+    };
+    const links = (a) => items(a).map((x) => named({ detail: x.detail, href: x.href }, x));
     switch (item.type) {
       case 'list':
         return listScreen('list', id, title, links(item.items));
       case 'downloads':
-        return listScreen('downloads', id, title, items(item.items).map((it) => ({
-          label: it.label,
+        return listScreen('downloads', id, title, items(item.items).map((it) => named({
           detail: [it.format, /^[–-]?$/.test(it.size ?? '') ? 0 : it.size].filter(Boolean).join(' · '),
           href: it.file,
-          download: String(it.file ?? '').split(/[?#]/)[0].split('/').pop(),
-        })));
+          download: fileName(it.file),
+        }, it)));
       case 'nowplaying':
         return nowPlayingScreen(item, id);
       default: {
@@ -265,7 +278,10 @@ export function createScreens(ctx) {
     const { player } = ctx;
     const { tracks } = player;
     const spot = item.spotifyUrl && safeHref(item.spotifyUrl);
-    const s = listScreen('nowplaying', id, L.nowPlaying, spot ? [{ label: L.openSpotify, href: spot, sub: true }] : []);
+    // "In Spotify öffnen", "In Apple Music öffnen", … from the address; "Playlist öffnen" for any other
+    const service = spot && serviceName(spot);
+    const openLabel = service ? L.openIn.replace('{service}', service) : L.openPlaylist;
+    const s = listScreen('nowplaying', id, L.nowPlaying, spot ? [{ label: openLabel, href: spot, sub: true }] : []);
     const { node } = s;
     const line = (cls, text) => h('div', `ipodc-np-${cls}`, { text });
     const [count, tTitle, tArtist] = ['count', 'title', 'artist'].map((c) => line(c));
@@ -307,6 +323,24 @@ export function createScreens(ctx) {
     } else node.classList.add('no-tracks');
     node.prepend(deco);
     if (!spot) node.classList.add('no-cta');
+    // the drawn screen is aria-hidden: assistive tech gets the same facts as text, the playing track and
+    // the track list (the current one marked). Without the Spotify row the iPod is a listbox, and this
+    // block is its one option, so it is read on focus.
+    const sr = h('div', 'ipodc-sr ipodc-np-sr');
+    const srNow = h('p');
+    const srList = h('ul', null, { 'aria-label': L.tracklist });
+    const srRows = trkRows.map((_, i) => {
+      const t = tracks[i];
+      return h('li', null, { text: [t.title, t.artist, t.duration].filter(Boolean).join(', ') });
+    });
+    srList.append(...srRows);
+    sr.append(srNow);
+    if (srRows.length) sr.append(srList);
+    node.append(sr);
+    if (!s.rows.length) {
+      for (const [k, v] of [['id', nid('t')], ['role', 'option'], ['aria-selected', 'true']]) sr.setAttribute(k, v);
+      s.adId = () => sr.id;
+    }
     let trkTop = 0;
     let volT = 0;
 
@@ -325,6 +359,10 @@ export function createScreens(ctx) {
       if (instant) { void node.offsetWidth; node.classList.remove('is-instant'); }
       tEl.textContent = fmtTime(player.elapsed);
       tRem.textContent = `-${fmtTime(dur - Math.floor(player.elapsed))}`;
+      const now = [count.textContent, [t.title, t.artist].filter(Boolean).join(', ')].filter(Boolean).join(': ');
+      const text = [now, [item.title, item.artist].filter(Boolean).join(', ')].filter(Boolean).join('. ');
+      if (srNow.textContent !== text) srNow.textContent = text;
+      srRows.forEach((r, i) => { if (i === player.track) r.setAttribute('aria-current', 'true'); else r.removeAttribute('aria-current'); });
     };
     s.summary = () => [tTitle.textContent, tArtist.textContent, item.title, count.textContent].filter(Boolean).join(', ');
     s.onShow = () => {

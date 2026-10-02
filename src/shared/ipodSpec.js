@@ -50,7 +50,7 @@ export const COLORS = {
   aluminiumLight: '#e2e4e7',
   aluminiumDark: '#9fa3a8',
   wheel: '#e4e5e7',
-  wheelLabel: '#7d8187', // printed grey, 3.1:1 on the wheel (WCAG 1.4.11 for the control labels)
+  wheelLabel: '#5f6368', // printed grey, 4.8:1 on the wheel (WCAG 1.4.3 for the word MENU, 1.4.11 for the glyphs)
   centerButton: '#cfd2d6',
   screenWindow: '#0b0c0e',
   lcdOff: '#14171a',

@@ -26,6 +26,9 @@ export function canvas(w, h, bg, k = 1) {
   return [c, g];
 }
 
+/** 1 px stand-in until the real canvas is drawn (never uploaded: the paint runs first) */
+export const blank = () => canvas(1, 1)[0];
+
 export function tex(c, { color = true, wrap = false, aniso = 8 } = {}) {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = color ? THREE.SRGBColorSpace : THREE.NoColorSpace;
