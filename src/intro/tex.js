@@ -1,6 +1,6 @@
 // Procedural canvas textures for intro C (no image files).
 import * as THREE from 'three';
-import { COLORS } from '../shared/ipodSpec.js';
+import { IPOD, COLORS } from '../shared/ipodSpec.js';
 
 const { PI, abs, floor, imul, min, round } = Math;
 const FONT = '"Helvetica Neue", Helvetica, Arial, sans-serif';
@@ -113,10 +113,11 @@ export function wheelCanvas(dMm, labelFactor, cbMm) {
   const cb = cbMm * px;
   dot(g, R, R + 0.19 * px, cb + 0.13 * px, 'rgba(255,255,255,.65)');
   dot(g, R, R, cb + 0.15 * px, 'rgba(100,104,110,.5)');
-  for (const d of [-0.04, 0.04]) text(g, 'MENU', R + (0.0525 + d) * px, R - lr, 2.1 * px, 700, COLORS.wheelLabel, 'center', 0.105 * px);
+  // the word and the glyphs of the DOM wheel (ipodSpec.js), so the intro's last frame matches it
+  const { menu = 'MENU', glyphs } = IPOD.wheelLabels;
+  for (const d of [-0.04, 0.04]) text(g, menu, R + (0.0525 + d) * px, R - lr, 2.1 * px, 700, COLORS.wheelLabel, 'center', 0.105 * px);
   const k = (2.1 / 9) * px;
-  [['M0 0l7.2 4.5L0 9zM7.2 0l7.2 4.5L7.2 9zM15.4 0h2.4v9h-2.4z', R + lr, R], ['M20 0l-7.2 4.5L20 9zM12.8 0L5.6 4.5l7.2 4.5zM4.6 0H2.2v9h2.4z', R - lr, R],
-    ['M1 0l7.4 4.5L1 9zM11.4 0h2.6v9h-2.6zM16.2 0h2.6v9h-2.6z', R, R + lr]].forEach(([d, x, y]) => {
+  [[glyphs.next, R + lr, R], [glyphs.prev, R - lr, R], [glyphs.play, R, R + lr]].forEach(([d, x, y]) => {
     g.setTransform(k, 0, 0, k, x - 10 * k, y - 4.5 * k);
     g.fill(new Path2D(d));
   });

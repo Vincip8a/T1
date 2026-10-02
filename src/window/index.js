@@ -2,7 +2,7 @@
 // API (see ARCHITECTURE.md): createDesktop(host, { config, onLinks, onFocus }) -> { el, contentEl, setInteractive, destroy }
 import './window.css';
 import { prefersReducedMotion } from '../shared/config.js';
-import { safeHref } from '../shared/href.js';
+import { safeHref, firstText } from '../shared/href.js';
 import { aspect } from '../shared/ipodSpec.js';
 import { h } from '../shared/dom.js';
 
@@ -33,6 +33,7 @@ function glyph(pathD) {
 
 export function createDesktop(host, { config, onLinks, onFocus }) {
   const brand = config?.brand ?? {};
+  const winTitle = firstText(brand.windowTitle, brand.name); // a blank windowTitle: the name stands in
   const mobileMq = window.matchMedia(MOBILE_MQ);
   const isMobile = () => mobileMq.matches;
   const cleanups = [];
@@ -75,7 +76,7 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
   // window
   const stage = h('main', 'dt-stage');
   const pos = h('div', 'dt-pos');
-  const win = h('section', 'dt-win', { 'aria-label': brand.windowTitle ?? 'Fenster', tabindex: '-1' });
+  const win = h('section', 'dt-win', { 'aria-label': winTitle || 'Fenster', tabindex: '-1' });
   const titlebar = h('div', 'dt-titlebar');
   const lights = h('div', 'dt-lights');
   const btnClose = h('button', 'dt-tl dt-tl-close', { type: 'button', 'aria-label': 'Schließen' });
@@ -85,7 +86,7 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
   btnMin.append(glyph('M2.6 6h6.8'));
   btnZoom.append(glyph('M2.8 6h6.4M6 2.8v6.4'));
   lights.append(btnClose, btnMin, btnZoom);
-  const title = h('h1', 'dt-title', { text: brand.windowTitle ?? '' });
+  const title = h('h1', 'dt-title', { text: winTitle });
   titlebar.append(lights, title, h('span', 'dt-title-spacer'));
 
   const contentEl = h('div', 'dt-content');
@@ -138,6 +139,8 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
   let zoomAnim = null;
   let tl = null;
   let destroyed = false;
+  let minimising = false; // the minimise genie (or the gsap load before it) is running
+  let restoreNext = false; // "Links" meanwhile: restore once it has landed
 
   const applyOffset = () => {
     pos.style.setProperty('--dx', `${ox}px`);
@@ -147,8 +150,13 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
   // a window larger than the stage (browser zoom) stays centred and the stage scrolls: no dragging
   const fits = () => win.offsetWidth <= stage.clientWidth && win.offsetHeight <= stage.clientHeight;
 
+  // a zoom glide still running is a transform on the window: it lands first, so the rects measured
+  // below are the window's own
+  const settleZoom = () => { if (zoomAnim?.playState === 'running') zoomAnim.finish(); };
+
   // clamp the current offset so the window stays inside the viewport (below the menu bar)
   const clampOffset = () => {
+    settleZoom();
     if (isMobile() || !fits()) { ox = oy = 0; applyOffset(); return; }
     const r = win.getBoundingClientRect();
     const baseL = r.left - ox, baseT = r.top - oy;
@@ -163,7 +171,11 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
   // FLIP: the layout jumps to the new size once (the iPod re-measures its text once), and the frame
   // glides from the old rect with a transform only, instead of animating --ipod-h every frame
   const setZoomed = (z, animate = true) => {
+    // `from`: where the frame is on screen now, mid-glide included (a second click reverses smoothly);
+    // the glide stops before the clamp measures the window
     const from = win.getBoundingClientRect();
+    zoomAnim?.cancel();
+    zoomAnim = null;
     if (z) userFrame = { ox, oy };
     else if (userFrame) { ({ ox, oy } = userFrame); userFrame = null; }
     zoomed = z;
@@ -174,7 +186,6 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
     const to = win.getBoundingClientRect();
     if (!to.width || !to.height) return;
     const flip = `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width}, ${from.height / to.height})`;
-    zoomAnim?.cancel();
     const anim = win.animate([{ transformOrigin: '0 0', transform: flip }, { transformOrigin: '0 0', transform: 'none' }],
       { duration: 340, easing: 'cubic-bezier(.3,.7,.2,1)' });
     zoomAnim = anim;
@@ -221,14 +232,19 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
     win.toggleAttribute('inert', m);
   };
 
+  const afterMinimise = () => {
+    minimising = false;
+    if (restoreNext) { restoreNext = false; restore(); } else focusIcon();
+  };
   const minimise = async () => {
     if (!interactive || minimised || busy) return;
-    busy = true;
+    busy = minimising = true;
+    restoreNext = false;
     if (prefersReducedMotion() || !(await loadGsap()) || destroyed) {
       busy = false;
       if (destroyed) return;
       setMinimisedState(true);
-      focusIcon();
+      afterMinimise();
       return;
     }
     const { dx, dy } = iconTarget();
@@ -240,7 +256,7 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
         gsap.set(win, { clearProps: 'all' });
         el.classList.remove('is-genie');
         busy = false;
-        focusIcon();
+        afterMinimise();
       },
     });
     tl.fromTo(win, { clipPath: FUNNEL_FROM }, { clipPath: FUNNEL_MID, duration: 0.2, ease: 'sine.in' })
@@ -293,6 +309,7 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
   });
   on(linksBtn, 'click', (e) => {
     if (minimised) { restore(); return; }
+    if (minimising) { restoreNext = true; return; } // the genie lands first, then the window comes back
     onLinks?.(e); // e.detail === 0: activated from the keyboard
   });
   // a press on the metal, the title bar, the status bar or a traffic light keeps keyboard focus on
@@ -310,6 +327,7 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
   on(titlebar, 'pointerdown', (e) => {
     if (!interactive || minimised || busy || isMobile() || !fits()) return;
     if (e.button !== 0 || e.target.closest('.dt-tl')) return;
+    settleZoom();
     const r = win.getBoundingClientRect();
     drag = {
       id: e.pointerId, sx: e.clientX, sy: e.clientY, ox, oy,

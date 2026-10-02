@@ -7,8 +7,9 @@
 // builders), sound.js (WebAudio ticks), art.js (procedural SVG), util.js (helpers, timers).
 import './ipodc.css';
 import { IPOD, COLORS } from '../shared/ipodSpec.js';
-import { prefersReducedMotion as isReduced } from '../shared/config.js';
+import { prefersReducedMotion as isReduced, isOff } from '../shared/config.js';
 import { h, createTimers } from './util.js';
+import { firstText } from '../shared/href.js';
 import { GLYPH, playIndicator, battery, sharedDefs } from './art.js';
 import { createSound } from './sound.js';
 import { createPlayer } from './player.js';
@@ -49,7 +50,7 @@ export function mountIpod(container, { config } = {}) {
   const brand = config.brand ?? {};
   // entries without a name or with an unknown type would be blank or broken rows: skip them, with a hint
   const menu = (Array.isArray(config.menu) ? config.menu : []).filter((m) => {
-    const ok = m && typeof m === 'object' && (m.label || m.title) && SCREEN_TYPES.includes(m.type);
+    const ok = m && typeof m === 'object' && firstText(m.label, m.title) && SCREEN_TYPES.includes(m.type);
     if (!ok) console.warn('[ipod] config.json: menu entry skipped (needs label or title and type list | page | nowplaying | downloads):', m);
     return ok;
   });
@@ -63,7 +64,7 @@ export function mountIpod(container, { config } = {}) {
     cleanups.push(() => t.removeEventListener(type, fn, o));
   };
   const timers = createTimers();
-  const soundOn = config.settings?.clickSound !== false;
+  const soundOn = !isOff(config.settings?.clickSound);
   const sound = createSound(soundOn);
   let destroyed = false;
   let phase = 'off'; // off → boot → ready
@@ -101,29 +102,36 @@ export function mountIpod(container, { config } = {}) {
   // and the live region sit beside the body because the listbox may only own options
   const hint = h('div', 'ipodc-sr', { id: hintId, text: L.hint });
   const live = h('div', 'ipodc-sr', { 'aria-live': 'polite', 'aria-atomic': 'true' });
+  // the iPod's name ("<screen title>, iPod"): an element, not aria-label, so the title can carry its
+  // own language (config.json lang, e.g. "Work Together" in English); aria-hidden, as the title bar is
+  const nameId = nid('name');
+  const nameEl = h('div', 'ipodc-sr', { id: nameId, 'aria-hidden': 'true' });
+  el.setAttribute('aria-labelledby', nameId);
   // the wheel is aria-hidden, so touch screen-reader users (VoiceOver, TalkBack) get MENU as an
   // invisible button; it is outside the tab order (keyboard users have Esc / Backspace)
   const backBtn = h('button', 'ipodc-sr', { type: 'button', tabindex: -1, hidden: '' });
   backBtn.textContent = L.back;
   const host = h('section', 'ipodc-host', { 'aria-label': 'iPod' });
-  host.append(el, hint, backBtn, live);
+  host.append(el, nameEl, hint, backBtn, live);
   container.append(host);
 
   /** real px per logical px (to measure wrapped text) */
   const pxPer = () => lcd.clientWidth / IPOD.screen.pxWidth || 1;
 
   let announceT = 0;
-  const announce = (text) => {
+  /** `content`: text, or a list of texts and elements (a part in another language is a span with lang) */
+  const announce = (content) => {
     timers.cancel(announceT);
     live.textContent = '';
-    announceT = timers.later(() => { live.textContent = text; }, 140);
+    announceT = timers.later(() => { live.replaceChildren(...[].concat(content)); }, 140);
   };
+  const inLang = (text, lang) => (lang ? h('span', null, { text, lang }) : text);
 
   // ── player
   const npItem = menu.find((m) => m.type === 'nowplaying');
   const tracks = !npItem ? [] : Array.isArray(npItem.tracks) && npItem.tracks.length
     ? npItem.tracks.filter((t) => t && typeof t === 'object')
-    : [{ title: npItem.title, artist: npItem.artist }];
+    : [{ title: firstText(npItem.title, npItem.label), artist: npItem.artist }];
   const player = createPlayer(tracks, (kind) => {
     ind.classList.toggle('is-on', player.started);
     ind.classList.toggle('is-paused', !player.playing);
@@ -223,7 +231,7 @@ export function mountIpod(container, { config } = {}) {
   function setTitle(text, dir, lang = null) {
     titleEl.textContent = text;
     if (lang) titleEl.lang = lang; else titleEl.removeAttribute('lang');
-    el.setAttribute('aria-label', `${text}, iPod`);
+    nameEl.replaceChildren(inLang(text, lang), ', iPod');
     if (dir && !isReduced()) titleEl.animate?.({ opacity: [0, 1], transform: [`translateX(${dir * 14}%)`, 'none'] }, { duration: SLIDE_MS, easing: EASE });
   }
 
@@ -252,8 +260,10 @@ export function mountIpod(container, { config } = {}) {
     const extra = dir > 0 && (typeof to.summary === 'function' ? to.summary() : to.summary);
     // a focused link row is read by the screen reader itself
     const focused = to.roving && document.activeElement === keyTarget();
-    // (one period between the parts, also when a part already ends in one)
-    announce([to.title, extra, !focused && to.currentLabel()].filter(Boolean).map((x) => String(x).replace(/[.!?:]\s*$/, '')).join('. '));
+    // (one period between the parts, also when a part already ends in one; title and row label in their own language)
+    const parts = [[to.title, to.lang], [extra], [!focused && to.currentLabel(), to.currentLang()]].filter(([x]) => x)
+      .map(([x, lang]) => inLang(String(x).replace(/[.!?:]\s*$/, ''), lang));
+    announce(parts.flatMap((p, i) => (i ? ['. ', p] : [p])));
   }
   const open = (item) => go(1, item);
   const back = () => stack.length > 1 && go(-1);
@@ -388,7 +398,8 @@ export function mountIpod(container, { config } = {}) {
     return false;
   };
   on(el, 'wheel', (e) => {
-    if (phase === 'off' || destroyed) return;
+    // Ctrl + wheel (and a trackpad pinch, which arrives as one) zooms the page, as everywhere else
+    if (e.ctrlKey || phase === 'off' || destroyed) return;
     const raw = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
     const dir = Math.sign(raw);
     const page = phase === 'ready' && dir !== 0 && Math.abs(e.deltaY) >= Math.abs(e.deltaX) && pageCanScroll(dir);
@@ -432,6 +443,9 @@ export function mountIpod(container, { config } = {}) {
     else if (!a) return;
     else if (!e.repeat) tap(a, e.timeStamp);
     e.preventDefault();
+    // browser zoom made the stage scroll (focus moves with preventScroll): a key never changes the
+    // selection out of sight, the screen comes back into view
+    if (pageCanScroll(1) || pageCanScroll(-1)) lcd.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
   on(el, 'keydown', onKey);
   // the focus ring follows the last input, like :focus-visible: any key except a lone modifier or a
@@ -500,7 +514,7 @@ export function mountIpod(container, { config } = {}) {
       phase = 'ready';
       if (homeAfterBoot) { const o = homeAfterBoot; homeAfterBoot = null; home(o); }
       // focus moving onto the iPod (main.js does that next) already reads the selected row
-      timers.later(() => { if (!el.contains(document.activeElement)) announce(`${menuScr.title}: ${menuScr.currentLabel()}`); }, 60);
+      timers.later(() => { if (!el.contains(document.activeElement)) announce([`${menuScr.title}: `, inLang(menuScr.currentLabel(), menuScr.currentLang())]); }, 60);
     })();
     return revealP;
   }

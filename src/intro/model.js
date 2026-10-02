@@ -259,7 +259,10 @@ export function buildIpod({ maxAniso = 8 } = {}) {
   {
     const p = mk('backShell'), w2 = W - 0.3, h2 = H - 0.3, cr = IPOD.cornerRadius - 0.15, bw = w2 - 1.8, bh = h2 - 1.8;
     const polish = { color: '#dfe1e3', metalness: 1, clearcoat: 0.6, clearcoatRoughness: 0.04 };
-    mats.steel = phys({ ...polish, roughness: 0.06 });
+    // the ring sits just behind the front plate; its side wall is seen nearly edge-on in the last, almost
+    // frontal frames, where its depth lost against the plate's face as a thin dark line near the edge:
+    // a small depth offset keeps it behind the plate
+    mats.steel = phys({ ...polish, roughness: 0.06, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
     add(p, ext(holed(rr(w2 - 0.06, h2 - 0.06, cr - 0.03, 0.25), rrHole(w2 - 1.2, h2 - 1.2, cr - 0.6, 0.25)), 9.1, 0.25, 3, SEG), mats.steel, 0, 0, 8.6);
     // both back canvases are drawn in one go, with the brand known by then (setBrand)
     const pair = () => (back.pair ??= T.backCanvases(bw, bh, back.brand));

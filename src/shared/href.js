@@ -11,9 +11,11 @@ const canParse = (s) => {
 
 /** Safe href or null (the row is then plain text). Anything else (javascript:, data:, //host, …) is
  *  rejected with a console warning. */
+// public/static.js (the legal pages and 404, served as they are) carries a copy of this rule: keep the two identical
 export function safeHref(href, base = import.meta.env?.BASE_URL ?? './') {
-  // test what the URL parser will see: it drops tabs and newlines anywhere, controls and spaces at the ends
-  const s = String(href ?? '').replace(/[\t\n\r]/g, '').replace(/^[\0- ]+|[\0- ]+$/g, '');
+  // test what the URL parser will see: it drops tabs and newlines anywhere, controls and spaces at the
+  // ends; any other blank at the ends too (a no-break space or BOM pasted along with an address)
+  const s = String(href ?? '').replace(/[\t\n\r]/g, '').replace(/^[\0- \s]+|[\0- \s]+$/g, '');
   if (!s) return null;
   if (/^(https?|mailto|tel):/i.test(s)) {
     if (canParse(s)) return s;
@@ -60,6 +62,10 @@ export function rowLabel({ label, detail, href, file } = {}) {
   if (/^tel:/i.test(s)) return s.slice(4);
   return hostOf(s) || fileName(s);
 }
+
+/** The first of `values` with visible text, trimmed ('' when none): an empty or blank label, title or
+ *  window title counts as missing, so the next one stands in (menu rows, screen titles, <noscript>). */
+export const firstText = (...values) => values.map((v) => (v == null ? '' : String(v).trim())).find(Boolean) ?? '';
 
 /** A `lang` from config.json (e.g. "en" for "Work Together"), or null when missing or malformed. */
 export const langOf = (x) => (typeof x?.lang === 'string' && /^[a-z]{2,3}(-[a-z\d]{1,8})*$/i.test(x.lang) ? x.lang : null);

@@ -1,5 +1,7 @@
 // Procedural SVG artwork (no external assets). Gradient ids are prefixed per call
 // (`p`) so several iPods on one page never share or collide on ids.
+import { IPOD } from '../shared/ipodSpec.js';
+
 const esc = (s) => String(s ?? '').replace(/[<&>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 // lg(id, '0 #fff,1 #000 .5') → linear gradient (top → bottom unless x2/y2 given); stop = "offset colour [opacity]"
 const lg = (id, stops, x2 = 0, y2 = 1) => `<linearGradient id="${id}" x2="${x2}" y2="${y2}">${stops.split(',').map((st) => { const [o, c, a = 1] = st.split(' '); return `<stop offset="${o}" stop-color="${c}" stop-opacity="${a}"/>`; }).join('')}</linearGradient>`;
@@ -7,12 +9,8 @@ const svg = (vb, body, cls = '') => `<svg${cls && ` class="${cls}"`} viewBox="${
 
 export const CHEVRON = svg('0 0 7 12', '<path d="M1.2 1.2 5.6 6l-4.4 4.8" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="square"/>', 'ipodc-chev');
 
-// Wheel glyphs, drawn in the wheel-label grey via currentColor
-export const GLYPH = {
-  next: svg('0 0 20 9', '<path d="M0 0l7.2 4.5L0 9zM7.2 0l7.2 4.5L7.2 9zM15.4 0h2.4v9h-2.4z"/>'),
-  prev: svg('0 0 20 9', '<path d="M20 0l-7.2 4.5L20 9zM12.8 0L5.6 4.5l7.2 4.5zM4.6 0H2.2v9h2.4z"/>'),
-  play: svg('0 0 20 9', '<path d="M1 0l7.4 4.5L1 9zM11.4 0h2.6v9h-2.6zM16.2 0h2.6v9h-2.6z"/>'),
-};
+// Wheel glyphs (path data from ipodSpec.js, shared with the 3D wheel), drawn in the wheel-label grey via currentColor
+export const GLYPH = Object.fromEntries(Object.entries(IPOD.wheelLabels.glyphs).map(([k, d]) => [k, svg('0 0 20 9', `<path d="${d}"/>`)]));
 
 export const playIndicator = (p) => svg('0 0 10 10', `<g fill="url(#${p}sbl)" stroke="#123f80" stroke-width=".8" stroke-linejoin="round"><path class="ipodc-ind-play" d="M1.2.6 9.2 5l-8 4.4z"/><path class="ipodc-ind-pause" d="M1.4.8H4v8.4H1.4zM6 .8h2.6v8.4H6z"/></g>`);
 

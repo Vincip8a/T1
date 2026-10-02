@@ -11,7 +11,7 @@
   --ipodc-font: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif;
   /* the 6G highlight: a glossy light band at the top and the split across the middle; from the cap
      height down the blue is deep enough for white text (≥ 4.5:1 under the glyphs) */
-  --ipodc-gloss: linear-gradient(#86b6ee, #2f6cc6 22%, #2463c0 48%, #1f5cb8 52%, #1a52a8);
+  --ipodc-gloss: linear-gradient(var(--ipodc-c-uiHighlightTop, #86b6ee), #2f6cc6 22%, #2463c0 48%, #1f5cb8 52%, #1a52a8);
   position: relative;
   flex: none;
   box-sizing: border-box;
@@ -337,6 +337,8 @@
 .ipodc-np-refl { --ipodc-m1: 14%; --ipodc-m2: 30%; top: calc(var(--ipodc-p) * 108); opacity: .34; }
 .ipodc-np-info, .ipodc-np-tracks { position: absolute; left: calc(var(--ipodc-p) * 120); right: calc(var(--ipodc-p) * 10); top: calc(var(--ipodc-p) * 8); }
 .ipodc-screen.no-tracks .ipodc-np-info { top: calc(var(--ipodc-p) * 24); }
+/* the playlist itself is the one "track": no count and no progress capsule */
+.ipodc-screen.no-tracks :is(.ipodc-np-count, .ipodc-np-prog) { display: none; }
 .ipodc-np-info div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font: 700 calc(var(--ipodc-p) * 13)/calc(var(--ipodc-p) * 16) var(--ipodc-font); }
 .ipodc-np-info .ipodc-np-title { font-size: calc(var(--ipodc-p) * 14.5); line-height: calc(var(--ipodc-p) * 18); }
 .ipodc-np-info .ipodc-np-album { font-weight: 400; }

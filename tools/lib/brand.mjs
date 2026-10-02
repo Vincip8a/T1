@@ -21,7 +21,8 @@ export const brand = {
   tagline: esc(cfgBrand.tagline ?? ''),
   email: esc(cfgBrand.email || 'hallo@example.com'),
   playlistTitle: esc(menu.find((m) => m.type === 'nowplaying')?.title || 'Playlist'),
-  menuLabels: menu.map((m) => esc(m.label ?? m.title ?? '')).filter(Boolean),
+  // wie auf dem iPod (firstText in src/shared/href.js): ein leeres label zaehlt als fehlend
+  menuLabels: menu.map((m) => esc([m.label, m.title].map((v) => String(v ?? '').trim()).find(Boolean) ?? '')).filter(Boolean),
 }
 
 export const palette = {

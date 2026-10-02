@@ -23,8 +23,12 @@ export async function loadConfig(url = new URL('config.json', document.baseURI).
   }
 }
 
-/** settings.intro: false, "off" or "never" turn the intro off (main.js and the build's preload use this) */
-export const introEnabled = (config) => ![false, 'never', 'off'].includes(config?.settings?.intro);
+/** A switch in config.json that is off: false, also written as a string ("false", "off", "never", "no",
+ *  "0") or 0, the usual slips when the file is edited by hand */
+export const isOff = (v) => v === false || /^(false|off|never|no|0)$/i.test(String(v ?? '').trim());
+
+/** settings.intro: off (isOff) turns the intro off (main.js and the build's preload use this) */
+export const introEnabled = (config) => !isOff(config?.settings?.intro);
 
 export const prefersReducedMotion = () =>
   window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;

@@ -8,38 +8,49 @@ Vite + plain JS, `three` and `gsap` are the only runtime dependencies. All conte
 
 1. `index.html` starts fetching `config.json` itself (`window.__configP`, picked up by
    `loadConfig`, 8 s timeout), and the built page preloads the intro chunk (an inline script adds
-   `<link rel="modulepreload">` where WebGL 2 exists; left out when `config.json` turns the intro
-   off at build time). The chunk is imported only once the config says the intro plays and WebGL 2
-   is available.
+   `<link rel="modulepreload">` only where the intro will play: a WebGL 2 context can really be
+   created, its answer passed on as `window.__gl2`; no reduced motion; not played yet in this
+   session; left out when `config.json` turns the intro off at build time). The chunk is imported
+   only once the config says the intro plays, it has not played in this browser session
+   (`sessionStorage` `ipodc-intro-seen`: back from the Impressum or after a reload the iPod comes at
+   once, with its boot screen), the visitor does not ask for reduced motion (the intro would only
+   fade in its last frame, which is the DOM iPod) and WebGL 2 is available. While `config.json`
+   takes longer than 300 ms, an empty desktop (window the iPod's size, spinner) stands in.
 2. It mounts the Aqua desktop + brushed-metal window (`src/window/`) and, inside it, the DOM iPod
    (`src/ipod/`). The iPod is laid out but `visibility:hidden`, so its rect can be measured.
 3. The intro (`src/intro/`, three.js, lazily imported) plays on a full-viewport canvas: the iPod
    is taken apart into an exploded view and reassembled. Its last frame lands frontal and
    pixel-aligned on the DOM iPod's rect (`ipod.getShellRect()`).
 4. Handoff: the canvas fades out (220 ms), `ipod.reveal()` shows the boot screen (brand monogram)
-   and then the main menu. The window becomes interactive and the iPod gets keyboard focus.
+   and then the main menu. The iPod gets keyboard focus as the boot screen appears (keys act once
+   the menu is up), so a skip never leaves focus on `<body>`; the window becomes interactive after
+   the boot. The disposed intro is let go of (`intro = null`, its texture canvases emptied).
 
 "Intro überspringen" (button, bottom right; centred on phones), Esc and "Links" in the menu bar
 skip to the aligned final frame; pressed while the intro chunk is still downloading, they reveal
 the iPod at once ("Links" then also focuses it).
 While the chunk is still on its way, a small Aqua spinner appears in the empty window after
 600 ms. Degradation: no WebGL 2, a failed chunk load, a chunk that takes longer than 6 s
-(`INTRO_CHUNK_MS`; a chunk that lands later is ignored), an exception in `runIntro`, or
-`settings.intro: false` all skip the intro and reveal the iPod directly. On a slow device the intro
+(`INTRO_CHUNK_MS`; a chunk that lands later is ignored), a setup (shaders, textures) over 4 s
+(`INTRO_SETUP_MS`; not with the test hooks, dev or `?debug`), an exception in `runIntro`, a lost
+WebGL context, or `settings.intro` off all skip the intro and reveal the iPod directly. On a slow device the intro
 skips frames rather than playing in slow motion; if the median frame stays over 50 ms it first
 drops the pixel ratio to 1, then hands off early. A watchdog (intro length + 6 s after its setup)
 reveals the iPod even if the render loop dies (it races `intro.done`, it does not rely on the
 intro). If `config.json` cannot be loaded, the window shows a short German error with a reload
 button and the Impressum / Datenschutz links (`config.legal` as it was at build time, `__LEGAL__`),
-and the reason goes to the console; menu entries without a name or with an unknown type, and rows
+and the reason goes to the console; any other start-up error is logged too and, unless the iPod is
+already up, puts the same note into the window that is there; menu entries without a name or with an unknown type, and rows
 with nothing to show, are skipped with a console warning.
 
 ## Modules
 
 ### `src/shared/ipodSpec.js`: single source of truth
 
-`IPOD` (geometry in mm: body, display window, LCD, click wheel, edge details), `PARTS` (exploded
-layers, front to back), `COLORS` (silver palette and iPod UI colours), `aspect` (width / height).
+`IPOD` (geometry in mm: body, display window, LCD, click wheel with its MENU label and transport
+glyph paths, edge details), `PARTS` (exploded layers, front to back), `COLORS` (silver palette and
+iPod UI colours), `aspect` (width / height). Every value is read by both iPods or by one of them;
+nothing in it is documentation only.
 Both the 3D model and the DOM iPod derive every size from these values, which is why the
 intro's last frame matches the DOM iPod exactly. Change a dimension here, never in a module.
 
@@ -54,12 +65,14 @@ of `settings.intro`, also used by the build), `prefersReducedMotion()`.
 `safeHref(href, base?)`: the one link rule for the iPod rows, the menu bar and (imported by
 `vite.config.js`) the `<noscript>` list. Only http(s), mailto, tel (each one that the URL parser
 accepts, so a placeholder `"https://"` is rejected) and relative paths; tabs and newlines are
-stripped first, as the URL parser does. Relative paths, a leading `/` included, resolve against
+stripped first, as the URL parser does, and blanks at the ends (a no-break space or BOM too).
+`public/static.js` carries a copy of it (it is served as it is): keep the two identical. Relative paths, a leading `/` included, resolve against
 the site base, so `/downloads/x.pdf` works under a GitHub Pages sub-path. Built on it, shared by the
 iPod rows and the `<noscript>` list: `linkAttrs(href, { download, origin })` (new tab for web links
 and for files on another origin, `download` only on this one), `rowLabel(spec)` (label, else
-detail, address or file name), `fileName(path)`, `langOf(x)` and `serviceName(url)` (Spotify,
-Apple Music, … for the playlist button).
+detail, address or file name), `fileName(path)`, `langOf(x)`, `serviceName(url)` (Spotify,
+Apple Music, … for the playlist button) and `firstText(...values)` (the first value with visible
+text: a blank label, title or window title counts as missing).
 
 ### `src/window/index.js`: desktop + window
 
@@ -70,7 +83,7 @@ Aqua wallpaper (CSS only; the drift runs two slow sweeps, then rests), menu bar 
 `brand.name`, which ellipsizes first when the bar is narrow and, under 400 px with a monogram, is
 left out (the monogram stands for it), "Links" when `onLinks` is given,
 "Kontakt" when `brand.email` is set; on the right the `config.legal` links and a clock),
-brushed-metal window titled `brand.windowTitle` with `brand.tagline` in the status bar.
+brushed-metal window titled `brand.windowTitle` (else `brand.name`) with `brand.tagline` in the status bar.
 Draggable by the title bar and clamped to the viewport; red/yellow minimise to a desktop icon
 (genie with gsap, loaded on idle; the icon shows its focus halo to keyboard users only), green
 zooms (a FLIP transform; zooming out restores the frame from before; wherever zoom would grow the
@@ -82,13 +95,16 @@ areas. `contentEl` sets `--ipod-aspect` (from `ipodSpec.js`) and `--ipod-h`:
 `--ipod-h` is the largest size that fits the screen width and height; on screens up to 640 px
 high the padding shrinks and the status bar is hidden. With a fine pointer (`--ipod-floor`) the
 iPod never gets smaller than 500 CSS px, so browser zoom enlarges its text (WCAG 1.4.4), except
-on a short (≤ 640 px) window that is not zoomed in: at 1x resolution, or 1024+ CSS px wide (zoom
+on a short (≤ 640 px) window that is not zoomed in (a phone turned sideways, touch and ≤ 480 px
+high, gets a 560 px floor instead, so its LCD text stays ≥ 9 px, and the stage scrolls): at 1x resolution, or 1024+ CSS px wide (zoom
 shrinks both sides, a Retina or 125 %/150 % laptop window keeps its width); a window larger than the screen
 stays centred, the stage scrolls and dragging is off. Title and status bar never widen the window.
 The iPod is the window's key view: restoring from the desktop icon focuses it, and a press on
 the metal, title bar or a traffic light leaves keyboard focus on it, all through `onFocus`
 (main.js: `ipod.focus()`, so a screen of links gets its selected row). "Links" calls
-`onLinks(event)` (main.js: skips a running intro, then `ipod.home({ keyboard: event.detail === 0 })`).
+`onLinks(event)` (main.js: skips a running intro, then `ipod.home({ keyboard: event.detail === 0 })`); pressed
+while the window is minimising, it restores it once the genie has landed. A zoom glide still
+running lands before the window is measured again (drag, resize, a second zoom click).
 `setInteractive(false)` locks drag and traffic lights during the intro (the lights are `inert` then).
 
 ### `src/ipod/index.js`: iPod UI
@@ -128,7 +144,9 @@ ring (Aqua's halo, `::after`) is drawn around the iPod; `data-input` follows the
 only on Now Playing) and an invisible "Zurück" button (outside the tab order) for touch screen
 readers complete it, because the wheel is `aria-hidden`. Now Playing's drawn screen is
 `aria-hidden`; a visually hidden block carries the playing track and the track list. Rows and
-screen titles get `lang` from `config.json`. The UI strings (German 6G firmware wording) are `DEFAULT_UI` in
+screen titles get `lang` from `config.json`; the iPod's name ("<title>, iPod", `aria-labelledby`)
+and the live announcement carry the title in a span with that `lang`. The keys also scroll the LCD
+back into view when browser zoom made the stage scroll. Ctrl + wheel (and pinch) zoom the page. The UI strings (German 6G firmware wording) are `DEFAULT_UI` in
 `src/ipod/index.js`; they are not read from `config.json`.
 
 ### `src/intro/index.js`: 3D intro
@@ -164,9 +182,11 @@ The generated assets (`tools/`, OG image, cover, PDFs) read `brand`, the playlis
 menu labels from `config.json` too (`tools/lib/brand.mjs`); rerun `node tools/make-all.mjs` after
 changing them.
 
-- `siteUrl`: optional public URL of the site. Without it the build uses `SITE_URL`, else, in the
-  GitHub Pages workflow (`GITHUB_REPOSITORY`), `https://<owner>.github.io/<repo>/`; with none of
-  them `og:image` stays relative.
+- `siteUrl`: optional public URL of the site (a bare host gets `https://`; a value that is no web
+  address is skipped with a build warning). Without it the build uses `SITE_URL` (same rule), else,
+  in the GitHub Pages workflow (`GITHUB_REPOSITORY`), `https://<owner>.github.io/<repo>/`; with none
+  of them `og:image` stays relative. A `config.json` that is not valid JSON stops dev server and
+  build with `public/config.json is not valid JSON: …` (line and column).
 
 - `brand`: `name`, `monogram`, `tagline` (status bar, meta description, og:description),
   `windowTitle`, `email` (the menu bar's Kontakt).
@@ -182,8 +202,9 @@ changing them.
 - `legal`: `{ impressum, datenschutz }`, path or URL of each legal page (a missing one has no
   link), linked from the menu bar, the static pages and the `<noscript>` list.
 - Paths (`cover`, `file`, `legal`) are page-relative; a leading `/` is treated the same.
-- `settings`: `clickSound` (bool), `intro` (`false`, `"off"` or `"never"` skip the intro;
-  anything else plays it on every load).
+- `settings`: `clickSound` (bool), `intro` (bool; once per browser session). Both read as off
+  `false`, `0` and the strings `"false"`, `"off"`, `"never"`, `"no"`, `"0"` (`isOff` in
+  `src/shared/config.js`).
 
 **Add a menu item:** append an object to `menu[]` with a unique `id` and one of the four
 `type`s. The main menu, its preview pane, the sub screen and the `<noscript>` list follow
@@ -200,7 +221,9 @@ inline script finds the site root via `config.json`, then loads the shared files
 its links work at any depth and under a sub-path). They share `public/static.css` (the Aqua
 desktop, menu bar and window, the same look as `src/window/window.css`) and `public/static.js`
 (`fillBar(root)`: monogram, name and `config.legal` links in the menu bar with the main page's
-link rule, the brand in the tab title, the clock). Without JavaScript their links point to the
+link rule, the brand in the tab title, the clock; a legal link that now leads to another page loses
+`aria-current`). Their menu bar follows the main one: a long name ellipsizes, under 400 px the
+monogram stands for it. Without JavaScript their links point to the
 pages next to them.
 
 ## Build

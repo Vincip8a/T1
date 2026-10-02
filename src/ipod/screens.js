@@ -2,7 +2,7 @@
 // for text pages and the Now Playing footer), the split main menu with its preview pane, and the
 // Now Playing layout. All geometry is in logical px; `ctx` is supplied by index.js.
 import { h, clamp, fmtTime, safeHref } from './util.js';
-import { linkAttrs, fileName, rowLabel, langOf, serviceName } from '../shared/href.js';
+import { linkAttrs, fileName, rowLabel, langOf, serviceName, firstText } from '../shared/href.js';
 import { CHEVRON, SPEAKER_LO, SPEAKER_HI, SPEAKER_NOW, previewIcon } from './art.js';
 
 const ROW = 27;        // 8 rows per screen, like the 6G
@@ -169,6 +169,7 @@ export function createScreens(ctx) {
         else s.bump(1);
       },
       currentLabel: () => specs[s.index]?.label ?? '',
+      currentLang: () => specs[s.index]?.lang ?? null,
     };
     view.addEventListener('animationend', () => view.classList.remove('bump-up', 'bump-down'));
     return s;
@@ -192,8 +193,8 @@ export function createScreens(ctx) {
   // ── main menu with the split-screen preview pane
   function menuScreen() {
     const { menu } = ctx;
-    const s = listScreen('menu', 'menu', brand.name || 'iPod',
-      menu.map((item) => ({ label: item.label ?? item.title, lang: langOf(item), sub: true, onActivate: () => ctx.open(item) })));
+    const s = listScreen('menu', 'menu', firstText(brand.name, 'iPod'),
+      menu.map((item) => ({ label: firstText(item.label, item.title), lang: langOf(item), sub: true, onActivate: () => ctx.open(item) })));
     s.node.classList.add('is-split');
     const preview = h('div', 'ipodc-preview', { 'aria-hidden': 'true' });
     s.node.append(preview);
@@ -238,11 +239,13 @@ export function createScreens(ctx) {
   // ── sub screens
   function buildScreen(item) {
     const s = buildScreenOf(item);
-    s.lang = langOf(item); // of the label and title (the screen title gets it, see go() in index.js)
+    // of the label and title (the screen title gets it, see go() in index.js); Now Playing's title is the
+    // firmware's own "Sie hören"
+    s.lang = s.kind === 'nowplaying' ? null : langOf(item);
     return s;
   }
   function buildScreenOf(item) {
-    const title = item.title ?? item.label;
+    const title = firstText(item.title, item.label);
     const id = item.id ?? item.type;
     const items = (a) => (Array.isArray(a) ? a : []).filter((x) => x && typeof x === 'object');
     // a row without a label shows its detail, host, e-mail or file name (rowLabel); one with nothing to
@@ -286,7 +289,12 @@ export function createScreens(ctx) {
     const line = (cls, text) => h('div', `ipodc-np-${cls}`, { text });
     const [count, tTitle, tArtist] = ['count', 'title', 'artist'].map((c) => line(c));
     const info = h('div', 'ipodc-np-info');
-    info.append(count, tTitle, tArtist, line('album', item.title ?? ''), line('by', item.artist ?? ''));
+    // without tracks (config.json has none) the player plays the playlist itself: its title and curator
+    // are the track lines already, so no album / curator lines, count or progress (no invented 3:30)
+    const own = Array.isArray(item.tracks) && item.tracks.length > 0;
+    const album = firstText(item.title, item.label);
+    info.append(count, tTitle, tArtist);
+    if (own) info.append(line('album', album), line('by', item.artist ?? ''));
     const meter = (wrap) => {
       const m = h('div', 'ipodc-meter');
       const f = h('div', 'ipodc-meter-fill');
@@ -309,7 +317,7 @@ export function createScreens(ctx) {
     deco.append(coverArt(item, 'ipodc-np-art'), coverArt(item, 'ipodc-np-refl'), info, prog, vol);
     // compact track list under the meta: tap a title to play it; the playing one carries the blue speaker
     const tlIn = h('div', 'ipodc-np-tracks-in');
-    const trkRows = Array.isArray(item.tracks) && item.tracks.length ? tracks.map((t, i) => {
+    const trkRows = own ? tracks.map((t, i) => {
       const r = h('div', 'ipodc-trk', { 'data-i': i });
       r.innerHTML = SPEAKER_NOW;
       r.append(h('span', 'ipodc-trk-t', { text: t.title ?? '' }), h('span', 'ipodc-trk-d', { text: t.duration ?? '' }));
@@ -329,15 +337,19 @@ export function createScreens(ctx) {
     const sr = h('div', 'ipodc-sr ipodc-np-sr');
     const srNow = h('p');
     const srList = h('ul', null, { 'aria-label': L.tracklist });
+    const option = !s.rows.length;
+    // as the listbox's option, its text is its name (and a list's aria-label would replace the titles):
+    // the list is introduced by a line of text instead
+    if (option) srList.removeAttribute('aria-label');
     const srRows = trkRows.map((_, i) => {
       const t = tracks[i];
       return h('li', null, { text: [t.title, t.artist, t.duration].filter(Boolean).join(', ') });
     });
     srList.append(...srRows);
     sr.append(srNow);
-    if (srRows.length) sr.append(srList);
+    if (srRows.length) sr.append(...(option ? [h('p', null, { text: `${L.tracklist}:` })] : []), srList);
     node.append(sr);
-    if (!s.rows.length) {
+    if (option) {
       for (const [k, v] of [['id', nid('t')], ['role', 'option'], ['aria-selected', 'true']]) sr.setAttribute(k, v);
       s.adId = () => sr.id;
     }
@@ -349,7 +361,7 @@ export function createScreens(ctx) {
       const dur = player.duration;
       tTitle.textContent = t.title ?? '';
       tArtist.textContent = t.artist ?? '';
-      count.textContent = tracks.length ? `${player.track + 1} ${L.of} ${tracks.length}` : '';
+      count.textContent = own && tracks.length ? `${player.track + 1} ${L.of} ${tracks.length}` : '';
       trkRows.forEach((r, i) => r.classList.toggle('is-cur', i === player.track));
       trkTop = clamp(trkTop, player.track - TRK_VIS + 1, player.track); // keep the playing track in view
       tlIn.style.setProperty('--ipodc-tt', trkTop);
@@ -360,11 +372,11 @@ export function createScreens(ctx) {
       tEl.textContent = fmtTime(player.elapsed);
       tRem.textContent = `-${fmtTime(dur - Math.floor(player.elapsed))}`;
       const now = [count.textContent, [t.title, t.artist].filter(Boolean).join(', ')].filter(Boolean).join(': ');
-      const text = [now, [item.title, item.artist].filter(Boolean).join(', ')].filter(Boolean).join('. ');
+      const text = [now, own && [album, item.artist].filter(Boolean).join(', ')].filter(Boolean).join('. ');
       if (srNow.textContent !== text) srNow.textContent = text;
       srRows.forEach((r, i) => { if (i === player.track) r.setAttribute('aria-current', 'true'); else r.removeAttribute('aria-current'); });
     };
-    s.summary = () => [tTitle.textContent, tArtist.textContent, item.title, count.textContent].filter(Boolean).join(', ');
+    s.summary = () => [tTitle.textContent, tArtist.textContent, own && album, count.textContent].filter(Boolean).join(', ');
     s.onShow = () => {
       if (!player.started) player.setPlaying(true);
       s.update(true);
@@ -390,7 +402,12 @@ export function createScreens(ctx) {
       player.setPlaying(true);
     };
     const baseActivate = s.activate;
-    s.activate = () => (s.rows.length ? baseActivate() : player.setPlaying(!player.playing));
+    // (Enter on the playlist block: play / pause, said like the play button says it)
+    s.activate = () => {
+      if (s.rows.length) return baseActivate();
+      player.setPlaying(!player.playing);
+      ctx.announce(player.playing ? L.playing : L.paused);
+    };
     s.update(true);
     return s;
   }

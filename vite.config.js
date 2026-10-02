@@ -1,24 +1,47 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
-import { linkAttrs, fileName, rowLabel, langOf, safeHref, serviceName } from './src/shared/href.js';
+import { linkAttrs, fileName, rowLabel, langOf, safeHref, serviceName, firstText } from './src/shared/href.js';
 import { introEnabled } from './src/shared/config.js';
 
 const CONFIG_PATH = fileURLToPath(new URL('./public/config.json', import.meta.url));
-const readConfig = () => JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
+// a typo in the hand-edited file must name the file, not "failed to load config from vite.config.js"
+const readConfig = () => {
+  const text = readFileSync(CONFIG_PATH, 'utf8');
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error(`public/config.json is not valid JSON: ${e.message}`); // (Node names line and column)
+  }
+};
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const langAttr = (x) => (langOf(x) ? ` lang="${esc(langOf(x))}"` : '');
 
-/** The public address: config.siteUrl, else SITE_URL, else (in the GitHub Pages workflow) the Pages
- *  address of the repository (a custom domain redirects from there). '' when unknown. */
+/** An http(s) site address as a URL ending in '/', or null. A bare host ("deinname.de/links") gets
+ *  https://; anything else that is not an address is ignored with a warning (`from`: where it came from). */
+function siteUrlFrom(value, from) {
+  const v = String(value ?? '').trim();
+  if (!v) return null;
+  const withScheme = /^[a-z][a-z\d+.-]*:/i.test(v) ? v : `https://${v.replace(/^\/+/, '')}`;
+  try {
+    const url = new URL(withScheme.replace(/\/?$/, '/'));
+    if (/^https?:$/.test(url.protocol) && (withScheme === v || url.hostname.includes('.'))) return url;
+  } catch { /* reported below */ }
+  console.warn(`[config-html] ${from} ignored (not a web address like https://deinname.de/):`, v);
+  return null;
+}
+
+/** The public address as a URL: config.siteUrl, else SITE_URL, else (in the GitHub Pages workflow) the
+ *  Pages address of the repository (a custom domain redirects from there). A value that is not an
+ *  address is skipped with a warning, so the next source still counts. null when unknown. */
 function siteUrlOf(config) {
-  if (config.siteUrl) return String(config.siteUrl);
-  if (process.env.SITE_URL) return process.env.SITE_URL;
+  const url = siteUrlFrom(config.siteUrl, 'siteUrl in public/config.json') ?? siteUrlFrom(process.env.SITE_URL, 'SITE_URL');
+  if (url) return url;
   const [owner, repo] = (process.env.GITHUB_ACTIONS && process.env.GITHUB_REPOSITORY || '').split('/');
-  if (!owner || !repo) return '';
+  if (!owner || !repo) return null;
   const host = `${owner.toLowerCase()}.github.io`;
-  return repo.toLowerCase() === host ? `https://${host}/` : `https://${host}/${repo}/`;
+  return new URL(repo.toLowerCase() === host ? `https://${host}/` : `https://${host}/${repo}/`);
 }
 
 /** Plain HTML linktree for crawlers and visitors without JavaScript. Rows follow the iPod's rules
@@ -45,7 +68,8 @@ function noscriptHtml(config, origin = null) {
     } else if (item.type === 'nowplaying') {
       const url = safeHref(item.spotifyUrl, './');
       const service = url && serviceName(url);
-      rows = [row(service ? `${item.title ?? 'Playlist'} auf ${service}` : (item.title ?? 'Playlist'), url)];
+      const name = firstText(item.title, item.label, 'Playlist');
+      rows = [row(service ? `${name} auf ${service}` : name, url)];
     } else if (item.type === 'downloads') {
       rows = items(item.items).map((d) => {
         const label = rowLabel({ label: d.label, file: d.file });
@@ -56,7 +80,7 @@ function noscriptHtml(config, origin = null) {
     rows = rows.filter(Boolean);
     const body = item.type === 'page' && item.body ? `<p>${esc(item.body)}</p>` : '';
     if (!rows.length && !body) continue;
-    sections.push(`<section><h2${langAttr(item)}>${esc(item.title ?? item.label)}</h2>${body}${rows.length ? `<ul>${rows.join('')}</ul>` : ''}</section>`);
+    sections.push(`<section><h2${langAttr(item)}>${esc(firstText(item.title, item.label))}</h2>${body}${rows.length ? `<ul>${rows.join('')}</ul>` : ''}</section>`);
   }
   const legal = config.legal ?? {};
   const legalLinks = [legal.impressum && row('Impressum', legal.impressum), legal.datenschutz && row('Datenschutz', legal.datenschutz)].filter(Boolean);
@@ -80,7 +104,8 @@ function noscriptHtml(config, origin = null) {
   `;
 }
 
-/** Fills <title>, the meta description, the og: tags (absolute with config.siteUrl) and the <noscript>
+/** Fills <title>, the meta description, the og: tags (og:image and og:url absolute when the site address
+ *  is known: config.siteUrl, SITE_URL or the GitHub Pages workflow, see siteUrlOf) and the <noscript>
  *  linktree from public/config.json. */
 function configHtml() {
   return {
@@ -94,9 +119,7 @@ function configHtml() {
         const title = esc(brand.name ? `${brand.name} · Links` : 'Links');
         const desc = esc(brand.tagline ?? '');
         // link previews need absolute URLs: with a known site address (siteUrlOf) og:image and og:url are absolute
-        const siteUrl = siteUrlOf(config);
-        let site = null;
-        try { site = /^https?:\/\//i.test(siteUrl) ? new URL(siteUrl.replace(/\/?$/, '/')) : null; } catch { /* invalid: stay relative */ }
+        const site = siteUrlOf(config);
         const ogImage = esc(site ? new URL('og-image.png', site).href : 'og-image.png');
         const ogUrl = (site ? `\n  <meta property="og:url" content="${esc(site.href)}" />` : '')
           + '\n  <meta property="og:image:width" content="1200" />\n  <meta property="og:image:height" content="630" />';
@@ -117,9 +140,11 @@ function configHtml() {
 
 /** Preload for the lazily imported intro chunk: its download starts while the HTML is parsed, not after
  *  the entry ran and config.json arrived (main.js imports it only then). A tiny inline script adds the
- *  <link rel="modulepreload"> only where WebGL 2 exists, so browsers that cannot play the intro never
- *  download it. Left out when config.json turns the intro off at build time (turning it off in a deployed
- *  config.json without a rebuild still skips the intro, but the chunk is still preloaded). */
+ *  <link rel="modulepreload"> only where the intro will play: a WebGL 2 context can really be created (the
+ *  answer goes to main.js as window.__gl2, so it probes once), no reduced motion, and not yet played in
+ *  this session (main.js's 'ipodc-intro-seen'). Left out when config.json turns the intro off at build
+ *  time (turning it off in a deployed config.json without a rebuild still skips the intro, but the chunk
+ *  is still preloaded). */
 function introPreload() {
   return {
     name: 'intro-preload',
@@ -132,7 +157,9 @@ function introPreload() {
         const intro = chunks.find((c) => c.type === 'chunk' && c.isDynamicEntry && /\/src\/intro\/index\.js$/.test(c.facadeModuleId ?? ''));
         if (!intro) return html;
         const files = JSON.stringify([intro.fileName, ...intro.imports.filter((f) => !html.includes(f))].map((f) => `./${f}`));
-        const script = `if (window.WebGL2RenderingContext) for (const f of ${files}) { const l = document.createElement('link'); l.rel = 'modulepreload'; l.crossOrigin = ''; l.href = f; document.head.append(l); }`;
+        const script = `try { if (!matchMedia('(prefers-reduced-motion: reduce)').matches && sessionStorage.getItem('ipodc-intro-seen') !== '1') {`
+          + ` const gl = document.createElement('canvas').getContext('webgl2'); window.__gl2 = !!gl; gl?.getExtension('WEBGL_lose_context')?.loseContext();`
+          + ` if (gl) for (const f of ${files}) { const l = document.createElement('link'); l.rel = 'modulepreload'; l.crossOrigin = ''; l.href = f; document.head.append(l); } } } catch {}`;
         // before the entry script and the stylesheet (an inline script after a stylesheet waits for it)
         return html.replace(/(\s*)<script type="module"/, (m, ws) => `${ws}<script>${script}</script>${m}`);
       },

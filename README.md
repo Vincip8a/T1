@@ -33,7 +33,9 @@ Benötigt **Node 22** oder neuer.
 Die Datei wird zur Laufzeit geladen. Nach dem Speichern reicht ein Neuladen im Browser,
 ein Neustart des Dev-Servers ist nicht nötig. Titel, Meta-Tags und die Linkliste für Besucher
 ohne JavaScript schreibt der Build aus dieser Datei in `index.html`: nach Änderungen also neu
-bauen (das erledigt der Deploy-Workflow bei jedem Push).
+bauen (das erledigt der Deploy-Workflow bei jedem Push). Ein Tippfehler in der Datei (z. B. ein
+Komma nach dem letzten Eintrag) bricht Dev-Server und Build mit
+`public/config.json is not valid JSON: … (line …)` ab: die genannte Zeile prüfen.
 
 **Pfade** zu eigenen Dateien (Cover, Downloads, Rechtliches) relativ angeben, ohne `/` am Anfang,
 z. B. `"downloads/media-kit.pdf"`. Sie gelten relativ zur Seite und funktionieren so auch unter
@@ -62,9 +64,10 @@ Social-Media-Vorschauen (LinkedIn, X, WhatsApp, Slack) brauchen eine absolute Bi
 schreibt `og:image` und `og:url` deshalb absolut, sobald er die Adresse kennt. Im
 GitHub-Pages-Workflow ermittelt er sie selbst aus dem Repository
 (`https://<nutzer>.github.io/<repo>/`). `siteUrl` ist also nur nötig für eine eigene Domain oder
-einen anderen Host (alternativ die Umgebungsvariable `SITE_URL` beim Build). Ohne bekannte Adresse
-(z. B. bei einem lokalen Build) bleibt das Vorschaubild relativ und wird von den meisten Diensten
-nicht angezeigt.
+einen anderen Host (alternativ die Umgebungsvariable `SITE_URL` beim Build). Eine Adresse ohne
+`https://` (z. B. `"deinname.de"`) ergänzt der Build selbst; ein Wert, der keine Webadresse ist,
+wird mit einer Warnung in der Build-Ausgabe übergangen. Ohne bekannte Adresse (z. B. bei einem
+lokalen Build) bleibt das Vorschaubild relativ und wird von den meisten Diensten nicht angezeigt.
 
 ### `menu[]`
 
@@ -77,7 +80,7 @@ Jeder Eintrag hat vier gemeinsame Felder und ein optionales fünftes:
 | `label` | String | Beschriftung im Menü                                                    |
 | `type`  | String | Bauart der Unterseite: `list`, `page`, `nowplaying` oder `downloads`   |
 | `title` | String | Überschrift der Unterseite                                              |
-| `lang`  | String | Optional: Sprache von `label` und `title`, wenn sie nicht Deutsch ist, z. B. `"en"` für „Work Together“ (Screenreader sprechen sie dann richtig aus) |
+| `lang`  | String | Optional: Sprache von `label` und `title`, wenn sie nicht Deutsch ist, z. B. `"en"` für „Work Together“ (Screenreader sprechen sie dann richtig aus). Gilt für beide Felder: nur setzen, wenn `label` und `title` in dieser Sprache sind |
 
 Je nach `type` kommen weitere Felder dazu. Zeilen (`items[]`, `actions[]`) können ebenfalls ein
 `lang` haben. Fehlt einer Zeile das `label`, zeigt sie ihr `detail`, die Adresse oder den
@@ -143,11 +146,13 @@ Fehlt ein Feld, fehlt auch der Link.
 | Feld         | Typ     | Bedeutung                                                            |
 | ------------ | ------- | -------------------------------------------------------------------- |
 | `clickSound` | Boolean | `true` spielt beim Navigieren ein Klickgeräusch                      |
-| `intro`      | Boolean | `true` zeigt die 3D-Einstiegsanimation bei jedem Aufruf, `false` nie |
+| `intro`      | Boolean | `true` zeigt die 3D-Einstiegsanimation beim ersten Aufruf, `false` nie |
 
-Für `intro` werden auch `"off"` und `"never"` als „aus“ verstanden. Die Animation lässt sich
-jederzeit mit „Intro überspringen“, Esc oder „Links“ in der Menüleiste abbrechen; ohne WebGL
-entfällt sie automatisch, auf einem zu langsamen Gerät endet sie früher. Wer sie nur in der
+Als „aus“ gelten bei beiden auch `"false"`, `"off"`, `"never"`, `"no"` und `0` (z. B. versehentlich
+in Anführungszeichen geschrieben). Die Animation läuft einmal pro Browser-Sitzung: wer vom
+Impressum zurückkommt oder neu lädt, sieht gleich den iPod. Sie lässt sich jederzeit mit „Intro
+überspringen“, Esc oder „Links“ in der Menüleiste abbrechen; ohne WebGL und bei der
+Systemeinstellung „Bewegung reduzieren“ entfällt sie, auf einem zu langsamen Gerät endet sie früher. Wer sie nur in der
 veröffentlichten `config.json` abschaltet, ohne neu zu bauen, spart die Animation, aber nicht den
 Download ihres Skripts: dafür neu bauen.
 
@@ -179,7 +184,7 @@ Download ihres Skripts: dafür neu bauen.
       "label": "Work Together",
       "lang": "en",
       "type": "page",
-      "title": "Zusammenarbeiten",
+      "title": "Work Together",
       "body": "Kurz beschreiben, woran du arbeitest und wofür dich Leute anfragen können.",
       "actions": [
         { "label": "Projekt anfragen", "href": "mailto:dein.name@example.com" }

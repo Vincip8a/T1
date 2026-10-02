@@ -49,20 +49,23 @@ html::after { /* soft vignette */
   -webkit-backdrop-filter: blur(10px) saturate(1.4); backdrop-filter: blur(10px) saturate(1.4);
   border-bottom: 1px solid rgba(0,0,0,.42); box-shadow: 0 1px 4px rgba(0,30,90,.28), inset 0 -1px 0 rgba(255,255,255,.35);
 }
-.bar .mono { font-weight: 800; font-size: 12px; letter-spacing: -.02em; padding: 0 9px 0 6px; }
-.bar .brand { font-weight: 700; padding: 0 9px; white-space: nowrap; }
+.bar .mono { flex: none; font-weight: 800; font-size: 12px; letter-spacing: -.02em; padding: 0 9px 0 6px; }
+/* a long name gives way first (ellipsis), as on the main page: the link, the legal links and the clock keep their room */
+.bar .brand { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 700; padding: 0 9px; white-space: nowrap; }
 .bar .mono:empty, .bar .brand:empty { display: none; }
-.bar a { color: #000; text-decoration: none; padding: 0 9px; height: 20px; display: inline-flex; align-items: center; border-radius: 4px; white-space: nowrap; }
+.bar a { flex: none; color: #000; text-decoration: none; padding: 0 9px; height: 20px; display: inline-flex; align-items: center; border-radius: 4px; white-space: nowrap; }
 @media (hover: hover) { .bar a:hover { background: linear-gradient(#5a9bf0, #2a64d8); color: #fff; } }
 .bar a:active { background: linear-gradient(#2a64d8, #1846a8); color: #fff; }
 .bar a:focus-visible { outline-offset: -2px; } /* inset, like the main menu bar: never cut at the top edge */
-.bar .right { margin-left: auto; display: flex; align-items: center; gap: 2px; font-size: 11px; }
+.bar .right { flex: none; margin-left: auto; padding-left: 8px; display: flex; align-items: center; gap: 2px; font-size: 11px; }
 .bar .legal { display: flex; align-items: center; gap: 2px; }
 .bar .right a { color: #3a3a3a; padding: 0 6px; height: 18px; }
 .bar .right a[aria-current] { color: #000; font-weight: 700; }
 .bar .clock { font-size: 13px; font-variant-numeric: tabular-nums; padding-left: 12px; white-space: nowrap; }
 .bar .clock:empty { display: none; }
-@media (max-width: 560px) { .bar .brand { display: none; } .bar .clock { padding-left: 6px; } }
+@media (max-width: 560px) { .bar .brand { padding-right: 4px; } .bar .clock { padding-left: 6px; } }
+/* under 400 px the monogram stands for the name (without one the name stays and ellipsizes) */
+@media (max-width: 399.98px) { .bar .mono:not(:empty) + .brand { display: none; } }
 @media (max-width: 400px) { .bar .clock { display: none; } .bar a, .bar .right a { padding: 0 4px; } }
 .win {
   position: relative; width: 100%; max-width: 620px; overflow: hidden;

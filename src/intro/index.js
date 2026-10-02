@@ -149,7 +149,8 @@ export function runIntro(opts = {}) {
       resolveReady();
     }
   })();
-  const stop = () => { if (real) real.dispose(); else stopped = true; };
+  // (a disposed intro is let go of: a test hook that keeps this controller must not keep the scene)
+  const stop = () => { if (real) { real.dispose(); real = null; } stopped = true; };
   return {
     duration, done, ready,
     get paused() { return real ? real.paused : pausedEarly; },
@@ -461,7 +462,9 @@ function start({ getTargetRect, getFrameRect, reducedMotion = false, config = nu
     canvas.remove();
     resolveDone();
   };
-  const onLost = (e) => { e.preventDefault(); lost = true; };
+  // a lost context ends the intro at once (no restore is asked for: a rebuild would be one long task,
+  // and a lost canvas paints a blank sheet over the desktop while the timeline runs on)
+  const onLost = () => { lost = true; canvas.style.opacity = '0'; if (!disposed) drop(); };
   const onRestored = () => { if (!disposed && !finished) drop(); };
   const listen = (on) => {
     const f = on ? 'addEventListener' : 'removeEventListener';
@@ -538,13 +541,21 @@ function start({ getTargetRect, getFrameRect, reducedMotion = false, config = nu
       disposed = true; playing = false;
       cancelAnimationFrame(raf); clearTimeout(fadeTimer);
       listen(false);
-      const res = new Set([...ipod.textures, shadowTex, envRT, conRT]);
-      scene.traverse((o) => {
-        res.add(o.geometry); if (o.isInstancedMesh) o.dispose();
-        for (const m of [].concat(o.material ?? [])) { res.add(m); for (const v of Object.values(m)) if (v?.isTexture) res.add(v); }
-      });
-      [...res, st, pmrem, renderer].forEach((x) => x?.dispose());
-      renderer.forceContextLoss?.();
+      // GPU side: only while the context lives (deleting objects of a lost context only logs warnings)
+      if (!lost && !renderer.getContext().isContextLost()) {
+        const res = new Set([...ipod.textures, shadowTex, envRT, conRT]);
+        scene.traverse((o) => {
+          res.add(o.geometry); if (o.isInstancedMesh) o.dispose();
+          for (const m of [].concat(o.material ?? [])) { res.add(m); for (const v of Object.values(m)) if (v?.isTexture) res.add(v); }
+        });
+        [...res, st, pmrem, renderer].forEach((x) => x?.dispose());
+        renderer.forceContextLoss?.();
+      }
+      // CPU side: the texture canvases' backing stores go now, even if a reference to the controller slips
+      for (const tex of [...ipod.textures, shadowTex]) {
+        if (tex.image) tex.image.width = tex.image.height = 0;
+        tex.image = null;
+      }
       canvas.remove();
       resolveDone();
     },

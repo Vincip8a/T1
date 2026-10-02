@@ -323,8 +323,17 @@
        (min-width: 1024px) and (max-height: 640px) {
   .dt-content { --ipod-floor: 0px; }
 }
+/* a phone turned sideways (touch, at most 480 px high): fitting the whole iPod into the height would
+   leave 5 px text on its screen. It keeps a readable size instead (560 px: the smallest LCD text is
+   9 px) and the stage scrolls to the click wheel, as with browser zoom. */
+@media (pointer: coarse) and (max-height: 480px) and (orientation: landscape) {
+  .dt-content { --ipod-floor: 560px; }
+}
 
-/* waiting for the intro chunk: a small Aqua spinner in the empty window, only after 600 ms */
+/* waiting for config.json: an empty box the size of the iPod keeps the window at its final size */
+.dt-placeholder { flex: none; height: var(--ipod-h); width: calc(var(--ipod-h) * var(--ipod-aspect)); }
+
+/* waiting for config.json or the intro chunk: a small Aqua spinner in the empty window, only after 600 ms */
 .dt.is-waiting .dt-content::after {
   content: ''; position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px;
   border-radius: 50%; pointer-events: none; opacity: 0;
