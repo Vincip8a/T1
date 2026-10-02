@@ -1,4 +1,4 @@
-// Intro C "studio teardown": turns up from the polished back to a still 3/4 rest, the shell is pried
+// 3D intro, "studio teardown": turns up from the polished back to a still 3/4 rest, the shell is pried
 // off, screws spin out, the stack opens outside-in, parts seat back to front (hover, snap, click,
 // glint) and the device lands frontal on getTargetRect(). Pure function of t.
 import * as THREE from 'three';
@@ -15,7 +15,7 @@ const ENV_END = 0.25, GLASS_FROM = 2.75, GLASS_END = 2.27, GLASS_Z = PI / 4;
 const WHEEL_GLOW = 0.24, CENTRE_GLOW = 0.3, END_EXPOSURE = 0.9, KEY_END = 0.9; // = DOM iPod tone
 const KEY_HOLD = 1.1, FACE_HOLD = 0.72; // hero: plate silver, not white
 // opening: rise with the polished back drifting (YB at drift), Hermite turn to the 38 deg rest at spin,
-// a short closed rest, then the removal story from the shell pry at 1.4 (OUT) runs exactly as before
+// a short closed rest, then the removal story from the shell pry at 1.4 (OUT)
 const TL = { rise: 0.65, drift: 0.34, spin: 1.3, screw: 1.52, re0: 4.15, reS: 0.085, reD: 0.62, cam0: 4.6 };
 const YB = 160, VD = 20, Y0 = YB + VD * TL.drift, P0 = -7, PB = 19; // yaw/s drift, top-down pitch at the edge pass
 // removal story [start, duration]: shell, screws, plate, frame, stack
@@ -60,7 +60,7 @@ function spline(keys) {
   };
 }
 // yaw/pitch opening, two beats: (1) back drifts Y0 -> YB at VD deg/s while rising; (2) cubic Hermite
-// (YB, -VD) -> (38, 0) over TL.spin - TL.drift (0.96 s, peak ~186 deg/s, HEAD's u^3 started at 305). The edge-on pass
+// (YB, -VD) -> (38, 0) over TL.spin - TL.drift (0.96 s, peak ~186 deg/s, no jump in speed). The edge-on pass
 // dips the pitch (PB) so the top edge (hold switch, jack) carries it, then the still 3/4 rest.
 const opening = (t) => {
   if (t <= TL.drift) return [Y0 - VD * t, P0];
@@ -98,7 +98,7 @@ function studios(stripTex) {
   box(con, 0, 0, 0, 1, 1, 1, 1.7, new THREE.CylinderGeometry(12, 12, 26, 96, 1, true), stripTex);
   box(con, 0, 12.5, 0, 26, 0.2, 26, 1.1);
   box(con, 0, -12.5, 0, 26, 0.2, 26, 0.01);
-  return { room, con, dispose: () => [room, con].forEach((s) => s.traverse((o) => { o.geometry?.dispose(); o.material?.dispose?.(); })) };
+  return { room, con, dispose: () => { stripTex.dispose(); [room, con].forEach((s) => s.traverse((o) => { o.geometry?.dispose(); o.material?.dispose?.(); })); } };
 }
 const BANDS = [
   [0, 12, 0.6, 0.4], [12, 14.5, 1], [14.5, 26, 0.5], [26, 32, 0.02], [32, 46, 0.75, 0.4], [46, 49, 1], [49, 60, 0.55],
@@ -107,7 +107,7 @@ const BANDS = [
   [223, 226, 0.006], [226, 227.5, 0.16], [227.5, 268, 0.006], [268, 300, 0.4], [300, 309, 1], [309, 330, 0.03], [330, 360, 0.5, 0.6],
 ];
 
-const NOOP = { duration: 0, done: Promise.resolve(), skip() {}, seek() {}, pause() {}, play() {}, dispose() {}, measure() {}, info() {} };
+const NOOP = { duration: 0, done: Promise.resolve(), ready: Promise.resolve(), skip() {}, seek() {}, pause() {}, play() {}, dispose() {}, measure() {}, info() {} };
 
 export function runIntro({ getTargetRect, reducedMotion = false, config = null } = {}) {
   const duration = reducedMotion ? 1.0 : D;
@@ -122,8 +122,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     return NOOP;
   }
   canvas.setAttribute('aria-hidden', 'true');
-  canvas.dataset.intro = 'c';
-  canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none;z-index:50';
+  canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none;z-index:50;opacity:0';
   document.body.append(canvas);
   renderer.setClearColor(0x000000, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -158,18 +157,23 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
   }));
   const gB = gM.map((m) => m.envMapIntensity), gF = gM.map((m) => m === face || m === lip);
   const CON = [glass, panel, ipod.mats.steel, ipod.mats.back], ROOM = gM.filter((m) => !CON.includes(m));
-
   const pmrem = new THREE.PMREMGenerator(renderer);
-  let envRT = null, conRT = null;
-  function buildEnv() {
-    envRT?.dispose(); conRT?.dispose();
-    const stripTex = new THREE.CanvasTexture(stripCanvas(BANDS)), st = studios(stripTex);
-    envRT = pmrem.fromScene(st.room, 0.03); conRT = pmrem.fromScene(st.con, 0.015);
-    st.dispose(); stripTex.dispose();
-    scene.environment = envRT.texture;
-    for (const m of gM) m.envMap = CON.includes(m) ? conRT.texture : envRT.texture;
-  }
-  buildEnv();
+  let envRT = null, conRT = null, st = null;
+  // two PMREM bakes (two setup tasks): the room for most materials, then the contrast studio
+  const bakes = [
+    () => {
+      envRT?.dispose(); conRT?.dispose();
+      st = studios(new THREE.CanvasTexture(stripCanvas(BANDS)));
+      envRT = pmrem.fromScene(st.room, 0.03);
+    },
+    () => {
+      conRT = pmrem.fromScene(st.con, 0.015);
+      st.dispose(); st = null;
+      scene.environment = envRT.texture;
+      for (const m of gM) m.envMap = CON.includes(m) ? conRT.texture : envRT.texture;
+    },
+  ];
+  const buildEnv = () => bakes.forEach((b) => b());
 
   const L = { vw: 0, vh: 0, dpr: 0, dz: [], o: ORBIT.land };
   const tmpV = new V3(), tmpE = new THREE.Euler(), tmpQ = new THREE.Quaternion();
@@ -229,7 +233,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     let r = null;
     try { r = getTargetRect?.(); } catch {}
     if (r?.height > 4) return r;
-    const h = min(L.vh * 0.74, 600), w = (h * IPOD.width) / IPOD.height;
+    const h = min(L.vh * 0.74, 600), w = (h * IPOD.width) / IPOD.height; // no rect: the desktop CSS size
     return { left: (L.vw - w) / 2, top: (L.vh - h) / 2, width: w, height: h };
   }
 
@@ -332,34 +336,38 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     return 1;
   }
 
-  let t = 0, playing = false, finished = false, raf = 0, last = 0, disposed = false, handedOff = false, lost = false, fadeTimer = 0, resolveDone;
+  let t = 0, playing = false, finished = false, ready = false, raf = 0, last = 0, disposed = false, handedOff = false, lost = false, fadeTimer = 0, resolveDone;
   const done = new Promise((r) => { resolveDone = r; });
   function render() {
-    if (disposed) return;
+    if (disposed || !ready) return;
     const op = pose(t);
     if (!handedOff) canvas.style.opacity = String(op);
     if (!lost) renderer.render(scene, camera);
   }
   const rectKey = () => { const r = targetRect(); return `${r.left},${r.top},${r.width},${r.height}`; };
-  // aligned frame, done, then a timer (not rAF) fade re-rendering if the rect moves; canvas removed
+  // done, aligned frame, then a timer (not rAF) fade re-rendering if the rect moves; canvas removed.
+  // done resolves first: a render that throws (driver / GPU failure) must never keep the iPod hidden,
+  // and such a canvas is simply dropped
   function finish() {
     if (finished || disposed) return;
     finished = handedOff = true; playing = false;
     cancelAnimationFrame(raf);
     t = duration;
-    render();
+    resolveDone();
     const t0 = performance.now();
-    let r0 = rectKey();
+    let r0 = null;
     const tick = () => {
       if (disposed || !handedOff) return;
       const u = min(1, (performance.now() - t0) / FADE_MS), r = rectKey();
-      if (r !== r0) { r0 = r; render(); }
+      if (r !== r0) {
+        r0 = r;
+        try { render(); } catch { canvas.remove(); return; }
+      }
       canvas.style.opacity = String((1 - u) ** 2);
       if (u < 1) fadeTimer = setTimeout(tick, 16);
       else canvas.remove();
     };
     tick();
-    resolveDone();
   }
   function frame(now) {
     if (!playing || disposed) return;
@@ -371,7 +379,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
   }
   const onResize = () => { if (!playing) render(); };
   const onLost = (e) => { e.preventDefault(); lost = true; };
-  const onRestored = () => { if (disposed) return; lost = false; buildEnv(); render(); };
+  const onRestored = () => { if (disposed) return; lost = false; if (ready) { buildEnv(); render(); } };
   const listen = (on) => {
     const f = on ? 'addEventListener' : 'removeEventListener';
     window[f]('resize', onResize);
@@ -386,17 +394,50 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     fetch(new URL(`${import.meta.env.BASE_URL}config.json`, location.href), { cache: 'force-cache' }).then((r) => r.json()).then(brand).catch(() => {});
   }
 
-  layout();
-  pose(3.4);
-  INTERNAL.forEach((i) => { parts[i].group.visible = true; });
-  renderer.compile(scene, camera);
-  ipod.textures.forEach((x) => renderer.initTexture(x));
-  render();
+  // Setup runs as a chain of short tasks, so input (the skip button, Esc) is handled in between and
+  // a skip or dispose stops it: the environment bakes, the drawing buffer, the shaders (compiled at
+  // once, then first used, i.e. link-checked, per part on a 1 px viewport), the texture uploads,
+  // then the first frame and play. `ready` settles when it ends either way.
+  const nextTask = () => new Promise((r) => setTimeout(r, 0));
+  const units = [...ipod.model.children, shadow];
+  const warmUp = (u) => () => {
+    const vis = units.map((x) => x.visible);
+    units.forEach((x) => { x.visible = x === u; });
+    renderer.setViewport(0, 0, 1, 1);
+    renderer.render(scene, camera);
+    renderer.setViewport(0, 0, L.vw, L.vh);
+    units.forEach((x, i) => { x.visible = vis[i]; });
+  };
+  const steps = [
+    ...bakes,
+    layout,
+    () => { pose(3.4); INTERNAL.forEach((i) => { parts[i].group.visible = true; }); renderer.compile(scene, camera); },
+    ...units.map(warmUp),
+    ...ipod.textures.map((x) => () => renderer.initTexture(x)),
+  ];
+  const settled = (async () => {
+    try {
+      for (const step of steps) {
+        await nextTask();
+        if (disposed || finished) return;
+        step();
+      }
+      ready = true;
+      render();
+      if (playing) { last = 0; raf = requestAnimationFrame(frame); }
+    } catch {
+      // a setup that throws (driver / GPU failure) never keeps the iPod hidden
+      finished = handedOff = true; playing = false;
+      canvas.remove();
+      resolveDone();
+    }
+  })();
 
   const fv = new V3();
   const controller = {
     duration,
     done,
+    ready: settled,
     skip: finish,
     seek(s) {
       if (disposed) return;
@@ -409,7 +450,7 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
       if (playing || finished || disposed) return;
       if (t >= duration) return finish();
       playing = true; last = 0;
-      raf = requestAnimationFrame(frame);
+      if (ready) raf = requestAnimationFrame(frame); // else the setup starts the loop
     },
     dispose() {
       if (disposed) return;
@@ -421,13 +462,13 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
         res.add(o.geometry); if (o.isInstancedMesh) o.dispose();
         for (const m of [].concat(o.material ?? [])) { res.add(m); for (const v of Object.values(m)) if (v?.isTexture) res.add(v); }
       });
-      [...res, pmrem, renderer].forEach((x) => x?.dispose());
+      [...res, st, pmrem, renderer].forEach((x) => x?.dispose());
       renderer.forceContextLoss?.();
       canvas.remove();
       resolveDone();
     },
     measure() {
-      if (disposed) return null;
+      if (disposed || !ready) return null;
       pose(t);
       ipod.model.updateWorldMatrix(true, false);
       camera.updateMatrixWorld();
@@ -449,7 +490,6 @@ export function runIntro({ getTargetRect, reducedMotion = false, config = null }
     },
     info: () => ({ ...renderer.info.memory, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }),
   };
-  controller._measure = controller.measure;
   if (import.meta.env.DEV) controller._three = { scene, renderer, ipod, key, rim };
   controller.play();
   return controller;

@@ -1,15 +1,6 @@
 // Small DOM / format helpers and a timer registry shared by the iPod UI modules.
 
-export function h(tag, cls, attrs = {}) {
-  const n = document.createElement(tag);
-  if (cls) n.className = cls;
-  for (const k in attrs) {
-    const v = attrs[k];
-    if (k === 'text') n.textContent = v ?? '';
-    else if (v != null && v !== false) n.setAttribute(k, v);
-  }
-  return n;
-}
+export { h } from '../shared/dom.js';
 
 export const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 

@@ -6,8 +6,9 @@ Vite + plain JS, `three` and `gsap` are the only runtime dependencies. All conte
 
 ## Flow
 
-1. `src/main.js` starts the intro chunk download right away (only if WebGL 2 is available) and
-   loads `config.json` in parallel.
+1. The built `index.html` preloads the intro chunk (`<link rel="modulepreload">`, left out when
+   `config.json` turns the intro off) while `src/main.js` loads `config.json` (8 s timeout). The
+   chunk is imported only once the config says the intro plays and WebGL 2 is available.
 2. It mounts the Aqua desktop + brushed-metal window (`src/window/`) and, inside it, the DOM iPod
    (`src/ipod/`). The iPod is laid out but `visibility:hidden`, so its rect can be measured.
 3. The intro (`src/intro/`, three.js, lazily imported) plays on a full-viewport canvas: the iPod
@@ -18,18 +19,21 @@ Vite + plain JS, `three` and `gsap` are the only runtime dependencies. All conte
 
 "Intro überspringen" (button, bottom right; centred on phones) and Esc skip to the aligned
 final frame; pressed while the intro chunk is still downloading, they reveal the iPod at once.
-Degradation: no WebGL 2, a failed chunk load, a chunk that takes longer than 6 s
+While the chunk is still on its way, a small Aqua spinner appears in the empty window after
+600 ms. Degradation: no WebGL 2, a failed chunk load, a chunk that takes longer than 6 s
 (`INTRO_CHUNK_MS`; a chunk that lands later is ignored), an exception in `runIntro`, or
 `settings.intro: false` all skip the intro and reveal the iPod directly. A watchdog reveals the
-iPod even if the render loop dies. If `config.json` cannot be loaded, the window shows a short
-German error with a reload button.
+iPod even if the render loop dies (it races `intro.done`, it does not rely on the intro). If
+`config.json` cannot be loaded, the window shows a short German error with a reload button and
+the reason goes to the console; menu entries without a name or with an unknown type are skipped
+with a console warning.
 
 ## Modules
 
 ### `src/shared/ipodSpec.js`: single source of truth
 
 `IPOD` (geometry in mm: body, display window, LCD, click wheel, edge details), `PARTS` (exploded
-layers, front to back), `COLORS` (silver palette and iPod UI colours), `mmToPx(heightPx)`.
+layers, front to back), `COLORS` (silver palette and iPod UI colours), `aspect` (width / height).
 Both the 3D model and the DOM iPod derive every size from these values, which is why the
 intro's last frame matches the DOM iPod exactly. Change a dimension here, never in a module.
 
@@ -53,16 +57,20 @@ createDesktop(host, { config, onLinks, onFocus }) → { el, contentEl, setIntera
 Aqua wallpaper (CSS only), menu bar (monogram, `brand.name`, Links, Kontakt; on the right the
 `config.legal` links and a clock), brushed-metal window titled `brand.windowTitle` with
 `brand.tagline` in the status bar. Draggable by the title bar and clamped to the viewport;
-red/yellow minimise to a desktop icon, green zooms. `contentEl` sets `--ipod-h`:
+red/yellow minimise to a desktop icon (genie with gsap, loaded on idle), green zooms (a FLIP
+transform; on phones the green light is disabled). The lights are 14 px gels with 24 px hit
+areas. `contentEl` sets `--ipod-aspect` (from `ipodSpec.js`) and `--ipod-h`:
 `min(74svh, 600px)` on desktop; under 640 px the window spans the width and hugs the iPod, and
 `--ipod-h` is the largest size that fits the screen width and height; on screens up to 640 px
 high the padding shrinks and the status bar is hidden. With a fine pointer (`--ipod-floor`) the
-iPod never gets smaller than 500 CSS px, so browser zoom enlarges its text (WCAG 1.4.4); a
-window larger than the screen stays centred, the stage scrolls and dragging is off.
+iPod never gets smaller than 500 CSS px, so browser zoom enlarges its text (WCAG 1.4.4), except
+on a short (≤ 640 px) window that is not zoomed in: at 1x resolution, or 1024+ CSS px wide (zoom
+shrinks both sides, a Retina or 125 %/150 % laptop window keeps its width); a window larger than the screen
+stays centred, the stage scrolls and dragging is off. Title and status bar never widen the window.
 The iPod is the window's key view: restoring from the desktop icon focuses it, and a press on
 the metal, title bar or a traffic light leaves keyboard focus on it, all through `onFocus`
 (main.js: `ipod.focus()`, so a screen of links gets its selected row). "Links" calls `onLinks`
-(main.js: `ipod.home()`). `setInteractive(false)` locks drag and traffic lights during the intro.
+(main.js: `ipod.home()`). `setInteractive(false)` locks drag and traffic lights during the intro (the lights are `inert` then).
 
 ### `src/ipod/index.js`: iPod UI
 
@@ -83,7 +91,7 @@ Height is `var(--ipod-h)`, every inner size is `calc(var(--ipod-h) / 103.5 * <mm
 The LCD UI is a logical 320×240 px space. Files: `wheel.js` (click-wheel input), `screens.js`
 (main menu with preview pane, list, page, Now Playing, downloads), `player.js` (simulated
 playback), `sound.js` (WebAudio clicks, `settings.clickSound`), `art.js` (procedural SVG),
-`util.js` (DOM helpers, re-exports `safeHref`), `ipodc.css`.
+`util.js` (helpers, re-exports `h` from `src/shared/dom.js` and `safeHref`), `ipodc.css`.
 
 Input: wheel drag, mouse wheel, touch, keys on the focused iPod (↑/↓/←/→ scroll, Enter centre,
 Esc/Backspace MENU, Space play, Shift+←/→ prev/next, Home/End, PageUp/PageDown).
@@ -102,10 +110,16 @@ the tab order) for touch screen readers complete it, because the wheel is `aria-
 ```js
 runIntro({ getTargetRect, reducedMotion = false, config = null }) → {
   duration, done,            // seconds; Promise resolved on the aligned final frame
+  ready,                     // Promise settled when the setup tasks have run (or were stopped)
   skip(), dispose(),         // jump to the end; free canvas, GPU resources, listeners
   seek(t), pause(), play(),  // test hooks (seconds)
+  measure(), info(),         // test hooks: projected outline vs. target rect (px), renderer memory/calls
 }
 ```
+`done` resolves before the final frame is drawn, so a render error can never keep the iPod hidden.
+The setup (environment bakes, drawing buffer, shader compile and first use per part, texture
+uploads) runs as a chain of short tasks, so the skip button and Esc respond while it runs; a skip
+or `dispose()` stops it. `window.__intro` is set once `ready` has settled.
 Procedural geometry only (`model.js`, canvas textures in `tex.js`), no model files. It owns a
 `position:fixed; inset:0; z-index:50; pointer-events:none` canvas. Without a WebGL 2 context it
 returns a no-op controller whose `done` is already resolved. `config.brand` is engraved on the
@@ -117,8 +131,9 @@ Loaded at runtime; edit and reload, no rebuild needed in dev. The build also rea
 `vite.config.js`) for `<title>`, the meta description, `og:title`/`og:description` (from
 `brand.name` and `brand.tagline`), absolute `og:image`/`og:url` (from `siteUrl`) and the
 `<noscript>` linktree, so rebuild after changes for crawlers and visitors without JavaScript.
-The generated assets (`tools/`, OG image, cover, PDFs) keep their own copy of the brand in
-`tools/lib/brand.mjs`; they do not read `config.json`.
+The generated assets (`tools/`, OG image, cover, PDFs) read `brand`, the playlist title and the
+menu labels from `config.json` too (`tools/lib/brand.mjs`); rerun `node tools/make-all.mjs` after
+changing them.
 
 - `siteUrl`: optional public URL of the site; without it `og:image` stays relative.
 
@@ -153,8 +168,9 @@ They are standalone pages with inline CSS in the same Aqua look.
 `vite.config.js`: `base: './'` (works on GitHub Pages sub-paths and any static host), the
 inline `config-html` plugin (meta tags and `<noscript>` from `config.json`, every value
 HTML-escaped, hrefs through `src/shared/href.js`), and `server.watch.ignored` for
-`.shots/` and `qa/`. The entry chunk holds main, window, iPod and gsap; three.js and the intro
-are a separate chunk loaded with `import()`.
+`.shots/` and `qa/`. The entry chunk holds main, window and iPod; three.js and the intro are a
+separate chunk loaded with `import()` and preloaded by the `intro-preload` plugin; gsap is its
+own small chunk, loaded on idle.
 
 Test hooks: `window.__ipod` and `window.__intro` exist only in dev or with `?debug`.
 
@@ -166,7 +182,9 @@ Test hooks: `window.__ipod` and `window.__intro` exist only in dev or with `?deb
 - `dev/window.html`: desktop and window with a grey placeholder.
 - `dev/webgl-smoke.html`: checks that WebGL renders.
 - `node scripts/shot.mjs <url> <out.png> [--w --h --wait --eval --mobile --dpr]`: screenshot
-  with headless Chromium and software WebGL (slow but correct).
+  with headless Chromium and software WebGL (slow but correct). The scripts find Chromium like
+  `tools/` do (`CHROME_PATH`, the Playwright browsers incl. `PLAYWRIGHT_BROWSERS_PATH`, a system
+  Chrome); without any, run `npx playwright install chromium` once.
 - `node scripts/intro-frames.mjs <url> <dir> [--times 0,1,2]`: intro frames via
   `window.__intro.seek()` (use the dev server or `?debug`).
 

@@ -49,7 +49,7 @@
           "href": "mailto:hallo@example.com?subject=Projektanfrage"
         },
         {
-          "label": "Call buchen",
+          "label": "Termin buchen",
           "href": "https://cal.com/"
         }
       ]
@@ -64,18 +64,18 @@
       "spotifyUrl": "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M",
       "tracks": [
         {
-          "title": "Track Eins",
-          "artist": "Artist A",
+          "title": "Titel eins",
+          "artist": "Interpret eins",
           "duration": "3:24"
         },
         {
-          "title": "Track Zwei",
-          "artist": "Artist B",
+          "title": "Titel zwei",
+          "artist": "Interpret zwei",
           "duration": "4:02"
         },
         {
-          "title": "Track Drei",
-          "artist": "Artist C",
+          "title": "Titel drei",
+          "artist": "Interpret drei",
           "duration": "2:51"
         }
       ]
@@ -90,19 +90,19 @@
           "label": "Portfolio 2026",
           "file": "downloads/portfolio-2026.pdf",
           "format": "PDF",
-          "size": "440 KB"
+          "size": "308 KB"
         },
         {
           "label": "Case Study: Projekt X",
           "file": "downloads/case-study-projekt-x.pdf",
           "format": "PDF",
-          "size": "387 KB"
+          "size": "289 KB"
         },
         {
           "label": "Media Kit",
           "file": "downloads/media-kit.pdf",
           "format": "PDF",
-          "size": "387 KB"
+          "size": "292 KB"
         }
       ]
     },

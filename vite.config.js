@@ -94,12 +94,34 @@ function configHtml() {
   };
 }
 
+/** <link rel="modulepreload"> for the lazily imported intro chunk: its download starts while the HTML
+ *  is parsed, not after the entry ran and config.json arrived (main.js imports it only then).
+ *  Left out when config.json turns the intro off. */
+function introPreload() {
+  return {
+    name: 'intro-preload',
+    apply: 'build',
+    transformIndexHtml: {
+      order: 'post',
+      handler(html, ctx) {
+        const config = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
+        if ([false, 'never', 'off'].includes(config.settings?.intro) || !ctx.bundle) return html;
+        const chunks = Object.values(ctx.bundle);
+        const intro = chunks.find((c) => c.type === 'chunk' && c.isDynamicEntry && /\/src\/intro\/index\.js$/.test(c.facadeModuleId ?? ''));
+        if (!intro) return html;
+        const files = [intro.fileName, ...intro.imports.filter((f) => !html.includes(f))];
+        return html.replace('</head>', () => `${files.map((f) => `  <link rel="modulepreload" crossorigin href="./${esc(f)}">\n`).join('')}</head>`);
+      },
+    },
+  };
+}
+
 // Relative base so the build works on GitHub Pages sub-paths and any static host.
 export default defineConfig({
   base: './',
   // the lazily loaded intro chunk carries three.js (~610 kB minified, ~160 kB gzip) by design
   build: { target: 'es2022', chunkSizeWarningLimit: 700 },
-  plugins: [configHtml()],
+  plugins: [configHtml(), introPreload()],
   server: {
     // agents and QA write screenshots there; reloads on those writes broke test runs
     watch: { ignored: ['**/.shots/**', '**/qa/**'] },

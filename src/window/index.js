@@ -1,23 +1,23 @@
 // Aqua-era desktop + brushed-metal window that frames the iPod.
 // API (see ARCHITECTURE.md): createDesktop(host, { config, onLinks, onFocus }) -> { el, contentEl, setInteractive, destroy }
-import gsap from 'gsap';
 import './window.css';
 import { prefersReducedMotion } from '../shared/config.js';
 import { safeHref } from '../shared/href.js';
+import { aspect } from '../shared/ipodSpec.js';
+import { h } from '../shared/dom.js';
 
 const MOBILE_MQ = '(max-width: 639.98px)';
 const MENUBAR_H = 22;
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
 
-function h(tag, cls, attrs = {}, text) {
-  const n = document.createElement(tag);
-  if (cls) n.className = cls;
-  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
-  if (text != null) n.textContent = text;
-  return n;
-}
+// gsap runs only the genie (minimise / restore): loaded on idle once the window is interactive,
+// so it stays out of the entry chunk. A failed load falls back to the instant (reduced-motion) path.
+let gsapP = null;
+let gsap = null;
+const loadGsap = () => (gsapP ??= import('gsap').then((m) => (gsap = m.gsap ?? m.default)).catch(() => { gsapP = null; return null; }));
+/** clamp where `lo` wins when the range is empty (a window larger than the viewport sticks to the top left) */
+const clampLo = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
 
 function glyph(pathD) {
   const svg = document.createElementNS(SVG_NS, 'svg');
@@ -49,13 +49,13 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
   // menu bar
   const bar = h('header', 'dt-bar');
   const barLeft = h('nav', 'dt-bar-left', { 'aria-label': 'Menüleiste' });
-  barLeft.append(h('span', 'dt-mono', { 'aria-hidden': 'true' }, brand.monogram ?? ''));
-  barLeft.append(h('strong', 'dt-brand', {}, brand.name ?? ''));
-  const linksBtn = h('button', 'dt-bar-item dt-bar-links', { type: 'button' }, 'Links');
+  barLeft.append(h('span', 'dt-mono', { 'aria-hidden': 'true', text: brand.monogram ?? '' }));
+  barLeft.append(h('strong', 'dt-brand', { text: brand.name ?? '' }));
+  const linksBtn = h('button', 'dt-bar-item dt-bar-links', { type: 'button', text: 'Links' });
   const mailHref = brand.email ? `mailto:${brand.email}` : null;
   const contact = mailHref
-    ? h('a', 'dt-bar-item', { href: mailHref }, 'Kontakt')
-    : h('span', 'dt-bar-item', {}, 'Kontakt');
+    ? h('a', 'dt-bar-item', { href: mailHref, text: 'Kontakt' })
+    : h('span', 'dt-bar-item', { text: 'Kontakt' });
   barLeft.append(linksBtn, contact);
   const clock = h('time', 'dt-clock');
   // right side: small legal links (config.legal), then the clock
@@ -64,7 +64,7 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
   const legalNav = h('nav', 'dt-legal', { 'aria-label': 'Rechtliches' });
   for (const [key, label] of [['impressum', 'Impressum'], ['datenschutz', 'Datenschutz']]) {
     const href = legal[key] ? safeHref(legal[key]) : null; // same rule as the iPod links
-    if (href) legalNav.append(h('a', 'dt-legal-link', { href }, label));
+    if (href) legalNav.append(h('a', 'dt-legal-link', { href, text: label }));
   }
   if (legalNav.childElementCount) barRight.append(legalNav);
   barRight.append(clock);
@@ -78,16 +78,17 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
   const lights = h('div', 'dt-lights');
   const btnClose = h('button', 'dt-tl dt-tl-close', { type: 'button', 'aria-label': 'Schließen' });
   const btnMin = h('button', 'dt-tl dt-tl-min', { type: 'button', 'aria-label': 'Minimieren' });
-  const btnZoom = h('button', 'dt-tl dt-tl-zoom', { type: 'button', 'aria-label': 'Zoomen' });
+  const btnZoom = h('button', 'dt-tl dt-tl-zoom', { type: 'button', 'aria-label': 'Zoomen', 'aria-pressed': 'false' });
   btnClose.append(glyph('M3.2 3.2l5.6 5.6M8.8 3.2L3.2 8.8'));
   btnMin.append(glyph('M2.6 6h6.8'));
   btnZoom.append(glyph('M2.8 6h6.4M6 2.8v6.4'));
   lights.append(btnClose, btnMin, btnZoom);
-  const title = h('h1', 'dt-title', {}, brand.windowTitle ?? '');
+  const title = h('h1', 'dt-title', { text: brand.windowTitle ?? '' });
   titlebar.append(lights, title, h('span', 'dt-title-spacer'));
 
   const contentEl = h('div', 'dt-content');
-  const status = h('footer', 'dt-status', {}, brand.tagline ?? '');
+  contentEl.style.setProperty('--ipod-aspect', String(aspect)); // the iPod's width / height (mobile sizing)
+  const status = h('footer', 'dt-status', { text: brand.tagline ?? '' });
   win.append(titlebar, contentEl, status);
   pos.append(win);
   stage.append(pos);
@@ -96,7 +97,7 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
   const icon = h('button', 'dt-icon', { type: 'button', 'aria-label': 'iPod wiederherstellen' });
   const iconArt = h('span', 'dt-icon-art', { 'aria-hidden': 'true' });
   iconArt.append(h('i', 'dt-icon-screen'), h('i', 'dt-icon-wheel'));
-  icon.append(iconArt, h('span', 'dt-icon-label', {}, 'iPod'));
+  icon.append(iconArt, h('span', 'dt-icon-label', { text: 'iPod' }));
 
   el.append(wall, bar, stage, icon);
   host.append(el);
@@ -119,8 +120,9 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
   let zoomed = false;
   let ox = 0; // drag offset (px) relative to the centred position
   let oy = 0;
-  let zoomTimer = 0;
+  let zoomAnim = null;
   let tl = null;
+  let destroyed = false;
 
   const applyOffset = () => {
     pos.style.setProperty('--dx', `${ox}px`);
@@ -136,23 +138,32 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
     const r = win.getBoundingClientRect();
     const baseL = r.left - ox, baseT = r.top - oy;
     const vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
-    ox = clamp(ox, -baseL, vw - (baseL + r.width));
-    oy = clamp(oy, MENUBAR_H - baseT, vh - (baseT + r.height));
+    ox = clampLo(ox, -baseL, vw - (baseL + r.width));
+    oy = clampLo(oy, MENUBAR_H - baseT, vh - (baseT + r.height));
     applyOffset();
   };
   on(window, 'resize', clampOffset);
   on(mobileMq, 'change', clampOffset);
 
+  // FLIP: the layout jumps to the new size once (the iPod re-measures its text once), and the frame
+  // glides from the old rect with a transform only, instead of animating --ipod-h every frame
   const setZoomed = (z) => {
+    const from = win.getBoundingClientRect();
     zoomed = z;
     el.classList.toggle('is-zoomed', z);
     btnZoom.setAttribute('aria-pressed', String(z));
-    if (!prefersReducedMotion()) {
-      el.classList.add('is-zooming');
-      clearTimeout(zoomTimer);
-      zoomTimer = setTimeout(() => { el.classList.remove('is-zooming'); clampOffset(); }, 380);
-    }
-    requestAnimationFrame(clampOffset);
+    clampOffset(); // final size and position, at once
+    if (prefersReducedMotion() || !win.animate) return;
+    const to = win.getBoundingClientRect();
+    if (!to.width || !to.height) return;
+    const flip = `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width}, ${from.height / to.height})`;
+    zoomAnim?.cancel();
+    const anim = win.animate([{ transformOrigin: '0 0', transform: flip }, { transformOrigin: '0 0', transform: 'none' }],
+      { duration: 340, easing: 'cubic-bezier(.3,.7,.2,1)' });
+    zoomAnim = anim;
+    // wall-clock safety net (as for the iPod's slides): a stalled document timeline never leaves the
+    // window scaled
+    setTimeout(() => { if (anim.playState === 'running') anim.finish(); }, 340 + 180);
   };
   const toggleZoom = () => {
     if (!interactive || minimised || busy || isMobile()) return;
@@ -185,14 +196,16 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
     win.toggleAttribute('inert', m);
   };
 
-  const minimise = () => {
+  const minimise = async () => {
     if (!interactive || minimised || busy) return;
-    if (prefersReducedMotion()) {
+    busy = true;
+    if (prefersReducedMotion() || !(await loadGsap()) || destroyed) {
+      busy = false;
+      if (destroyed) return;
       setMinimisedState(true);
       icon.focus({ preventScroll: true });
       return;
     }
-    busy = true;
     const { dx, dy } = iconTarget();
     el.classList.add('is-genie');
     gsap.killTweensOf(win);
@@ -214,14 +227,16 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
     setTimeout(() => icon.classList.remove('is-arriving'), 700);
   };
 
-  const restore = () => {
+  const restore = async () => {
     if (!minimised || busy) return;
-    if (prefersReducedMotion()) {
+    busy = true;
+    if (prefersReducedMotion() || !(await loadGsap()) || destroyed) {
+      busy = false;
+      if (destroyed) return;
       setMinimisedState(false);
       focusContent();
       return;
     }
-    busy = true;
     const { dx, dy } = iconTarget();
     el.classList.add('is-genie');
     setMinimisedState(false);
@@ -282,8 +297,8 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
     const vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
     if (!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 3) return;
     if (!drag.moved) { drag.moved = true; el.classList.add('is-dragging'); }
-    ox = clamp(drag.ox + e.clientX - drag.sx, -drag.baseL, vw - (drag.baseL + drag.w));
-    oy = clamp(drag.oy + e.clientY - drag.sy, MENUBAR_H - drag.baseT, vh - (drag.baseT + drag.h));
+    ox = clampLo(drag.ox + e.clientX - drag.sx, -drag.baseL, vw - (drag.baseL + drag.w));
+    oy = clampLo(drag.oy + e.clientY - drag.sy, MENUBAR_H - drag.baseT, vh - (drag.baseT + drag.h));
     applyOffset();
   });
   const endDrag = (e) => {
@@ -300,24 +315,36 @@ export function createDesktop(host, { config, onLinks, onFocus }) {
   });
 
   /* ---------- public API ---------- */
-  const setInteractive = (v) => {
+  // on a phone the window always spans the screen, so the zoom light is disabled there (and looks it)
+  const syncZoomLight = () => {
+    el.classList.toggle('is-zoom-off', isMobile());
+    btnZoom.setAttribute('aria-disabled', String(!interactive || isMobile()));
+  };
+  on(mobileMq, 'change', syncZoomLight);
+  const applyInteractive = (v) => {
     interactive = !!v;
     el.classList.toggle('is-locked', !interactive);
-    for (const b of [btnClose, btnMin, btnZoom]) {
-      b.setAttribute('aria-disabled', String(!interactive));
-    }
+    // locked (intro): the lights are no tab stops either, their focus ring would sit under the 3D canvas
+    lights.inert = !interactive;
+    for (const b of [btnClose, btnMin]) b.setAttribute('aria-disabled', String(!interactive));
+    syncZoomLight();
     if (!interactive) endDrag();
+  };
+  const setInteractive = (v) => {
+    applyInteractive(v);
+    if (interactive && !gsap) (window.requestIdleCallback ?? setTimeout)(() => { if (!destroyed) loadGsap(); });
   };
 
   const destroy = () => {
+    destroyed = true;
     clearTimeout(clockTimer);
-    clearTimeout(zoomTimer);
+    zoomAnim?.cancel();
     tl?.kill();
-    gsap.killTweensOf(win);
+    gsap?.killTweensOf(win);
     cleanups.forEach((fn) => fn());
     el.remove();
   };
 
-  setInteractive(true);
+  applyInteractive(true);
   return { el, contentEl, setInteractive, destroy };
 }

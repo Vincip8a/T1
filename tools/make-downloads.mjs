@@ -42,7 +42,7 @@ const PLACEHOLDER_HINT =
 const projects = [
   {
     eyebrow: 'Beispielprojekt 01',
-    title: 'Projekt Alpha — Website-Relaunch',
+    title: 'Projekt Alpha · Website-Relaunch',
     lead:
       'Ein erfundenes Beispielprojekt, das zeigt, wie eine Projektseite in diesem ' +
       'Portfolio aufgebaut ist: kurze Einordnung, Rahmendaten, Ergebnis, Details.',
@@ -65,7 +65,7 @@ const projects = [
   },
   {
     eyebrow: 'Beispielprojekt 02',
-    title: 'Projekt Beta — Markenauftritt',
+    title: 'Projekt Beta · Markenauftritt',
     lead:
       'Zweites Beispielprojekt. Der Aufbau bleibt gleich, damit sich die Seiten ' +
       'beim Durchblättern ruhig lesen und Inhalte leicht austauschbar sind.',
@@ -88,7 +88,7 @@ const projects = [
   },
   {
     eyebrow: 'Beispielprojekt 03',
-    title: 'Projekt Gamma — Produkt-App',
+    title: 'Projekt Gamma · Produkt-App',
     lead:
       'Drittes Beispielprojekt mit Schwerpunkt auf Interaktion und Prototyping. ' +
       'Auch hier gilt: alle Angaben sind Platzhalter.',
@@ -112,13 +112,13 @@ const projects = [
 ]
 
 const portfolio = buildDocument({
-  title: 'Portfolio 2026 — Platzhalter',
+  title: 'Portfolio 2026 · Platzhalter',
   sections: [
     cover({
       kicker: 'Portfolio',
       title: 'Portfolio<br>2026',
-      subtitle: 'Ausgewählte Arbeiten aus Design, Code und Konzept — als Platzhalter angelegt.',
-      meta: ['Ausgabe 2026 · Version 0.1', 'dein.name@example.com', 'Alle Inhalte sind Beispieldaten'],
+      subtitle: 'Ausgewählte Arbeiten aus Design, Code und Konzept, als Platzhalter angelegt.',
+      meta: ['Ausgabe 2026 · Version 0.1', brand.email, 'Alle Inhalte sind Beispieldaten'],
     }),
     ...projects.map((project) =>
       page({
@@ -142,12 +142,12 @@ const portfolio = buildDocument({
       title: 'Lass uns zusammenarbeiten',
       body: [
         lead(
-          'Die Kontaktseite schließt das Portfolio ab. Trage hier deine echten Daten ein — ' +
+          'Die Kontaktseite schließt das Portfolio ab. Trage hier deine echten Daten ein, ' +
             'am einfachsten direkt in der HTML-Vorlage in <b>tools/make-downloads.mjs</b>.',
         ),
         divider(),
         kv([
-          { term: 'E-Mail', value: 'dein.name@example.com' },
+          { term: 'E-Mail', value: brand.email },
           { term: 'Website', value: 'example.com' },
           { term: 'Standort', value: 'Platzhalter-Stadt' },
           { term: 'Verfügbarkeit', value: 'Auf Anfrage' },
@@ -169,12 +169,12 @@ const portfolio = buildDocument({
 /* ------------------------------------------------------------------ */
 
 const caseStudy = buildDocument({
-  title: 'Case Study: Projekt X — Platzhalter',
+  title: 'Case Study: Projekt X · Platzhalter',
   sections: [
     cover({
       kicker: 'Case Study',
       title: 'Projekt X',
-      subtitle: 'Von der Ausgangslage über den Prozess zum Ergebnis — ein Beispiel-Fallbericht.',
+      subtitle: 'Von der Ausgangslage über den Prozess zum Ergebnis: ein Beispiel-Fallbericht.',
       meta: ['Fallstudie · Version 0.1', 'Zeitraum: Platzhalter', 'Alle Zahlen sind Beispieldaten'],
     }),
     page({
@@ -191,7 +191,7 @@ const caseStudy = buildDocument({
           'Die Startseite erklärte alles gleichzeitig und dadurch nichts richtig.',
           'Inhalte lagen an vier Orten und widersprachen sich an drei davon.',
           'Auf kleinen Bildschirmen brach das Layout an den wichtigsten Stellen.',
-          'Für jede Änderung war Entwicklungszeit nötig — niemand pflegte etwas.',
+          'Für jede Änderung war Entwicklungszeit nötig, also pflegte niemand etwas.',
         ]),
         divider(),
         kv([
@@ -207,7 +207,7 @@ const caseStudy = buildDocument({
       eyebrow: 'Kapitel 02',
       title: 'Prozess',
       body: [
-        lead('Vier Schritte, die sich in dieser Reihenfolge bewährt haben — hier als Beispiel beschrieben.'),
+        lead('Vier Schritte, die sich in dieser Reihenfolge bewährt haben, hier als Beispiel beschrieben.'),
         divider(),
         steps([
           {
@@ -220,7 +220,7 @@ const caseStudy = buildDocument({
           },
           {
             title: 'Gestalten und prüfen',
-            text: 'Entwürfe früh an echten Inhalten getestet statt an Blindtext — zwei Runden.',
+            text: 'Entwürfe früh an echten Inhalten getestet statt an Blindtext, in zwei Runden.',
           },
           {
             title: 'Umsetzen und übergeben',
@@ -267,7 +267,7 @@ const caseStudy = buildDocument({
         ]),
         divider(),
         bullets([
-          'Inhalte zuerst — Gestaltung an Blindtext verschiebt die Probleme nur nach hinten.',
+          'Inhalte zuerst. Gestaltung an Blindtext verschiebt die Probleme nur nach hinten.',
           'Weniger Bereiche heißt mehr Klarheit, nicht weniger Inhalt.',
           'Wer die Inhalte pflegt, muss die Struktur ohne Erklärung verstehen.',
         ]),
@@ -282,13 +282,13 @@ const caseStudy = buildDocument({
 /* ------------------------------------------------------------------ */
 
 const mediaKit = buildDocument({
-  title: 'Media Kit — Platzhalter',
+  title: 'Media Kit · Platzhalter',
   sections: [
     cover({
       kicker: 'Media Kit',
       title: 'Media Kit',
-      subtitle: `${brand.name} — Kurzprofil, Leistungen und Reichweite auf vier Seiten.`,
-      meta: ['Version 0.1 · Stand: Platzhalter', 'dein.name@example.com', 'Alle Zahlen sind Beispieldaten'],
+      subtitle: `${brand.name} · Kurzprofil, Leistungen und Reichweite auf vier Seiten.`,
+      meta: ['Version 0.1 · Stand: Platzhalter', brand.email, 'Alle Zahlen sind Beispieldaten'],
     }),
     page({
       windowTitle: 'Media Kit',
@@ -335,7 +335,7 @@ const mediaKit = buildDocument({
           {
             title: 'Umsetzung',
             tag: 'Paket 03',
-            text: 'Saubere, leichte Frontend-Umsetzung — Inhalte bleiben ohne Entwicklung pflegbar.',
+            text: 'Saubere, leichte Frontend-Umsetzung. Inhalte bleiben ohne Entwicklung pflegbar.',
           },
           {
             title: 'Begleitung',
@@ -351,7 +351,7 @@ const mediaKit = buildDocument({
       title: 'Reichweite & Kennzahlen',
       body: [
         lead(
-          'Alle Werte auf dieser Seite sind Platzhalter. Trage deine echten Zahlen ein — ' +
+          'Alle Werte auf dieser Seite sind Platzhalter. Trage deine echten Zahlen ein ' +
             'und nenne immer Quelle und Zeitraum dazu.',
         ),
         divider(),
@@ -380,7 +380,7 @@ const mediaKit = buildDocument({
         lead('Für Kooperationen, Projektanfragen und Presseanfragen.'),
         divider(),
         kv([
-          { term: 'E-Mail', value: 'dein.name@example.com' },
+          { term: 'E-Mail', value: brand.email },
           { term: 'Website', value: 'example.com' },
           { term: 'Presse', value: 'presse@example.com' },
           { term: 'Antwortzeit', value: 'Zwei Werktage (Platzhalter)' },
@@ -414,7 +414,7 @@ async function main() {
   }
 }
 
-// Nur ausfuehren, wenn das Skript direkt aufgerufen wird - so koennen andere
+// Nur ausfuehren, wenn das Skript direkt aufgerufen wird. So koennen andere
 // Skripte die HTML-Vorlagen importieren, ohne zu rendern.
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   main().catch((error) => {

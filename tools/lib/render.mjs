@@ -1,8 +1,9 @@
 // Rendert HTML nach PDF bzw. PNG mit einem lokal vorhandenen Chromium.
 //
-// Bewusst ohne npm-Abhaengigkeit: das Skript nimmt das Chromium, das Playwright
-// mitbringt (falls installiert), sonst ein System-Chrome/Chromium/Edge. Mit
-// CHROME_PATH laesst sich ein beliebiger Binaerpfad erzwingen.
+// Bewusst ohne zusaetzliche npm-Abhaengigkeit: das Skript nimmt das Chromium, das
+// Playwright mitbringt (falls installiert, auch unter PLAYWRIGHT_BROWSERS_PATH),
+// sonst ein System-Chrome/Chromium/Edge. Mit CHROME_PATH laesst sich ein
+// beliebiger Binaerpfad erzwingen. scripts/browser.mjs nutzt dieselbe Suche.
 
 import { execFile, spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
@@ -28,27 +29,44 @@ const SYSTEM_CANDIDATES = [
 ]
 
 function playwrightCacheRoot() {
+  if (process.env.PLAYWRIGHT_BROWSERS_PATH && process.env.PLAYWRIGHT_BROWSERS_PATH !== '0') {
+    return process.env.PLAYWRIGHT_BROWSERS_PATH
+  }
   const home = process.env.HOME ?? process.env.USERPROFILE ?? ''
   if (process.platform === 'win32') return join(process.env.LOCALAPPDATA ?? home, 'ms-playwright')
   if (process.platform === 'darwin') return join(home, 'Library', 'Caches', 'ms-playwright')
   return join(home, '.cache', 'ms-playwright')
 }
 
+// Playwright installiert je nach Version Chromium oder "Chrome for Testing"
+const PLAYWRIGHT_BINS = [
+  'chrome-linux64/chrome',
+  'chrome-linux/chrome',
+  'chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing',
+  'chrome-mac-x64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing',
+  'chrome-mac/Chromium.app/Contents/MacOS/Chromium',
+  'chrome-mac-arm64/Chromium.app/Contents/MacOS/Chromium',
+  'chrome-win64/chrome.exe',
+  'chrome-win/chrome.exe',
+]
+
 async function playwrightChromium() {
+  // 1. das Chromium, das das installierte Playwright selbst verwenden wuerde (devDependency)
+  try {
+    const { chromium } = await import('playwright')
+    const bin = chromium.executablePath()
+    if (bin && existsSync(bin)) return bin
+  } catch {
+    /* Playwright nicht installiert */
+  }
+  // 2. irgendein Chromium-Build im Playwright-Browserverzeichnis, neuester zuerst
   const root = playwrightCacheRoot()
   if (!existsSync(root)) return null
   const builds = (await readdir(root))
-    .filter((name) => name.startsWith('chromium-'))
-    .sort()
-    .reverse()
-  const relativeBins = [
-    'chrome-mac/Chromium.app/Contents/MacOS/Chromium',
-    'chrome-mac-arm64/Chromium.app/Contents/MacOS/Chromium',
-    'chrome-linux/chrome',
-    'chrome-win/chrome.exe',
-  ]
+    .filter((name) => /^chromium-\d+$/.test(name))
+    .sort((a, b) => Number(b.slice(9)) - Number(a.slice(9)))
   for (const build of builds) {
-    for (const rel of relativeBins) {
+    for (const rel of PLAYWRIGHT_BINS) {
       const bin = join(root, build, ...rel.split('/'))
       if (existsSync(bin)) return bin
     }
@@ -102,7 +120,7 @@ async function readWhenComplete(path, marker) {
 // Chromium startet Renderer- und Crashpad-Prozesse, die ein Signal an den
 // gestarteten Prozess nicht erreicht. Aufgeraeumt wird deshalb ueber das
 // Profilverzeichnis: es ist pro Aufruf frisch angelegt und steht in der
-// Kommandozeile jedes beteiligten Prozesses - fremde Browser-Fenster der
+// Kommandozeile jedes beteiligten Prozesses, fremde Browser-Fenster der
 // Nutzerin bleiben dadurch unberuehrt.
 async function killByProfile(profileDir) {
   if (process.platform === 'win32') return
@@ -177,8 +195,30 @@ export function htmlToPdf(html, outPath) {
   )
 }
 
-/** HTML -> PNG im angegebenen Viewport. */
-export function htmlToPng(html, outPath, { width, height }) {
+/** HTML -> PNG im angegebenen Viewport. Mit Playwright (devDependency) exakt im
+ *  Viewport; ohne Playwright ueber --screenshot (neuere Chromium-Versionen ziehen
+ *  dort die Fensterleisten von --window-size ab, das Bild wird unten abgeschnitten). */
+export async function htmlToPng(html, outPath, { width, height }) {
+  let chromium = null
+  try {
+    ;({ chromium } = await import('playwright'))
+  } catch {
+    /* Playwright nicht installiert: Kommandozeilen-Weg */
+  }
+  if (chromium) {
+    const browser = await chromium.launch({ executablePath: await findChromium(), args: ['--disable-gpu', '--hide-scrollbars'] })
+    try {
+      const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 })
+      await withTempHtml(html, async ({ url }) => {
+        await page.goto(url, { waitUntil: 'load' })
+        await page.evaluate(() => document.fonts.ready)
+        await page.screenshot({ path: outPath, omitBackground: false })
+      })
+    } finally {
+      await browser.close()
+    }
+    return (await readFile(outPath)).length
+  }
   return withTempHtml(html, ({ url, profile }) =>
     renderWithChromium(
       [
@@ -195,7 +235,7 @@ export function htmlToPng(html, outPath, { width, height }) {
   )
 }
 
-/** "123,4 kB" / "1,2 MB" - gleiches Format wie in public/config.json. */
+/** "123,4 kB" / "1,2 MB", gleiches Format wie in public/config.json. */
 export function formatSize(bytes) {
   if (bytes < 1000) return `${bytes} B`
   if (bytes < 1000 * 1000) return `${(bytes / 1000).toFixed(1).replace('.', ',')} kB`

@@ -4,7 +4,7 @@
 
 import { brand, fontStack, palette, playerSvg } from './brand.mjs'
 
-const PLACEHOLDER_NOTE = 'Platzhalter-Dokument – Inhalte und Zahlen sind frei erfunden.'
+const PLACEHOLDER_NOTE = 'Platzhalter-Dokument. Inhalte und Zahlen sind frei erfunden.'
 
 export const css = `
   @page { size: A4; margin: 0; }

@@ -50,7 +50,7 @@ export const COLORS = {
   aluminiumLight: '#e2e4e7',
   aluminiumDark: '#9fa3a8',
   wheel: '#e4e5e7',
-  wheelLabel: '#7d8187', // printed grey, ≈ 3.4:1 on the wheel (large bold glyphs)
+  wheelLabel: '#7d8187', // printed grey, 3.1:1 on the wheel (WCAG 1.4.11 for the control labels)
   centerButton: '#cfd2d6',
   screenWindow: '#0b0c0e',
   lcdOff: '#14171a',
@@ -67,7 +67,5 @@ export const COLORS = {
 };
 
 // Helpers
+/** width / height of the body: the window CSS (--ipod-aspect) and the dev pages size the iPod with it */
 export const aspect = IPOD.width / IPOD.height;
-
-/** Pixel size of 1 mm when the iPod is rendered `heightPx` tall. */
-export const mmToPx = (heightPx) => heightPx / IPOD.height;

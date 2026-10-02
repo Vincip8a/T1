@@ -20,6 +20,7 @@ const SLIDE_MS = 260;
 // never also the first link on the screen it opened (going back with MENU is not guarded)
 const SETTLE_MS = 450;
 const EASE = 'cubic-bezier(.32,.08,.24,1)';
+const SCREEN_TYPES = ['list', 'page', 'nowplaying', 'downloads'];
 let seq = 0;
 
 // UI strings (not content): German 6G firmware wording.
@@ -37,13 +38,19 @@ const DEFAULT_UI = {
   downloadStarted: 'Download gestartet',
   backHint: 'Zurück mit MENU',
   back: 'Zurück',
+  empty: 'Keine Einträge',
   hint: 'Pfeiltasten blättern, Enter wählt, Escape zurück, Leertaste Wiedergabe.',
 };
 
 export function mountIpod(container, { config } = {}) {
   config ??= {};
   const brand = config.brand ?? {};
-  const menu = (Array.isArray(config.menu) ? config.menu : []).filter((m) => m && typeof m === 'object');
+  // entries without a name or with an unknown type would be blank or broken rows: skip them, with a hint
+  const menu = (Array.isArray(config.menu) ? config.menu : []).filter((m) => {
+    const ok = m && typeof m === 'object' && (m.label || m.title) && SCREEN_TYPES.includes(m.type);
+    if (!ok) console.warn('[ipod] config.json: menu entry skipped (needs label or title and type list | page | nowplaying | downloads):', m);
+    return ok;
+  });
   const L = DEFAULT_UI;
   const P = `ipodc${++seq}`;
   let uid = 0;
@@ -84,19 +91,20 @@ export function mountIpod(container, { config } = {}) {
     + `<div class="ipodc-stage"></div><div class="ipodc-toast" ${hid}></div><div class="ipodc-boot" ${hid}><div class="ipodc-boot-mono"></div></div>`
     + `</div></div><div class="ipodc-glare"></div></div><div class="ipodc-wheel" ${hid}><span class="ipodc-wbtn ipodc-wbtn--menu">${IPOD.wheelLabels.menu ?? 'MENU'}</span>`
     + ['next', 'prev', 'play'].map((n) => `<span class="ipodc-wbtn ipodc-wbtn--${n}">${GLYPH[n]}</span>`).join('')
-    + `<div class="ipodc-center"></div></div><div class="ipodc-sr" id="${hintId}">${L.hint}</div>${sharedDefs(`${P}s`)}`;
+    + `<div class="ipodc-center"></div></div>${sharedDefs(`${P}s`)}`;
   const [lcd, ind, titleEl, stage, toast, boot, wheel, centerBtn] = ['lcd', 'ind', 'title', 'stage', 'toast', 'boot', 'wheel', 'center']
     .map((c) => el.querySelector(`.ipodc-${c}`));
   boot.firstChild.textContent = brand.monogram ?? '';
-  // a landmark around the body (display: contents, so it adds no box); the live region sits
-  // beside the body because the listbox may only own options
+  // a landmark around the body (display: contents, so it adds no box); the key hint (aria-describedby)
+  // and the live region sit beside the body because the listbox may only own options
+  const hint = h('div', 'ipodc-sr', { id: hintId, text: L.hint });
   const live = h('div', 'ipodc-sr', { 'aria-live': 'polite', 'aria-atomic': 'true' });
   // the wheel is aria-hidden, so touch screen-reader users (VoiceOver, TalkBack) get MENU as an
   // invisible button; it is outside the tab order (keyboard users have Esc / Backspace)
   const backBtn = h('button', 'ipodc-sr', { type: 'button', tabindex: -1, hidden: '' });
   backBtn.textContent = L.back;
   const host = h('section', 'ipodc-host', { 'aria-label': 'iPod' });
-  host.append(el, backBtn, live);
+  host.append(el, hint, backBtn, live);
   container.append(host);
 
   /** real px per logical px (to measure wrapped text) */
@@ -239,7 +247,8 @@ export function mountIpod(container, { config } = {}) {
     const extra = dir > 0 && (typeof to.summary === 'function' ? to.summary() : to.summary);
     // a focused link row is read by the screen reader itself
     const focused = to.roving && document.activeElement === keyTarget();
-    announce([to.title, extra, !focused && to.currentLabel()].filter(Boolean).join('. '));
+    // (one period between the parts, also when a part already ends in one)
+    announce([to.title, extra, !focused && to.currentLabel()].filter(Boolean).map((x) => String(x).replace(/[.!?:]\s*$/, '')).join('. '));
   }
   const open = (item) => go(1, item);
   const back = () => stack.length > 1 && go(-1);
@@ -429,7 +438,12 @@ export function mountIpod(container, { config } = {}) {
     keyTarget().focus({ preventScroll: true, focusVisible: true });
   }
 
-  const wait = (ms) => new Promise((r) => timers.later(r, ms));
+  // destroy() clears the timers, so it also settles every pending wait: reveal() then returns early
+  const waiting = new Set();
+  const wait = (ms) => new Promise((r) => {
+    waiting.add(r);
+    timers.later(() => { waiting.delete(r); r(); }, ms);
+  });
   let revealP = null;
   function reveal({ boot: doBoot = true } = {}) {
     revealP ??= (async () => {
@@ -439,8 +453,10 @@ export function mountIpod(container, { config } = {}) {
         const rm = isReduced();
         phase = 'boot';
         await wait(rm ? 40 : 220);
+        if (destroyed) return;
         boot.classList.add('show-mono');
         await wait(rm ? 450 : 950);
+        if (destroyed) return;
         boot.classList.add('is-out');
         await wait(rm ? 80 : 340);
       }
@@ -448,7 +464,8 @@ export function mountIpod(container, { config } = {}) {
       boot.hidden = true;
       current().layout();
       phase = 'ready';
-      announce(`${menuScr.title}: ${menuScr.currentLabel()}`);
+      // focus moving onto the iPod (main.js does that next) already reads the selected row
+      timers.later(() => { if (!el.contains(document.activeElement)) announce(`${menuScr.title}: ${menuScr.currentLabel()}`); }, 60);
     })();
     return revealP;
   }
@@ -459,6 +476,8 @@ export function mountIpod(container, { config } = {}) {
     for (const fn of cleanups) { try { fn(); } catch { /* ignore */ } }
     for (const a of anims.values()) a.cancel();
     timers.clearAll();
+    waiting.forEach((r) => r());
+    waiting.clear();
     ro.disconnect();
     player.destroy();
     sound.close();

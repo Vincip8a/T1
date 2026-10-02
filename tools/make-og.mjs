@@ -16,8 +16,9 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const WIDTH = 1200
 const HEIGHT = 630
 
+// Name und Menuepunkte aus public/config.json (ueber lib/brand.mjs, bereits maskiert)
 const title = brand.name
-const subtitle = 'Kontakt · Work Together · Playlist · Downloads'
+const subtitle = brand.menuLabels.join(' · ')
 
 const html = `<!doctype html>
 <html lang="de"><head><meta charset="utf-8"><style>
@@ -63,6 +64,7 @@ const html = `<!doctype html>
   p.sub {
     margin: 28px 0 0; font-size: 31px; font-weight: 500; letter-spacing: .2px;
     color: rgba(255,255,255,.93); text-shadow: 0 2px 10px rgba(4,32,60,.3);
+    text-wrap: balance; /* viele Menuepunkte: zwei gleich lange Zeilen */
   }
   .rule { margin-top: 34px; width: 232px; height: 4px; border-radius: 2px;
           background: linear-gradient(90deg, rgba(255,255,255,.95), rgba(255,255,255,.1)); }
@@ -74,7 +76,7 @@ const html = `<!doctype html>
   <div class="frame"></div>
   <div class="stage">
     <div class="copy">
-      <span class="badge"><span class="mono">${brand.monogram}</span>Linktree</span>
+      <span class="badge"><span class="mono">${brand.monogram}</span>Links</span>
       <h1>${title}</h1>
       <p class="sub">${subtitle}</p>
       <div class="rule"></div>

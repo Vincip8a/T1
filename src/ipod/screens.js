@@ -23,11 +23,12 @@ export function createScreens(ctx) {
       let desc = L.link;
       const web = /^https?:/i.test(href);
       const newTab = () => { row.target = '_blank'; row.rel = 'noopener'; };
-      if (spec.download != null) {
+      // browsers ignore `download` on other origins and would navigate the page away: a file hosted
+      // elsewhere opens in a new tab like any web link (and gets no "Download gestartet" toast)
+      const foreign = web && new URL(href, location.href).origin !== location.origin;
+      if (spec.download != null && !foreign) {
         row.download = spec.download;
         desc = L.download;
-        // browsers ignore `download` on other origins and would navigate the page away: new tab instead
-        if (web && new URL(href, location.href).origin !== location.origin) newTab();
       } else if (web) { newTab(); desc = L.newTab; } else if (/^mailto:/i.test(href)) desc = L.mail;
       row.setAttribute('aria-description', desc);
     }
@@ -40,6 +41,8 @@ export function createScreens(ctx) {
   /** Generic scrolling list screen. `pre` is optional content above the rows (page text). */
   function listScreen(kind, id, title, specs, pre) {
     specs = specs.filter(Boolean);
+    // an empty list says so (centred grey note, like the 6G), it never shows a bare white screen
+    if (!specs.length && !pre && kind !== 'nowplaying') pre = h('div', 'ipodc-empty', { text: L.empty });
     const node = h('div', `ipodc-screen ipodc-screen--${kind}`);
     const view = h('div', 'ipodc-view');
     const content = h('div', 'ipodc-content');

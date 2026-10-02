@@ -6,7 +6,9 @@ ausgeliefert als statische Seite über GitHub Pages.
 
 Alle Inhalte (Menü, Texte, Links, Playlist, Downloads) stehen in einer einzigen Datei:
 [`public/config.json`](public/config.json). Für Textänderungen ist kein Build-Wissen nötig.
-Ausnahme sind die erzeugten Grafiken und PDFs, siehe [Assets neu erzeugen](#assets-neu-erzeugen).
+Social-Bild, Cover und PDFs lesen Name, Monogramm, E-Mail und Menüpunkte ebenfalls aus dieser
+Datei, müssen nach einer Namensänderung aber neu erzeugt werden, siehe
+[Assets neu erzeugen](#assets-neu-erzeugen).
 
 Sämtliche Grafiken (Favicon, Playlist-Cover, Social-Bild, PDFs) sind selbst gezeichnet und
 werden reproduzierbar aus Skripten in [`tools/`](tools/) erzeugt.
@@ -106,7 +108,11 @@ Je nach `type` kommen weitere Felder dazu:
 | `items[].label`   | String | Beschriftung des Eintrags                               |
 | `items[].file`    | String | Pfad zur Datei, z. B. `"downloads/media-kit.pdf"`       |
 | `items[].format`  | String | Dateiformat als Text, z. B. `"PDF"`                     |
-| `items[].size`    | String | Dateigröße als Text, z. B. `"387 kB"`                   |
+| `items[].size`    | String | Dateigröße als Text, z. B. `"292 kB"`                   |
+
+Die Datei am besten in `public/downloads/` ablegen. Eine Datei auf einem anderen Server (z. B.
+einem Cloud-Speicher) öffnet sich in einem neuen Tab, weil Browser dort nicht direkt
+herunterladen.
 
 ### `legal`
 
@@ -182,9 +188,9 @@ jederzeit mit „Intro überspringen“ oder Esc abbrechen; ohne WebGL entfällt
       "type": "downloads",
       "title": "Downloads",
       "items": [
-        { "label": "Portfolio 2026", "file": "downloads/portfolio-2026.pdf", "format": "PDF", "size": "440 kB" },
-        { "label": "Case Study: Projekt X", "file": "downloads/case-study-projekt-x.pdf", "format": "PDF", "size": "387 kB" },
-        { "label": "Media Kit", "file": "downloads/media-kit.pdf", "format": "PDF", "size": "387 kB" }
+        { "label": "Portfolio 2026", "file": "downloads/portfolio-2026.pdf", "format": "PDF", "size": "308 kB" },
+        { "label": "Case Study: Projekt X", "file": "downloads/case-study-projekt-x.pdf", "format": "PDF", "size": "289 kB" },
+        { "label": "Media Kit", "file": "downloads/media-kit.pdf", "format": "PDF", "size": "292 kB" }
       ]
     }
   ],
@@ -236,10 +242,12 @@ node tools/make-og.mjs         # og-image.png (1200x630)
 node tools/make-downloads.mjs  # die drei PDFs
 ```
 
-Die Skripte suchen sich ein Chromium in dieser Reihenfolge:
+Die Skripte suchen sich ein Chromium in dieser Reihenfolge (die Screenshot-Skripte in
+`scripts/` ebenso):
 
 1. Umgebungsvariable `CHROME_PATH`
-2. Chromium von Playwright (`npx playwright install chromium`)
+2. Chromium von Playwright (`npx playwright install chromium`; auch unter
+   `PLAYWRIGHT_BROWSERS_PATH`)
 3. System-Installation von Chrome, Chromium oder Edge
 
 Wird keines gefunden, bricht das Skript mit einem Hinweis ab. Ein anderer Pfad lässt sich
@@ -250,15 +258,13 @@ CHROME_PATH="/Pfad/zu/chromium" node tools/make-all.mjs
 ```
 
 Gestaltung und Farben liegen zentral in [`tools/lib/brand.mjs`](tools/lib/brand.mjs)
-(Palette, Monogramm, gezeichnete Motive) und [`tools/lib/pdf.mjs`](tools/lib/pdf.mjs)
+(Palette, gezeichnete Motive) und [`tools/lib/pdf.mjs`](tools/lib/pdf.mjs)
 (Seitenlayout der PDFs).
 
-> **Wichtig nach einer Namensänderung:** Die Skripte lesen `config.json` nicht. Name, Monogramm
-> und Tagline der Grafiken stehen in `brand` in [`tools/lib/brand.mjs`](tools/lib/brand.mjs), die
-> Untertitelzeile des Social-Bilds in [`tools/make-og.mjs`](tools/make-og.mjs), Texte und
-> Kontaktadresse der PDFs in [`tools/make-downloads.mjs`](tools/make-downloads.mjs). Dort
-> anpassen und danach `node tools/make-all.mjs` ausführen, sonst zeigen Social-Bild, Cover und
-> PDFs weiter „Dein Name“.
+> **Wichtig nach einer Namensänderung:** Die Skripte lesen `brand` (Name, Monogramm, E-Mail),
+> den Titel der Playlist und die Menüpunkte aus `public/config.json`. Nach einer Änderung dort
+> `node tools/make-all.mjs` ausführen, sonst zeigen Social-Bild, Cover und PDFs die alten
+> Angaben. Die übrigen PDF-Texte stehen in [`tools/make-downloads.mjs`](tools/make-downloads.mjs).
 
 ---
 
@@ -333,7 +339,7 @@ Aufbau, Ablauf und Modul-Schnittstellen im Detail: [`ARCHITECTURE.md`](ARCHITECT
 Favicon, Touch-Icon, Playlist-Cover, Social-Bild und die PDFs sind vollständig selbst
 gezeichnet (SVG und HTML, reine Geometrie). Es werden keine fremden Bilder und keine Logos
 verwendet. Die Player-Darstellung ist eine stilisierte Eigenzeichnung und zitiert nur die
-allgemeine Formensprache von Geräten dieser Bauart. Produktnamen wie „iPod“ (Fenstertitel,
-Seiteninhalt) und „Linktree“ (Abzeichen im Social-Bild) sind Marken ihrer Inhaber; sie werden
-nur beschreibend verwendet. Wer das vermeiden möchte, ändert `windowTitle` in `config.json` und
-das Abzeichen in [`tools/make-og.mjs`](tools/make-og.mjs).
+allgemeine Formensprache von Geräten dieser Bauart. Diese Aussage gilt für die Grafiken. Im
+Seitentext kommt der Produktname „iPod“ vor (Fenstertitel, Symbolname, Hinweis ohne JavaScript,
+Rechtsseiten); er ist eine Marke ihres Inhabers und wird nur beschreibend verwendet. Wer das
+vermeiden möchte, ändert `windowTitle` in `config.json` und die übrigen Stellen im Code.

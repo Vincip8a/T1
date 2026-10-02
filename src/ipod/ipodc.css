@@ -307,6 +307,10 @@
   hyphens: auto;
 }
 .ipodc-text:empty { display: none; }
+.ipodc-empty {
+  height: calc(var(--ipodc-p) * 200); display: flex; align-items: center; justify-content: center;
+  font: calc(var(--ipodc-p) * 13)/1 var(--ipodc-font); color: #808387;
+}
 .ipodc-text + .ipodc-list { box-shadow: 0 calc(var(--ipodc-p) * -1) #d3d5d8; }
 
 /* ───────────── Now Playing (6G layout) ───────────── */
@@ -437,7 +441,8 @@
   z-index: 9;
   display: grid;
   place-items: center;
-  background: #000;
+  /* the dark glass of the 3D intro's last frame: a faint diagonal sheen, not flat black */
+  background: linear-gradient(135deg, #0c0d10, #050506 45%, #000 72%);
 }
 .ipodc-boot[hidden] { display: none; }
 .ipodc-boot.is-out, .ipodc-boot-mono { opacity: 0; }
@@ -531,6 +536,20 @@
 .ipodc-pv.is-on .ipodc-pv-cover { animation: ipodc-pan 16s ease-in-out infinite alternate; }
 .ipodc-toast { transition: .18s; transition-property: opacity, transform; }
 .ipodc-toast.is-on { transform: translate(-50%, -50%) scale(1); }
+/* handoff: the intro canvas fades out over 220 ms; what its frontal last frame does not show (the drop
+   shadow, the hold switch and jack on the top edge) fades in with it instead of popping in */
+.ipodc.is-revealed { animation: ipodc-handoff .22s ease-out; }
+.ipodc.is-revealed .ipodc-edge { animation: ipodc-fade-in .22s ease-out; }
+@keyframes ipodc-handoff {
+  from {
+    box-shadow:
+      inset 0 0 0 calc(var(--ipodc-u) * .14) #54585e80,
+      inset 0 0 0 calc(var(--ipodc-u) * .34) #ffffff80,
+      inset 0 calc(var(--ipodc-u) * .45) calc(var(--ipodc-u) * .55) calc(var(--ipodc-u) * -.1) #ffffff80,
+      0 calc(var(--ipodc-u) * 1.2) calc(var(--ipodc-u) * 4) #0000;
+  }
+}
+@keyframes ipodc-fade-in { from { opacity: 0; } }
 .ipodc-boot { transition: opacity .32s; }
 .ipodc-boot-mono { transform: scale(.985); transition: opacity .34s, transform 1.2s ease-out; }
 .ipodc-boot.show-mono .ipodc-boot-mono { transform: none; }
@@ -545,6 +564,10 @@
 /* ───────────── forced colours / high contrast ───────────── */
 @media (forced-colors: active) {
   .ipodc, .ipodc-wheel, .ipodc-center { border: 1px solid CanvasText; }
-  .ipodc-hl { forced-color-adjust: none; background: Highlight; }
-  .ipodc-row.is-sel, .ipodc-row.is-sel * { forced-color-adjust: none; color: HighlightText; }
+  /* :is(...) carries the specificity of the Now Playing overrides above, so they lose here too */
+  :is(.ipodc-hl, .ipodc.is-centre .ipodc-screen--nowplaying .ipodc-hl, .ipodc-screen--nowplaying .ipodc-view:hover .ipodc-hl) {
+    forced-color-adjust: none; background: Highlight;
+  }
+  :is(.ipodc-row.is-sel, .ipodc.is-centre .ipodc-screen--nowplaying .ipodc-row.is-sel, .ipodc-screen--nowplaying .ipodc-view:hover .ipodc-row.is-sel),
+  :is(.ipodc-row.is-sel, .ipodc.is-centre .ipodc-screen--nowplaying .ipodc-row.is-sel) * { forced-color-adjust: none; color: HighlightText; }
 }

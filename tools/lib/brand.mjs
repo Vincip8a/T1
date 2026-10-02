@@ -1,12 +1,27 @@
 // Gemeinsame Gestaltung fuer alle generierten Assets: Farben, Schrift und die
 // selbst gezeichneten SVG-Motive (Player-Silhouette, Click Wheel, Monogramm).
-// Alle Motive sind reine Geometrie - keine fremden Bilder, keine Logos.
+// Alle Motive sind reine Geometrie, keine fremden Bilder, keine Logos.
 
+import { readFileSync } from 'node:fs'
+
+// Name, Monogramm, Tagline, E-Mail, Playlist-Titel und Menuepunkte kommen aus
+// public/config.json, damit Social-Bild, Cover und PDFs zur Seite passen.
+// Nach einer Aenderung dort: node tools/make-all.mjs
+const config = JSON.parse(readFileSync(new URL('../../public/config.json', import.meta.url), 'utf8'))
+const cfgBrand = config.brand ?? {}
+const menu = (Array.isArray(config.menu) ? config.menu : []).filter((m) => m && typeof m === 'object')
+
+/** Text fuer HTML- und SVG-Vorlagen: &, <, >, " und ' maskiert. */
+export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
+
+// Alle Werte sind bereits maskiert und duerfen direkt in Markup eingesetzt werden.
 export const brand = {
-  name: 'Dein Name',
-  monogram: 'DN',
-  tagline: 'Design, Code und Konzept',
-  playlistTitle: 'Meine Playlist',
+  name: esc(cfgBrand.name || 'Dein Name'),
+  monogram: esc(cfgBrand.monogram || 'DN'),
+  tagline: esc(cfgBrand.tagline ?? ''),
+  email: esc(cfgBrand.email || 'hallo@example.com'),
+  playlistTitle: esc(menu.find((m) => m.type === 'nowplaying')?.title || 'Playlist'),
+  menuLabels: menu.map((m) => esc(m.label ?? m.title ?? '')).filter(Boolean),
 }
 
 export const palette = {
@@ -68,7 +83,7 @@ function defs(ns) {
   </defs>`
 }
 
-/** Transport-Glyphen als Pfade - unabhaengig von installierten Schriften. */
+/** Transport-Glyphen als Pfade, unabhaengig von installierten Schriften. */
 function transportGlyphs(cx, cy, r, fill) {
   const s = r * 0.17
   const bar = s * 0.34
@@ -198,7 +213,7 @@ export function playlistCoverSvg() {
   const bars = [34, 58, 86, 70, 44, 96, 62, 38]
     .map((h, i) => `<rect x="${196 + i * 27}" y="${508 - h}" width="13" height="${h}" rx="6" fill="#ffffff" fill-opacity="${0.32 + (i % 3) * 0.14}"/>`)
     .join('\n  ')
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600" role="img" aria-label="${brand.playlistTitle} - Album-Cover">
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600" role="img" aria-label="${brand.playlistTitle}, Album-Cover">
   <defs>
     <linearGradient id="${ns}-bg" x1="0" y1="0" x2=".55" y2="1">
       <stop offset="0" stop-color="#8fd3ff"/>

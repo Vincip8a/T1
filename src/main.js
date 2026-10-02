@@ -64,16 +64,16 @@ const noteKeyboard = () => { usedKeyboard = true; };
 window.addEventListener('keydown', noteKeyboard, true);
 
 async function main() {
-  // start the intro chunk download immediately, in parallel with config.json
-  const webgl = hasWebGL2();
-  let introModP = webgl ? import('./intro/index.js') : null;
-  introModP?.catch(() => {}); // handled where it is awaited
-
+  // The built index.html already fetches the intro chunk with <link rel="modulepreload"> while this
+  // entry loads (vite.config.js, unless config.json turns the intro off), so it is imported only
+  // once config.json says the intro plays: no download or evaluation for nothing.
   let config;
   try {
     config = await loadConfig();
     if (!config || typeof config !== 'object') throw new Error('config.json: no object');
-  } catch {
+  } catch (err) {
+    // the visitor sees the short note; the site owner gets the reason (HTTP status, JSON syntax error)
+    console.error('[config] config.json could not be loaded:', err);
     showConfigError();
     return;
   }
@@ -81,7 +81,8 @@ async function main() {
   const brand = config.brand ?? {};
   if (brand.name) document.title = `${brand.name} · Links`;
   const introOff = [false, 'never', 'off'].includes(config.settings?.intro);
-  if (introOff) introModP = null;
+  const introModP = !introOff && hasWebGL2() ? import('./intro/index.js') : null;
+  introModP?.catch(() => {}); // handled where it is awaited
 
   // "Links" in the menu bar brings the main menu up, and restoring or a press on the metal focuses the
   // iPod's key target (ipod is assigned before any click can happen)
@@ -96,6 +97,8 @@ async function main() {
     let onSkipped;
     const skipP = new Promise((r) => { onSkipped = r; });
     const removeSkip = createSkipControl(() => { skipped = true; onSkipped(); intro?.skip(); });
+    // a quiet Aqua spinner in the empty window if the chunk takes a moment (CSS shows it after 600 ms)
+    desktop.el.classList.add('is-waiting');
     try {
       // a skip, or a chunk that is slow or stalls, must not keep the iPod hidden: whatever comes
       // first wins, and a chunk that lands after that is ignored
@@ -103,10 +106,19 @@ async function main() {
       if (!skipped && mod?.runIntro) {
         const { runIntro } = mod;
         intro = runIntro({ getTargetRect: () => ipod.getShellRect(), reducedMotion: prefersReducedMotion(), config });
+        // its setup runs as short tasks (the skip button keeps working, the spinner keeps turning);
+        // the test hook and the watchdog below start once it has settled
+        await Promise.race([intro.ready, intro.done]);
+        desktop.el.classList.remove('is-waiting');
         if (DEBUG) window.__intro = intro;
-        // safety net: a render loop that died must never leave the iPod hidden
-        const watchdog = setTimeout(() => intro.skip(), ((intro.duration || 0) * 3 + 12) * 1000);
-        await intro.done;
+        // safety net: a render loop that died must never leave the iPod hidden. The race does not
+        // rely on the intro at all; a late skip() only asks for the aligned frame (the canvas goes
+        // with dispose() below either way)
+        let watchdog = 0;
+        const late = new Promise((r) => { watchdog = setTimeout(r, ((intro.duration || 0) * 3 + 12) * 1000, 'late'); });
+        if (await Promise.race([intro.done, late]) === 'late') {
+          try { intro.skip(); } catch { /* render loop already broken */ }
+        }
         clearTimeout(watchdog);
       }
     } catch {
@@ -114,6 +126,7 @@ async function main() {
       try { intro?.dispose(); } catch { /* already gone */ }
       intro = null;
     }
+    desktop.el.classList.remove('is-waiting');
     removeSkip();
   }
 

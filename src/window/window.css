@@ -68,7 +68,10 @@
   padding: 0 9px; border-radius: 4px; text-decoration: none; cursor: default;
   text-shadow: 0 1px 0 rgba(255,255,255,.6);
 }
-.dt-bar-item:hover { background: linear-gradient(#5a9bf0, #2a64d8); color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.35); }
+@media (hover: hover) {
+  .dt-bar-item:hover { background: linear-gradient(#5a9bf0, #2a64d8); color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.35); }
+}
+.dt-bar-item:active { background: linear-gradient(#2a64d8, #1846a8); color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.4); }
 .dt-bar-item:focus-visible { outline: 2px solid #2a64d8; outline-offset: -2px; }
 .dt-bar-right { display: flex; align-items: center; height: 100%; min-width: 0; }
 .dt-legal { display: flex; align-items: center; height: 100%; gap: 2px; }
@@ -77,7 +80,10 @@
   padding: 0 6px; height: calc(var(--bar-h) - 4px); display: inline-flex; align-items: center; border-radius: 4px;
   text-shadow: 0 1px 0 rgba(255,255,255,.6);
 }
-.dt-legal-link:hover { background: linear-gradient(#5a9bf0, #2a64d8); color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.35); }
+@media (hover: hover) {
+  .dt-legal-link:hover { background: linear-gradient(#5a9bf0, #2a64d8); color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.35); }
+}
+.dt-legal-link:active { background: linear-gradient(#2a64d8, #1846a8); color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.4); }
 .dt-legal-link:focus-visible { outline: 2px solid #2a64d8; outline-offset: -2px; }
 .dt-clock { font-variant-numeric: tabular-nums; padding-left: 12px; text-shadow: 0 1px 0 rgba(255,255,255,.6); white-space: nowrap; }
 
@@ -123,7 +129,8 @@
 /* title bar */
 .dt-titlebar {
   position: relative; z-index: 2; flex: none; height: 24px;
-  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+  /* the side columns are at least as wide as the lights, so a long title stays centred and ellipsizes */
+  display: grid; grid-template-columns: minmax(var(--lights-w), 1fr) minmax(0, max-content) minmax(var(--lights-w), 1fr); column-gap: 8px; align-items: center;
   padding: 0 8px; touch-action: none; cursor: default;
   background: linear-gradient(to bottom, rgba(255,255,255,.62) 0%, rgba(255,255,255,.16) 50%, rgba(0,0,0,.05) 100%);
   border-bottom: 1px solid rgba(0,0,0,.32);
@@ -131,12 +138,17 @@
 }
 .dt-title {
   margin: 0; font-family: inherit; font-size: 13px; font-weight: 400; line-height: 1; text-align: center;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60vw;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 100%;
   color: #1c1c1c; text-shadow: 0 1px 0 rgba(255,255,255,.75);
 }
 
-/* glossy gel traffic lights */
-.dt-lights { display: flex; gap: 8px; align-items: center; }
+/* the title bar and the status bar never widen the window: it is as wide as the iPod plus metal
+   (width 0 drops their text from the window's size, min-width 100% fills it again) */
+.dt-titlebar, .dt-status { width: 0; min-width: 100%; }
+
+/* glossy gel traffic lights: 14 px gels, 24 px hit areas (::after) 24 px apart (WCAG 2.5.8) */
+.dt-win { --lights-w: calc(3 * 14px + 2 * 10px); }
+.dt-lights { display: flex; gap: 10px; align-items: center; }
 .dt-tl {
   --c1: #ff8a80; --c2: #e8261b; --c3: #8c0c06;
   appearance: none; position: relative; width: 14px; height: 14px; padding: 0; margin: 0;
@@ -152,17 +164,22 @@
   background: linear-gradient(to bottom, rgba(255,255,255,.92), rgba(255,255,255,.12));
   pointer-events: none;
 }
+.dt-tl::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; } /* 14 + 2×(6 - 1 border) = 24 px */
 .dt-tl svg { position: relative; width: 10px; height: 10px; opacity: 0; transition: opacity .1s; }
 .dt-tl svg path { fill: none; stroke: rgba(0,0,0,.62); stroke-width: 1.7; stroke-linecap: round; }
-.dt-lights:hover .dt-tl svg, .dt-tl:focus-visible svg { opacity: 1; }
+@media (hover: hover) { .dt-lights:hover .dt-tl svg { opacity: 1; } } /* no sticky glyphs after a tap */
+.dt-tl:focus-visible svg { opacity: 1; }
 .dt-tl-min  { --c1: #ffe38a; --c2: #f3b215; --c3: #94670a; }
 .dt-tl-zoom { --c1: #a6f08a; --c2: #3cb52a; --c3: #1c6b12; }
 .dt-tl:active { filter: brightness(.82); }
 .dt-tl:focus-visible { outline: 2px solid #fff; outline-offset: 1px; box-shadow: 0 0 0 4px rgba(20,90,220,.8); }
 .dt.is-locked .dt-tl { filter: saturate(.55) brightness(1.05); }
+/* phone: zoom has nothing to do, the light is a clear grey gel without its glyph (Aqua's disabled light) */
+.dt.is-zoom-off .dt-tl-zoom { filter: grayscale(1) brightness(1.18); opacity: .7; }
+.dt.is-zoom-off .dt-tl-zoom svg { display: none; }
 .dt.is-locked .dt-titlebar, .dt.is-locked .dt-lights { pointer-events: none; }
 
-/* content: iPod centred, size driven by --ipod-h.
+/* content: iPod centred, size driven by --ipod-h (--ipod-aspect = width / height, set from ipodSpec.js).
    --ipod-floor: with a mouse or trackpad the iPod never gets smaller than 500 CSS px, so browser zoom
    enlarges its text (WCAG 1.4.4) and the stage scrolls instead; touch screens size it to fit. */
 .dt-content {
@@ -181,11 +198,11 @@
   .dt.is-zoomed .dt-content { --ipod-h: max(var(--ipod-floor), min(calc(100svh - 150px), 780px)); }
 }
 @media (pointer: fine) { .dt-content { --ipod-floor: 500px; } }
-.dt.is-zooming .dt-content { transition: --ipod-h .34s cubic-bezier(.3,.7,.2,1); }
 
 .dt-status {
+  /* a block, not a flex box: text-overflow only ellipsizes a block's own text (a long tagline) */
   position: relative; z-index: 1; flex: none; height: 22px;
-  display: flex; align-items: center; justify-content: center;
+  display: block; line-height: 21px; text-align: center;
   font-size: 11px; color: #3a3a3a; text-shadow: 0 1px 0 rgba(255,255,255,.7);
   border-top: 1px solid rgba(0,0,0,.26);
   background: linear-gradient(to bottom, rgba(255,255,255,.4), rgba(255,255,255,.08));
@@ -225,8 +242,14 @@
   color: #fff; font-size: 12px; line-height: 1; padding: 3px 8px; border-radius: 9px;
   text-shadow: 0 1px 2px rgba(0,0,0,.85);
 }
-.dt-icon:hover .dt-icon-label, .dt-icon:focus-visible .dt-icon-label {
+.dt-icon:active .dt-icon-art { filter: brightness(.7); } /* pressed, like a Dock icon */
+.dt-icon:focus-visible .dt-icon-label, .dt-icon:active .dt-icon-label {
   background: linear-gradient(#4a8fe8, #1e56c8); box-shadow: 0 1px 2px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.35);
+}
+@media (hover: hover) {
+  .dt-icon:hover .dt-icon-label {
+    background: linear-gradient(#4a8fe8, #1e56c8); box-shadow: 0 1px 2px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.35);
+  }
 }
 .dt-icon:focus-visible { outline: 2px solid rgba(255,255,255,.85); outline-offset: 1px; }
 
@@ -239,13 +262,12 @@
   .dt-pos { width: 100%; transform: none; }
   .dt-win { width: 100%; }
   .dt-content, .dt.is-zoomed .dt-content {
-    --ipod-h: max(var(--ipod-floor), min(calc(100vh - 96px), calc((100vw - 38px) * 103.5 / 61.8)));
+    --ipod-h: max(var(--ipod-floor), min(calc(100vh - 96px), calc((100vw - 38px) / var(--ipod-aspect))));
     padding: 12px 10px 14px;
   }
   @supports (height: 1svh) {
-    .dt-content, .dt.is-zoomed .dt-content { --ipod-h: max(var(--ipod-floor), min(calc(100svh - 96px), calc((100vw - 38px) * 103.5 / 61.8))); }
+    .dt-content, .dt.is-zoomed .dt-content { --ipod-h: max(var(--ipod-floor), min(calc(100svh - 96px), calc((100vw - 38px) / var(--ipod-aspect)))); }
   }
-  .dt-title { max-width: 52vw; }
   .dt-status { display: none; }
   .dt-icon { right: 14px; bottom: 14px; }
   .dt-brand { padding-right: 4px; }
@@ -254,6 +276,9 @@
   .dt-legal-link { padding: 0 4px; }
   .dt-clock { padding-left: 6px; }
 }
+
+/* the narrowest phones (320 px): the clock gives way, so Kontakt and the legal links keep their room */
+@media (max-width: 359.98px) { .dt-clock { display: none; } }
 
 /* ---------- short screens (a phone turned sideways, a netbook, a zoomed-in browser) ----------
    Same height budget as the mobile sheet (90px + 6px air): compact padding, no status bar. */
@@ -264,9 +289,32 @@
   }
   .dt-status { display: none; }
 }
+/* a short window at 100 % zoom: no floor, the iPod fits without scrolling. CSS cannot tell browser
+   zoom from a HiDPI screen, so two cues mark "not zoomed in": a 1x resolution (zoom raises it), or a
+   wide-but-short window (zoom shrinks both sides: 1440 x 900 at 200 % is 720 x 450, while a Retina
+   or 125 %/150 % laptop window keeps 1024+ CSS px of width). Zoomed in, the 500 px floor applies
+   again (WCAG 1.4.4). */
+@media (min-width: 640px) and (max-height: 640px) and (max-resolution: 1dppx),
+       (min-width: 1024px) and (max-height: 640px) {
+  .dt-content { --ipod-floor: 0px; }
+}
+
+/* waiting for the intro chunk: a small Aqua spinner in the empty window, only after 600 ms */
+.dt.is-waiting .dt-content::after {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px;
+  border-radius: 50%; pointer-events: none; opacity: 0;
+  background: conic-gradient(from 0deg, rgba(40,40,40,.08), rgba(40,40,40,.75));
+  -webkit-mask: repeating-conic-gradient(#000 0 13deg, transparent 13deg 30deg), radial-gradient(circle, transparent 0 7px, #000 7.5px);
+  -webkit-mask-composite: source-in;
+  mask: repeating-conic-gradient(#000 0 13deg, transparent 13deg 30deg), radial-gradient(circle, transparent 0 7px, #000 7.5px);
+  mask-composite: intersect;
+  animation: dt-wait-in .3s .6s forwards, dt-wait-spin 1s steps(12) infinite;
+}
+@keyframes dt-wait-in { to { opacity: 1; } }
+@keyframes dt-wait-spin { to { transform: rotate(360deg); } }
 
 @media (prefers-reduced-motion: reduce) {
   .dt-wall-drift { animation: none; }
-  .dt.is-zooming .dt-content { transition: none; }
+  .dt.is-waiting .dt-content::after { animation: dt-wait-in .3s .6s forwards; }
   .dt-icon.is-arriving .dt-icon-art { animation: none; }
 }

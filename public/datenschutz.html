@@ -17,24 +17,61 @@
     font: 13px/1.55 "Lucida Grande", "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif; color: #1c1c1c;
     -webkit-font-smoothing: antialiased;
     background:
-      radial-gradient(60% 38% at 22% 108%, rgba(255,255,255,.55), rgba(255,255,255,0) 70%),
-      radial-gradient(46% 30% at 82% 98%, rgba(190,235,255,.55), rgba(190,235,255,0) 70%),
-      radial-gradient(40% 52% at 8% 22%, rgba(110,215,255,.50), rgba(110,215,255,0) 70%),
       radial-gradient(130% 100% at 50% 118%, #6cc0f7 0%, #3f9bea 36%, #1f6fd0 62%, #12489f 100%) fixed;
     background-color: #1f6fd0;
   }
+  /* the same desktop as the main page (src/window/window.css): drifting wallpaper, grain, vignette */
+  body::before, body::after { content: ''; position: fixed; z-index: -1; pointer-events: none; }
+  body::before {
+    inset: -12%;
+    background:
+      radial-gradient(60% 38% at 22% 108%, rgba(255,255,255,.55), rgba(255,255,255,0) 70%),
+      radial-gradient(46% 30% at 82% 98%, rgba(190,235,255,.55), rgba(190,235,255,0) 70%),
+      radial-gradient(34% 22% at 70% 16%, rgba(255,255,255,.28), rgba(255,255,255,0) 72%),
+      radial-gradient(40% 52% at 8% 22%, rgba(110,215,255,.50), rgba(110,215,255,0) 70%),
+      conic-gradient(from 196deg at 64% 138%,
+        rgba(255,255,255,0) 0deg, rgba(255,255,255,.34) 22deg, rgba(120,200,255,.0) 46deg,
+        rgba(255,255,255,0) 130deg, rgba(160,225,255,.30) 168deg, rgba(255,255,255,0) 210deg,
+        rgba(255,255,255,0) 360deg),
+      radial-gradient(130% 100% at 50% 118%, #6cc0f7 0%, #3f9bea 36%, #1f6fd0 62%, #12489f 100%);
+    animation: drift 70s ease-in-out infinite alternate;
+  }
+  body::after {
+    inset: 0; opacity: .5; mix-blend-mode: soft-light;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  html::after { /* soft vignette */
+    content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background: radial-gradient(120% 100% at 50% 40%, rgba(0,0,0,0) 55%, rgba(0,20,70,.26) 100%);
+  }
+  @keyframes drift {
+    0%   { transform: translate3d(-2%, -1%, 0) rotate(-1.2deg) scale(1.02); }
+    100% { transform: translate3d(2.5%, 1.5%, 0) rotate(1.4deg) scale(1.08); }
+  }
+  @media (prefers-reduced-motion: reduce) { body::before { animation: none; transform: translate3d(-2%, -1%, 0) rotate(-1.2deg) scale(1.02); } }
+  /* menu bar as on the main page: monogram, name, one menu item; legal links and the clock right */
   .bar {
     position: fixed; top: 0; left: 0; right: 0; height: 22px; z-index: 2;
-    display: flex; align-items: center; padding: 0 12px; gap: 14px;
-    background: linear-gradient(to bottom, rgba(255,255,255,.95), rgba(246,246,246,.92) 48%, rgba(224,224,224,.92));
-    border-bottom: 1px solid rgba(0,0,0,.42); box-shadow: 0 1px 4px rgba(0,30,90,.28);
+    display: flex; align-items: center; padding: 0 10px 0 6px; line-height: 1;
+    background: linear-gradient(to bottom, rgba(255,255,255,.93), rgba(246,246,246,.9) 48%, rgba(224,224,224,.9));
+    -webkit-backdrop-filter: blur(10px) saturate(1.4); backdrop-filter: blur(10px) saturate(1.4);
+    border-bottom: 1px solid rgba(0,0,0,.42); box-shadow: 0 1px 4px rgba(0,30,90,.28), inset 0 -1px 0 rgba(255,255,255,.35);
   }
-  .bar a { color: #000; text-decoration: none; padding: 2px 6px; border-radius: 4px; }
-  .bar a:first-child { font-weight: 700; }
-  .bar a:hover { background: linear-gradient(#5a9bf0, #2a64d8); color: #fff; }
-  .bar .right { margin-left: auto; display: flex; gap: 4px; font-size: 11px; }
-  .bar .right a { color: #3a3a3a; font-weight: 400; }
+  .bar .mono { font-weight: 800; font-size: 12px; letter-spacing: -.02em; padding: 0 9px 0 6px; }
+  .bar .brand { font-weight: 700; padding: 0 9px; white-space: nowrap; }
+  .bar .mono:empty, .bar .brand:empty { display: none; }
+  .bar a { color: #000; text-decoration: none; padding: 0 9px; height: 20px; display: inline-flex; align-items: center; border-radius: 4px; white-space: nowrap; }
+  @media (hover: hover) { .bar a:hover { background: linear-gradient(#5a9bf0, #2a64d8); color: #fff; } }
+  .bar a:active { background: linear-gradient(#2a64d8, #1846a8); color: #fff; }
+  .bar a:focus-visible { outline-offset: -2px; } /* inset, like the main menu bar: never cut at the top edge */
+  .bar .right { margin-left: auto; display: flex; align-items: center; gap: 2px; font-size: 11px; }
+  .bar .legal { display: flex; align-items: center; gap: 2px; }
+  .bar .right a { color: #3a3a3a; padding: 0 6px; height: 18px; }
   .bar .right a[aria-current] { color: #000; font-weight: 700; }
+  .bar .clock { font-size: 13px; font-variant-numeric: tabular-nums; padding-left: 12px; white-space: nowrap; }
+  .bar .clock:empty { display: none; }
+  @media (max-width: 560px) { .bar .brand { display: none; } .bar .clock { padding-left: 6px; } }
+  @media (max-width: 400px) { .bar .clock { display: none; } .bar a, .bar .right a { padding: 0 4px; } }
   .win {
     position: relative; width: 100%; max-width: 620px; overflow: hidden;
     border: 1px solid rgba(0,0,0,.62); border-radius: 8px 8px 5px 5px;
@@ -50,8 +87,12 @@
     background: linear-gradient(to bottom, rgba(255,255,255,.62), rgba(255,255,255,.16) 50%, rgba(0,0,0,.05));
     border-bottom: 1px solid rgba(0,0,0,.32); box-shadow: 0 1px 0 rgba(255,255,255,.35);
   }
-  .lights { display: flex; gap: 8px; }
-  .lights i { width: 14px; height: 14px; border-radius: 50%; border: 1px solid #8c0c06;
+  .lights { display: flex; gap: 10px; }
+  .lights i::before { /* top gloss */
+    content: ''; position: absolute; left: 2px; right: 2px; top: 1px; height: 6px; border-radius: 6px 6px 4px 4px;
+    background: linear-gradient(to bottom, rgba(255,255,255,.92), rgba(255,255,255,.12));
+  }
+  .lights i { position: relative; width: 14px; height: 14px; border-radius: 50%; border: 1px solid #8c0c06;
     background: radial-gradient(70% 55% at 50% 118%, #ff8a80, rgba(255,255,255,0) 72%), linear-gradient(#e8261b, #8c0c06 150%);
     box-shadow: inset 0 1px 1px rgba(255,255,255,.35), 0 1px 0 rgba(255,255,255,.65); }
   .lights i:nth-child(2) { border-color: #94670a; background: radial-gradient(70% 55% at 50% 118%, #ffe38a, rgba(255,255,255,0) 72%), linear-gradient(#f3b215, #94670a 150%); }
@@ -79,7 +120,7 @@
 </style>
 </head>
 <body>
-<header class="bar"><a href="./">Zurück zum iPod</a><nav class="right" aria-label="Rechtliches"><a href="impressum.html">Impressum</a><a href="datenschutz.html" aria-current="page">Datenschutz</a></nav></header>
+<header class="bar"><span class="mono" data-brand="monogram" aria-hidden="true"></span><strong class="brand" data-brand="name"></strong><a href="./">Zurück zum iPod</a><div class="right"><nav class="legal" aria-label="Rechtliches"><a href="impressum.html">Impressum</a><a href="datenschutz.html" aria-current="page">Datenschutz</a></nav><time class="clock"></time></div></header>
 <main class="win" aria-labelledby="wt">
   <div class="titlebar"><div class="lights" aria-hidden="true"><i></i><i></i><i></i></div><h1 id="wt">Datenschutz</h1><span></span></div>
   <div class="content">
@@ -99,5 +140,18 @@
   </div>
   <div class="foot"><a class="btn" href="./">Zurück zum iPod</a></div>
 </main>
+<script>
+  // menu bar: monogram and name from config.json (as on the main page), and the clock
+  window.fillBar = (root) => {
+    const clock = document.querySelector('.bar .clock');
+    const fmt = new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' });
+    const tick = () => { clock.textContent = fmt.format(new Date()); setTimeout(tick, 60050 - (Date.now() % 60000)); };
+    tick();
+    fetch(root + 'config.json', { cache: 'no-cache' }).then((r) => r.json()).then((c) => {
+      for (const el of document.querySelectorAll('.bar [data-brand]')) el.textContent = String(c?.brand?.[el.dataset.brand] ?? '');
+    }).catch(() => {});
+  };
+</script>
+<script>fillBar('./');</script>
 </body>
 </html>

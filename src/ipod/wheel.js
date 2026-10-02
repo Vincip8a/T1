@@ -32,7 +32,7 @@ export function createWheel(wheel, on, { onStep, onPress, onDown }) {
     if (e.button || g || e.target.closest('.ipodc-center')) return;
     const r = wheel.getBoundingClientRect();
     const R = r.width / 2;
-    g = { id: e.pointerId, cx: r.left + R, cy: r.top + R, R, acc: 0, total: 0, v: 0, t: e.timeStamp, drag: false };
+    g = { id: e.pointerId, cx: r.left + R, cy: r.top + R, R, acc: 0, rev: 0, total: 0, v: 0, t: e.timeStamp, drag: false };
     const a = angle(e);
     if (Math.hypot(e.clientX - g.cx, e.clientY - g.cy) > R + 2) return void (g = null);
     e.preventDefault();
@@ -49,9 +49,16 @@ export function createWheel(wheel, on, { onStep, onPress, onDown }) {
     const d = g.last == null || a == null ? 0 : ((a - g.last + 540) % 360) - 180;
     g.last = a;
     if (!d) return;
-    // a clear reversal answers on the very next detent instead of first unwinding the remainder
-    if (Math.abs(d) > 2.5 && g.acc * d < 0) g.acc = 0;
-    g.acc += d; // counted from the first degree, so a slow arc never loses a step
+    // a reversal answers after one full detent instead of first unwinding the old direction's
+    // remainder: once the finger has turned back 2 degrees (less is jitter), that remainder is
+    // dropped and the reverse arc counts on its own, however slowly it is drawn
+    if (g.acc * d < 0) {
+      g.rev += d;
+      if (Math.abs(g.rev) >= 2) { g.acc = g.rev; g.rev = 0; } else g.acc += d;
+    } else {
+      g.rev = 0;
+      g.acc += d; // counted from the first degree, so a slow arc never loses a step
+    }
     g.total += Math.abs(d);
     const dt = Math.max(1, e.timeStamp - g.t);
     g.t = e.timeStamp;
