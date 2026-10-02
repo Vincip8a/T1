@@ -120,7 +120,7 @@ Dateinamen; eine Zeile ganz ohne Angaben wird mit einem Hinweis in der Browser-K
 | `items[].label`   | String | Beschriftung des Eintrags                               |
 | `items[].file`    | String | Pfad zur Datei, z. B. `"downloads/media-kit.pdf"`       |
 | `items[].format`  | String | Dateiformat als Text, z. B. `"PDF"`                     |
-| `items[].size`    | String | Dateigröße als Text, z. B. `"292 kB"` (1 kB = 1000 Byte) |
+| `items[].size`    | String | Dateigröße als Text, z. B. `"386 kB"`. Für Dateien in `public/` trägt der Build die echte Größe automatisch ein |
 
 Die Datei am besten in `public/downloads/` ablegen. Eine Datei auf einem anderen Server (z. B.
 einem Cloud-Speicher) öffnet sich in einem neuen Tab, weil Browser dort nicht direkt
@@ -209,9 +209,9 @@ Download ihres Skripts: dafür neu bauen.
       "type": "downloads",
       "title": "Downloads",
       "items": [
-        { "label": "Portfolio 2026", "file": "downloads/portfolio-2026.pdf", "format": "PDF", "size": "308 kB" },
-        { "label": "Case Study: Projekt X", "file": "downloads/case-study-projekt-x.pdf", "format": "PDF", "size": "289 kB" },
-        { "label": "Media Kit", "file": "downloads/media-kit.pdf", "format": "PDF", "size": "292 kB" }
+        { "label": "Portfolio 2026", "file": "downloads/portfolio-2026.pdf", "format": "PDF", "size": "440 kB" },
+        { "label": "Case Study: Projekt X", "file": "downloads/case-study-projekt-x.pdf", "format": "PDF", "size": "386 kB" },
+        { "label": "Media Kit", "file": "downloads/media-kit.pdf", "format": "PDF", "size": "386 kB" }
       ]
     }
   ],
@@ -236,12 +236,11 @@ Zahlen und Kontaktdaten darin sind frei erfunden und als Platzhalter gekennzeich
 So ersetzt du sie durch eigene:
 
 1. Eigenes PDF nach `public/downloads/` legen.
-2. In `public/config.json` im `downloads`-Eintrag `file`, `label`, `format` und `size`
-   auf die neue Datei anpassen.
-3. Dateigröße ermitteln: `node tools/file-sizes.mjs` gibt für jede Datei in
-   `public/downloads/` die fertige Zeile zum Einfügen aus, z. B. `"size": "308 kB"`
-   (1 kB = 1000 Byte, auf ganze kB gerundet; ab 1 MB z. B. `"1,2 MB"`). Bitte nicht `du`
-   nehmen: es rundet auf und zeigt dann oft 1 kB mehr.
+2. In `public/config.json` im `downloads`-Eintrag `file`, `label` und `format` auf die neue
+   Datei anpassen. Die Dateigröße (`size`) musst du nicht pflegen: Beim Bauen und im
+   Entwicklungsserver wird sie aus der echten Datei berechnet (1 kB = 1000 Byte, z. B.
+   `"386 kB"`, ab 1 MB `"1,2 MB"`). Nur für Dateien auf einem anderen Server gilt der Wert aus
+   `config.json`. Zum Nachsehen gibt `node tools/file-sizes.mjs` die Größen aus.
 
 Alternativ die Platzhalter weiterverwenden und nur die Texte austauschen: Die Inhalte stehen
 als HTML-Vorlagen in [`tools/make-downloads.mjs`](tools/make-downloads.mjs). Nach dem Ändern
@@ -250,8 +249,8 @@ als HTML-Vorlagen in [`tools/make-downloads.mjs`](tools/make-downloads.mjs). Nac
 node tools/make-downloads.mjs
 ```
 
-ausführen. Das überschreibt die drei PDFs und gibt die neuen Dateigrößen schon in der Form für
-`config.json` aus (`"size": "308 kB"`).
+ausführen. Das überschreibt die drei PDFs; die Größen im Downloads-Menü zieht der nächste Build
+von selbst nach.
 
 ---
 

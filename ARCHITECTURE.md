@@ -34,8 +34,10 @@ While the chunk is still on its way, a small Aqua spinner appears in the empty w
 (`INTRO_CHUNK_MS`; a chunk that lands later is ignored), a setup (shaders, textures) over 4 s
 (`INTRO_SETUP_MS`; not with the test hooks, dev or `?debug`), an exception in `runIntro`, a lost
 WebGL context, or `settings.intro` off all skip the intro and reveal the iPod directly. On a slow device the intro
-skips frames rather than playing in slow motion; if the median frame stays over 50 ms it first
-drops the pixel ratio to 1, then hands off early. A watchdog (intro length + 6 s after its setup)
+skips frames rather than playing in slow motion. It watches windows of 12 frames: when a quarter
+of them miss 60 Hz (over 24 ms) the pixel ratio steps down 2 → 1.5 → 1 (WebKit and Firefox drawing
+the full-window canvas at 2x lock to 30 Hz or drop frames where Chrome holds 60); a median over
+50 ms drops it to 1 at once and, at 1, hands off early. A watchdog (intro length + 6 s after its setup)
 reveals the iPod even if the render loop dies (it races `intro.done`, it does not rely on the
 intro). If `config.json` cannot be loaded, the window shows a short German error with a reload
 button and the Impressum / Datenschutz links (`config.legal` as it was at build time, `__LEGAL__`),
@@ -196,7 +198,9 @@ changing them.
   - `page`: `body` text and `actions[]` of `{ label, href, lang? }`.
   - `nowplaying`: `artist`, `cover`, `spotifyUrl` (any streaming address; the button names the
     service, `serviceName`), `tracks[]` of `{ title, artist, duration }`.
-  - `downloads`: `items[]` of `{ label, file, format, size }` (`size` like `"308 kB"`, SI); rows
+  - `downloads`: `items[]` of `{ label, file, format, size }` (`size` like `"308 kB"`, SI; for a file
+    in the site the build and the dev server set it from the file itself, see `downloadSizes` in
+    vite.config.js); rows
     are `<a download>` (a file on another origin opens in a new tab).
   - A row without `label` shows its detail, address or file name (`rowLabel`).
 - `legal`: `{ impressum, datenschutz }`, path or URL of each legal page (a missing one has no

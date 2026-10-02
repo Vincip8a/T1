@@ -1,8 +1,10 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import { linkAttrs, fileName, rowLabel, langOf, safeHref, serviceName, firstText } from './src/shared/href.js';
 import { introEnabled } from './src/shared/config.js';
+import { formatSize } from './tools/lib/size.mjs';
 
 const CONFIG_PATH = fileURLToPath(new URL('./public/config.json', import.meta.url));
 // a typo in the hand-edited file must name the file, not "failed to load config from vite.config.js"
@@ -138,6 +140,47 @@ function configHtml() {
   };
 }
 
+/** `size` of every download that lives in the site (`file` relative to it), set from the file itself in
+ *  `dir`; a download elsewhere keeps the `size` written in config.json */
+function withSizes(config, dir) {
+  for (const entry of Array.isArray(config.menu) ? config.menu : []) {
+    for (const item of entry?.type === 'downloads' && Array.isArray(entry.items) ? entry.items : []) {
+      const file = typeof item?.file === 'string' ? item.file.split(/[?#]/)[0] : '';
+      if (!file || /^([a-z][a-z\d+.-]*:|\/\/)/i.test(file)) continue;
+      const path = resolve(dir, decodeURIComponent(file.replace(/^\.?\//, '')));
+      if (relative(dir, path).startsWith('..') || !existsSync(path)) continue;
+      item.size = formatSize(statSync(path).size);
+    }
+  }
+  return config;
+}
+
+/** Download sizes are never stale: the built config.json (and the one the dev server hands out) carries
+ *  the real size of each file in the site, so a replaced PDF needs no hand-edited `size`. */
+function downloadSizes() {
+  let outDir = '', publicDir = '';
+  return {
+    name: 'download-sizes',
+    configResolved(c) { outDir = resolve(c.root, c.build.outDir); publicDir = c.publicDir; },
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url?.split('?')[0] !== '/config.json') return next();
+        let config;
+        try { config = readConfig(); } catch { return next(); } // the browser then gets the file and its error
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.end(JSON.stringify(withSizes(config, publicDir), null, 2));
+      });
+    },
+    closeBundle() {
+      const path = join(outDir, 'config.json');
+      if (!existsSync(path)) return;
+      const config = JSON.parse(readFileSync(path, 'utf8'));
+      writeFileSync(path, `${JSON.stringify(withSizes(config, outDir), null, 2)}\n`);
+    },
+  };
+}
+
 /** Preload for the lazily imported intro chunk: its download starts while the HTML is parsed, not after
  *  the entry ran and config.json arrived (main.js imports it only then). A tiny inline script adds the
  *  <link rel="modulepreload"> only where the intro will play: a WebGL 2 context can really be created (the
@@ -172,7 +215,7 @@ export default defineConfig({
   base: './',
   // the lazily loaded intro chunk carries three.js (~610 kB minified, ~160 kB gzip) by design
   build: { target: 'es2022', chunkSizeWarningLimit: 700 },
-  plugins: [configHtml(), introPreload()],
+  plugins: [configHtml(), introPreload(), downloadSizes()],
   // config.legal at build time: the config error window still links the Impressum and Datenschutz
   define: { __LEGAL__: JSON.stringify(readConfig().legal ?? null) },
   server: {

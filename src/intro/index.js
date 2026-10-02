@@ -11,10 +11,12 @@ const { PI, abs, cos, exp, max, min, sign, sin, sqrt, tan } = Math;
 const DEG = PI / 180, HALF_D = IPOD.depth / 2;
 const FOV_HERO = 26, FOV_END = 20, tHero = tan(13 * DEG);
 const STILL = 6.32, D = STILL + 0.22, FADE_MS = 220; // static tail: aligned and still from STILL to D
-// frame-time watch: a median frame slower than SLOW_MS (under 20 fps) first drops the pixel ratio to 1,
-// then hands off to the DOM iPod; a slow frame advances the intro by at most MAX_STEP (it skips frames
-// rather than playing in slow motion)
-const SLOW_MS = 50, WATCH_N = 6, MAX_STEP = 0.25;
+// frame-time watch over windows of WATCH_N frames: when a quarter of them miss 60 Hz (JANK_MS) the pixel
+// ratio steps down along DPR_STEPS (WebKit and Firefox drawing the full-window canvas at 2x lock to 30 Hz
+// or drop frames where Chrome holds 60); a median slower than SLOW_MS (under 20 fps) drops it to 1 at
+// once, and at 1 hands off to the DOM iPod. A slow frame advances the intro by at most MAX_STEP (it skips
+// frames rather than playing in slow motion).
+const JANK_MS = 24, SLOW_MS = 50, WATCH_N = 12, MAX_STEP = 0.25, DPR_STEPS = [1.5, 1];
 const SHADOW_FEATHER = 24; // css px: the floor shadow fades out towards the window edges
 const ENV_END = 0.25, GLASS_FROM = 2.75, GLASS_END = 2.27, GLASS_Z = PI / 4;
 const WHEEL_GLOW = 0.24, CENTRE_GLOW = 0.3, END_EXPOSURE = 0.9, KEY_END = 0.9; // = DOM iPod tone
@@ -436,11 +438,14 @@ function start({ getTargetRect, getFrameRect, reducedMotion = false, config = nu
   function watchFrames(dt) {
     frameMs.push(dt);
     if (frameMs.length < WATCH_N) return;
-    const median = frameMs.sort((a, b) => a - b)[WATCH_N >> 1];
+    const sorted = frameMs.sort((a, b) => a - b), median = sorted[WATCH_N >> 1];
+    const janky = sorted.filter((ms) => ms > JANK_MS).length * 4 >= WATCH_N;
     frameMs = [];
-    if (median <= SLOW_MS) return;
-    if (L.dpr > 1) L.maxDpr = 1; // layout() applies it on the next pose
-    else finish(); // still too slow: the aligned final frame, then the DOM iPod
+    // layout() applies a new maxDpr on the next pose
+    if (median > SLOW_MS) {
+      if (L.dpr > 1) L.maxDpr = 1;
+      else finish(); // still too slow: the aligned final frame, then the DOM iPod
+    } else if (janky && L.dpr > 1) L.maxDpr = DPR_STEPS.find((d) => d < L.dpr) ?? 1;
   }
   function frame(now) {
     if (!playing || disposed) return;
