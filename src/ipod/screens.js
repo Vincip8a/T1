@@ -12,15 +12,23 @@ export function createScreens(ctx) {
   const { L, brand, nid, timers } = ctx;
   const mono = brand.monogram ?? '';
 
-  /** One option row. A link row IS the real <a> (role=option), so no focusable element is nested
-   *  inside an option; its link nature is given via aria-description and modifier clicks stay native. */
+  /** One row. A link row IS the real <a>: on screens of links it takes keyboard focus itself (roving
+   *  tabindex, see listScreen), so screen readers meet a real link; modifier clicks stay native.
+   *  Other rows are options of the iPod listbox. */
   function makeRow(spec) {
     const href = spec.href && safeHref(spec.href);
     const row = h(href ? 'a' : 'div', 'ipodc-row', { role: 'option', id: nid('o'), 'aria-selected': 'false' });
     if (href) {
       Object.assign(row, { href, tabIndex: -1, draggable: false });
       let desc = L.link;
-      if (spec.download != null) { row.download = spec.download; desc = L.download; } else if (/^https?:/i.test(href)) { row.target = '_blank'; row.rel = 'noopener'; desc = L.newTab; } else if (/^mailto:/i.test(href)) desc = L.mail;
+      const web = /^https?:/i.test(href);
+      const newTab = () => { row.target = '_blank'; row.rel = 'noopener'; };
+      if (spec.download != null) {
+        row.download = spec.download;
+        desc = L.download;
+        // browsers ignore `download` on other origins and would navigate the page away: new tab instead
+        if (web && new URL(href, location.href).origin !== location.origin) newTab();
+      } else if (web) { newTab(); desc = L.newTab; } else if (/^mailto:/i.test(href)) desc = L.mail;
       row.setAttribute('aria-description', desc);
     }
     row.append(h('span', 'ipodc-row-label', { text: spec.label ?? '' }));
@@ -40,6 +48,10 @@ export function createScreens(ctx) {
     const sb = h('div', 'ipodc-sb');
     const thumb = h('div', 'ipodc-sb-thumb');
     const rows = specs.map(makeRow);
+    // a screen with links is a group of real links with a roving tabindex (index.js moves DOM focus to
+    // the current row); a screen without links stays an option list of the iPod listbox
+    const roving = rows.some((r) => r.href);
+    if (roving) for (const r of rows) { r.removeAttribute('role'); r.removeAttribute('aria-selected'); r.tabIndex = -1; }
     const css = (n, k, v) => n.style.setProperty(`--ipodc-${k}`, v);
     list.append(hl, ...rows);
     if (pre) content.append(pre);
@@ -56,8 +68,8 @@ export function createScreens(ctx) {
     const page = kind === 'page';
 
     const s = {
-      kind, id, title: title ?? '', node, rows, specs, index: 0, off: 0, top: 0, contentH: 0, viewH: 218, enteredAt: 0,
-      adId: () => (rows[s.index] ?? pre)?.id,
+      kind, id, title: title ?? '', node, rows, specs, roving, index: 0, off: 0, top: 0, contentH: 0, viewH: 218, enteredAt: 0,
+      adId: () => (roving ? null : (rows[s.index] ?? pre)?.id),
       measure() {
         const k = ctx.pxPer();
         s.top = pre ? Math.round(pre.offsetHeight / k) : 0;
@@ -100,7 +112,7 @@ export function createScreens(ctx) {
         const changed = i !== s.index;
         for (const [n, on] of [[rows[s.index], false], [rows[i], true]]) {
           n.classList.toggle('is-sel', on);
-          n.setAttribute('aria-selected', on);
+          if (!roving) n.setAttribute('aria-selected', on);
         }
         s.index = i;
         if (ensure) s.off = clamp(s.off + s.need(i), 0, s.maxOff());

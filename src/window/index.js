@@ -1,8 +1,9 @@
 // Aqua-era desktop + brushed-metal window that frames the iPod.
-// API (see ARCHITECTURE.md): createDesktop(host, { config }) -> { el, contentEl, setInteractive, destroy }
+// API (see ARCHITECTURE.md): createDesktop(host, { config, onLinks, onFocus }) -> { el, contentEl, setInteractive, destroy }
 import gsap from 'gsap';
 import './window.css';
 import { prefersReducedMotion } from '../shared/config.js';
+import { safeHref } from '../shared/href.js';
 
 const MOBILE_MQ = '(max-width: 639.98px)';
 const MENUBAR_H = 22;
@@ -28,7 +29,7 @@ function glyph(pathD) {
   return svg;
 }
 
-export function createDesktop(host, { config }) {
+export function createDesktop(host, { config, onLinks, onFocus }) {
   const brand = config?.brand ?? {};
   const mobileMq = window.matchMedia(MOBILE_MQ);
   const isMobile = () => mobileMq.matches;
@@ -62,11 +63,8 @@ export function createDesktop(host, { config }) {
   const legal = config?.legal ?? {};
   const legalNav = h('nav', 'dt-legal', { 'aria-label': 'Rechtliches' });
   for (const [key, label] of [['impressum', 'Impressum'], ['datenschutz', 'Datenschutz']]) {
-    const href = String(legal[key] ?? '').trim();
-    // relative pages or http(s) only
-    if (href && (/^https?:/i.test(href) || !/^[a-z][a-z\d+.-]*:|^\/\//i.test(href))) {
-      legalNav.append(h('a', 'dt-legal-link', { href }, label));
-    }
+    const href = legal[key] ? safeHref(legal[key]) : null; // same rule as the iPod links
+    if (href) legalNav.append(h('a', 'dt-legal-link', { href }, label));
   }
   if (legalNav.childElementCount) barRight.append(legalNav);
   barRight.append(clock);
@@ -129,9 +127,12 @@ export function createDesktop(host, { config }) {
     pos.style.setProperty('--dy', `${oy}px`);
   };
 
+  // a window larger than the stage (browser zoom) stays centred and the stage scrolls: no dragging
+  const fits = () => win.offsetWidth <= stage.clientWidth && win.offsetHeight <= stage.clientHeight;
+
   // clamp the current offset so the window stays inside the viewport (below the menu bar)
   const clampOffset = () => {
-    if (isMobile()) { ox = oy = 0; applyOffset(); return; }
+    if (isMobile() || !fits()) { ox = oy = 0; applyOffset(); return; }
     const r = win.getBoundingClientRect();
     const baseL = r.left - ox, baseT = r.top - oy;
     const vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
@@ -167,6 +168,15 @@ export function createDesktop(host, { config }) {
     const a = iconArt.getBoundingClientRect();
     const w = win.getBoundingClientRect();
     return { dx: a.left + a.width / 2 - (w.left + w.width / 2), dy: a.top + a.height / 2 - (w.top + w.height / 2) };
+  };
+
+  // the iPod is the window's key view: restoring, "Links" and clicks on the metal put focus on it
+  // (onFocus is the iPod's own focus(): its key target, i.e. the selected row on a screen of links;
+  //  the selector is only a fallback for a desktop without an iPod, e.g. the config error window)
+  const focusContent = () => {
+    if (onFocus) { onFocus(); return; }
+    const target = contentEl.querySelector('.ipodc [tabindex="0"], .ipodc[tabindex="0"], a[href], button') ?? win;
+    target.focus({ preventScroll: true });
   };
 
   const setMinimisedState = (m) => {
@@ -208,7 +218,7 @@ export function createDesktop(host, { config }) {
     if (!minimised || busy) return;
     if (prefersReducedMotion()) {
       setMinimisedState(false);
-      win.focus({ preventScroll: true });
+      focusContent();
       return;
     }
     busy = true;
@@ -221,7 +231,7 @@ export function createDesktop(host, { config }) {
         gsap.set(win, { clearProps: 'all' });
         el.classList.remove('is-genie');
         busy = false;
-        win.focus({ preventScroll: true });
+        focusContent();
       },
     });
     tl.to(win, { x: 0, y: 0, scaleX: 1, scaleY: 1, opacity: 1, clipPath: FUNNEL_MID, duration: 0.4, ease: 'power3.out' })
@@ -243,14 +253,22 @@ export function createDesktop(host, { config }) {
   });
   on(linksBtn, 'click', () => {
     if (minimised) { restore(); return; }
-    const first = contentEl.querySelector('[tabindex], a[href], button');
-    (first ?? win).focus?.({ preventScroll: true });
+    if (onLinks) onLinks(); else focusContent();
+  });
+  // a press on the metal, the title bar, the status bar or a traffic light keeps keyboard focus on
+  // the iPod (the window itself would otherwise take it, and the iPod keys would stop working)
+  on(win, 'mousedown', (e) => {
+    // (the traffic lights do not take focus on a click either, like Aqua's)
+    const ctl = e.target.closest('a[href], button, input, textarea, [tabindex="0"]');
+    if (e.button || (ctl && !ctl.matches('.dt-tl'))) return;
+    e.preventDefault();
+    if (!contentEl.contains(document.activeElement)) focusContent();
   });
 
   /* ---------- drag by title bar ---------- */
   let drag = null;
   on(titlebar, 'pointerdown', (e) => {
-    if (!interactive || minimised || busy || isMobile()) return;
+    if (!interactive || minimised || busy || isMobile() || !fits()) return;
     if (e.button !== 0 || e.target.closest('.dt-tl')) return;
     const r = win.getBoundingClientRect();
     drag = {

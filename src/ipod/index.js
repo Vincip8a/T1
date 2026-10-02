@@ -1,5 +1,5 @@
 // iPod Classic (6th/7th gen, silver) linktree UI.
-// API per ARCHITECTURE.md: mountIpod(container, { config }) → { el, getShellRect, reveal, press, scroll, getState, destroy }
+// API per ARCHITECTURE.md: mountIpod(container, { config }) → { el, getShellRect, reveal, press, scroll, home, focus, getState, destroy }
 //
 // The LCD UI is laid out in a logical 320×240 px space with container-query units
 // (--ipodc-p = 100cqw / 320 is one logical px), so text renders at its real size and stays crisp.
@@ -16,6 +16,9 @@ import { createWheel } from './wheel.js';
 import { createScreens } from './screens.js';
 
 const SLIDE_MS = 260;
+// a freshly opened screen ignores the centre button / Enter this long: a double press opens an item,
+// never also the first link on the screen it opened (going back with MENU is not guarded)
+const SETTLE_MS = 450;
 const EASE = 'cubic-bezier(.32,.08,.24,1)';
 let seq = 0;
 
@@ -157,9 +160,22 @@ export function mountIpod(container, { config } = {}) {
   const stack = [];
   const current = () => stack[stack.length - 1];
   const isCurrent = (s) => !!s && current() === s;
+  /** the element with keyboard focus: the iPod (a listbox with aria-activedescendant), or on a screen
+   *  of links the current row itself (roving tabindex), so screen readers meet real links */
+  const keyTarget = () => {
+    const s = current();
+    return (s?.roving && s.rows[s.index]) || el;
+  };
   const syncAD = () => {
-    const id = current()?.adId();
+    const s = current();
+    const id = s?.adId();
     if (id) el.setAttribute('aria-activedescendant', id); else el.removeAttribute('aria-activedescendant');
+    el.setAttribute('role', s?.roving ? 'group' : 'listbox');
+    el.tabIndex = s?.roving ? -1 : 0;
+    if (s?.roving) s.rows.forEach((r, i) => { r.tabIndex = i === s.index ? 0 : -1; });
+    // focus follows the selection while it is anywhere in the iPod
+    const t = keyTarget();
+    if (el.contains(document.activeElement) && document.activeElement !== t) t.focus({ preventScroll: true });
   };
 
   const anims = new Map(); // screen node → its running slide
@@ -214,12 +230,16 @@ export function mountIpod(container, { config } = {}) {
     const to = current();
     from.onHide?.();
     from.node.setAttribute('aria-hidden', 'true');
+    for (const r of from.rows) r.tabIndex = -1;
+    to.opened = dir > 0;
     show(to);
     setTitle(to.title, dir);
     backBtn.hidden = stack.length < 2;
     slide(from.node, to.node, dir).then(() => { if (!isCurrent(from)) from.node.remove(); });
     const extra = dir > 0 && (typeof to.summary === 'function' ? to.summary() : to.summary);
-    announce([to.title, extra, to.currentLabel()].filter(Boolean).join('. '));
+    // a focused link row is read by the screen reader itself
+    const focused = to.roving && document.activeElement === keyTarget();
+    announce([to.title, extra, !focused && to.currentLabel()].filter(Boolean).join('. '));
   }
   const open = (item) => go(1, item);
   const back = () => stack.length > 1 && go(-1);
@@ -237,18 +257,19 @@ export function mountIpod(container, { config } = {}) {
     if (zone === 'center') { centerBtn.classList.add('is-pressed'); el.classList.add('is-centre'); } else wheel.dataset.press = zone;
     flashT = timers.later(unflash, 160);
   }
-  function press(btn) {
+  /** `at`: when the press began (the centre acts on release, a slow second tap still counts as early) */
+  function press(btn, at = performance.now()) {
     if (phase !== 'ready' || destroyed) return;
     sound.play('press');
     const s = current();
     if (btn === 'menu') back();
-    else if (btn === 'center') s.activate();
+    else if (btn === 'center') { if (!s.opened || at - s.enteredAt >= SETTLE_MS) s.activate(); }
     else if (btn === 'play' && tracks.length) {
       player.setPlaying(!player.playing);
       announce(player.playing ? L.playing : L.paused);
     } else if ((btn === 'next' || btn === 'prev') && (s.kind === 'nowplaying' || player.started)) player.skip(btn === 'next' ? 1 : -1);
   }
-  const tap = (btn) => { flash(btn); press(btn); };
+  const tap = (btn, at) => { flash(btn); press(btn, at); };
 
   function step(dir) {
     if (phase !== 'ready' || destroyed || !dir) return false;
@@ -270,7 +291,7 @@ export function mountIpod(container, { config } = {}) {
     L, brand, menu, P, nid, timers, player, isReduced, isCurrent, pxPer, syncAD, announce, showToast, followLink, open,
   });
 
-  const focusRoot = () => { if (document.activeElement !== el) el.focus({ preventScroll: true }); };
+  const focusRoot = () => { const t = keyTarget(); if (document.activeElement !== t) t.focus({ preventScroll: true }); };
 
   // ── click wheel input (no momentum: the list stops when the finger lifts)
   const stopWheel = createWheel(wheel, on, {
@@ -285,13 +306,14 @@ export function mountIpod(container, { config } = {}) {
   // centre button: acts on pointerup inside it. It is not a <button> and has no click handler,
   // so a touch tap (whose click arrives with detail 0) can never fire a second activation.
   let centerDown = null;
+  let centerDownAt = 0;
   const centreUp = (e) => {
     if (centerDown !== e.pointerId) return;
     centerDown = null;
     unflash();
     if (e.type !== 'pointerup') return;
     const r = centerBtn.getBoundingClientRect();
-    if (Math.hypot(e.clientX - r.left - r.width / 2, e.clientY - r.top - r.height / 2) <= r.width / 2 + 8) tap('center');
+    if (Math.hypot(e.clientX - r.left - r.width / 2, e.clientY - r.top - r.height / 2) <= r.width / 2 + 8) tap('center', centerDownAt);
   };
   on(centerBtn, 'pointerdown', (e) => {
     if (e.button) return;
@@ -301,6 +323,7 @@ export function mountIpod(container, { config } = {}) {
     focusRoot();
     unflash();
     centerDown = e.pointerId;
+    centerDownAt = e.timeStamp; // when the finger came down, even if the main thread was busy then
     centerBtn.classList.add('is-pressed');
     el.classList.add('is-centre');
     try { centerBtn.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ }
@@ -371,11 +394,14 @@ export function mountIpod(container, { config } = {}) {
     else if (k === 'PageDown' || k === 'PageUp') jump(i + (k === 'PageDown' ? 4 : -4)); // half a screen
     else if (typeof a === 'number') step(a);
     else if (!a) return;
-    else if (!e.repeat) tap(a);
+    else if (!e.repeat) tap(a, e.timeStamp);
     e.preventDefault();
   }
   on(el, 'keydown', onKey);
-  on(document, 'keydown', (e) => { if (e.key === 'Tab') el.dataset.input = 'key'; }); // keyboard navigation: show the focus ring
+  // keyboard navigation (Tab, or a key on another control such as the Dock icon): show the focus ring
+  on(document, 'keydown', (e) => {
+    if (e.key === 'Tab' || (!el.contains(e.target) && !e.metaKey && !e.ctrlKey && !/^(Shift|Control|Alt|Meta)$/.test(e.key))) el.dataset.input = 'key';
+  });
   // pointer users get no focus ring (focus still moves to the iPod so the keys work afterwards);
   // touch pointerdown is not a user activation for audio: unlock on pointerup / click as well
   on(el, 'pointerdown', () => { el.dataset.input = 'pointer'; sound.ensure(); });
@@ -391,6 +417,17 @@ export function mountIpod(container, { config } = {}) {
   stack.push(menuScr);
   show(menuScr);
   setTitle(menuScr.title);
+
+  /** "Links" in the menu bar: back to the main menu in one slide, MENU flashes, focus with its ring */
+  function home() {
+    if (phase !== 'ready' || destroyed) return;
+    flash('menu');
+    sound.play('press');
+    if (stack.length > 2) stack.splice(1, stack.length - 2); // slide straight from the top screen
+    back();
+    el.dataset.input = 'key';
+    keyTarget().focus({ preventScroll: true, focusVisible: true });
+  }
 
   const wait = (ms) => new Promise((r) => timers.later(r, ms));
   let revealP = null;
@@ -434,6 +471,8 @@ export function mountIpod(container, { config } = {}) {
     reveal,
     press,
     scroll,
+    home,
+    focus: focusRoot,
     getState: () => {
       const s = current();
       return { screen: phase === 'ready' ? s.kind : phase, path: stack.slice(1).map((x) => x.id), index: s.index };

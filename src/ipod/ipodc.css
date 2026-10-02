@@ -9,8 +9,9 @@
   --ipodc-h: var(--ipod-h, 560px);
   --ipodc-u: calc(var(--ipodc-h) / var(--ipodc-mm-h, 103.5));
   --ipodc-font: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif;
-  /* the 6G highlight: glossy split across the middle */
-  --ipodc-gloss: linear-gradient(#a3cbf6, var(--ipodc-c-uiHighlightTop) 46%, #4b8fdc 54%, var(--ipodc-c-uiHighlightBottom));
+  /* the 6G highlight: a glossy light band at the top and the split across the middle; from the cap
+     height down the blue is deep enough for white text (≥ 4.5:1 under the glyphs) */
+  --ipodc-gloss: linear-gradient(#86b6ee, #2f6cc6 22%, #2463c0 48%, #1f5cb8 52%, #1a52a8);
   position: relative;
   flex: none;
   box-sizing: border-box;
@@ -43,7 +44,12 @@
 }
 .ipodc.is-revealed { visibility: inherit; }
 /* keyboard focus only: a pointer press focuses the iPod too, but must not draw the ring */
-.ipodc:focus-visible { outline: 3px solid #0b4fc4; outline-offset: 4px; } /* ≥ 4.5:1 on window and desktop */
+/* data-input="key": the last input was the keyboard (or "Links" in the menu bar), so any focus shows it.
+   On a screen of links the focused row is the key view: the ring still goes around the iPod. */
+.ipodc:focus-visible, .ipodc[data-input="key"]:focus,
+.ipodc:not([data-input="pointer"]):has(.ipodc-row:focus-visible), .ipodc[data-input="key"]:has(.ipodc-row:focus) {
+  outline: 3px solid #0b4fc4; outline-offset: 4px; /* ≥ 4.5:1 on window and desktop */
+}
 .ipodc[data-input="pointer"] { outline: none; }
 
 .ipodc-defs, .ipodc-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -194,7 +200,7 @@
 .ipodc-row-detail {
   max-width: 58%;
   font: calc(var(--ipodc-p) * 12.5)/calc(var(--ipodc-p) * 27) var(--ipodc-font);
-  color: #808387;
+  color: #6b6f75;
 }
 .ipodc-chev {
   flex: none;
@@ -342,7 +348,7 @@
   visibility: hidden;
 }
 .ipodc-trk .ipodc-trk-t { flex: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.ipodc-trk-d { color: #8a8e93; font-size: calc(var(--ipodc-p) * 10.5); font-variant-numeric: tabular-nums; }
+.ipodc-trk-d { color: #6b6f75; font-size: calc(var(--ipodc-p) * 10.5); font-variant-numeric: tabular-nums; }
 .ipodc-trk.is-cur { color: #000; font-weight: 700; }
 .ipodc-trk.is-cur .ipodc-trk-ico { visibility: inherit; }
 

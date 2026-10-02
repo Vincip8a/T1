@@ -56,6 +56,9 @@ function createSkipControl(onSkip) {
   };
 }
 
+// how long the intro chunk may take before the iPod is revealed without it
+const INTRO_CHUNK_MS = 6000;
+
 let usedKeyboard = false;
 const noteKeyboard = () => { usedKeyboard = true; };
 window.addEventListener('keydown', noteKeyboard, true);
@@ -80,7 +83,9 @@ async function main() {
   const introOff = [false, 'never', 'off'].includes(config.settings?.intro);
   if (introOff) introModP = null;
 
-  const desktop = createDesktop(app, { config });
+  // "Links" in the menu bar brings the main menu up, and restoring or a press on the metal focuses the
+  // iPod's key target (ipod is assigned before any click can happen)
+  const desktop = createDesktop(app, { config, onLinks: () => ipod.home(), onFocus: () => ipod.focus() });
   const ipod = mountIpod(desktop.contentEl, { config });
   if (DEBUG) window.__ipod = ipod;
 
@@ -88,10 +93,15 @@ async function main() {
   if (introModP) {
     desktop.setInteractive(false);
     let skipped = false;
-    const removeSkip = createSkipControl(() => { skipped = true; intro?.skip(); });
+    let onSkipped;
+    const skipP = new Promise((r) => { onSkipped = r; });
+    const removeSkip = createSkipControl(() => { skipped = true; onSkipped(); intro?.skip(); });
     try {
-      const { runIntro } = await introModP;
-      if (!skipped) {
+      // a skip, or a chunk that is slow or stalls, must not keep the iPod hidden: whatever comes
+      // first wins, and a chunk that lands after that is ignored
+      const mod = await Promise.race([introModP, skipP, new Promise((r) => setTimeout(r, INTRO_CHUNK_MS))]);
+      if (!skipped && mod?.runIntro) {
+        const { runIntro } = mod;
         intro = runIntro({ getTargetRect: () => ipod.getShellRect(), reducedMotion: prefersReducedMotion(), config });
         if (DEBUG) window.__intro = intro;
         // safety net: a render loop that died must never leave the iPod hidden
@@ -113,8 +123,9 @@ async function main() {
   // the iPod listens for keys on its own element: focus it so ↑/↓/Enter/Esc work right away.
   // Without prior keyboard use this focus must not draw the ring (the iPod's own pointer state
   // hides it; Tab switches the ring back on).
+  // (a click on the window during the intro leaves focus on the window itself: tabIndex -1)
   const active = document.activeElement;
-  if (!active || active === document.body) {
+  if (!active || active === document.body || active.tabIndex < 0) {
     if (!usedKeyboard) ipod.el.dataset.input = 'pointer';
     ipod.el.focus({ preventScroll: true, focusVisible: usedKeyboard });
   }

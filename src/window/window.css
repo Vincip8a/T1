@@ -84,9 +84,10 @@
 /* ---------- stage + window ---------- */
 .dt-stage {
   position: absolute; z-index: 10; inset: var(--bar-h) 0 0 0;
-  display: grid; place-items: center; pointer-events: none;
+  display: grid; overflow: auto; /* scrolls only when browser zoom makes the window larger than the screen */
 }
-.dt-pos { transform: translate3d(var(--dx, 0px), var(--dy, 0px), 0); pointer-events: none; }
+/* auto margins centre the window and, unlike place-items, never push it past the scrollable start */
+.dt-pos { margin: auto; transform: translate3d(var(--dx, 0px), var(--dy, 0px), 0); pointer-events: none; }
 .dt-win {
   position: relative; pointer-events: auto; outline: none; overflow: hidden;
   display: flex; flex-direction: column;
@@ -161,21 +162,25 @@
 .dt.is-locked .dt-tl { filter: saturate(.55) brightness(1.05); }
 .dt.is-locked .dt-titlebar, .dt.is-locked .dt-lights { pointer-events: none; }
 
-/* content: iPod centred, size driven by --ipod-h */
+/* content: iPod centred, size driven by --ipod-h.
+   --ipod-floor: with a mouse or trackpad the iPod never gets smaller than 500 CSS px, so browser zoom
+   enlarges its text (WCAG 1.4.4) and the stage scrolls instead; touch screens size it to fit. */
 .dt-content {
-  --ipod-h: min(74vh, 600px);
+  --ipod-floor: 0px;
+  --ipod-h: max(var(--ipod-floor), min(74vh, 600px));
   position: relative; z-index: 1; flex: 1 1 auto;
   display: flex; align-items: center; justify-content: center;
   padding: 26px 46px 22px;
   user-select: auto; -webkit-user-select: auto;
 }
-.dt.is-zoomed .dt-content { --ipod-h: min(calc(100vh - 150px), 780px); }
+.dt.is-zoomed .dt-content { --ipod-h: max(var(--ipod-floor), min(calc(100vh - 150px), 780px)); }
 /* small-viewport units: stable on mobile while the browser bars slide in and out
    (--ipod-h is a registered <length>, so the vh lines above are the fallback via @supports) */
 @supports (height: 1svh) {
-  .dt-content { --ipod-h: min(74svh, 600px); }
-  .dt.is-zoomed .dt-content { --ipod-h: min(calc(100svh - 150px), 780px); }
+  .dt-content { --ipod-h: max(var(--ipod-floor), min(74svh, 600px)); }
+  .dt.is-zoomed .dt-content { --ipod-h: max(var(--ipod-floor), min(calc(100svh - 150px), 780px)); }
 }
+@media (pointer: fine) { .dt-content { --ipod-floor: 500px; } }
 .dt.is-zooming .dt-content { transition: --ipod-h .34s cubic-bezier(.3,.7,.2,1); }
 
 .dt-status {
@@ -234,11 +239,11 @@
   .dt-pos { width: 100%; transform: none; }
   .dt-win { width: 100%; }
   .dt-content, .dt.is-zoomed .dt-content {
-    --ipod-h: min(calc(100vh - 96px), calc((100vw - 38px) * 103.5 / 61.8));
+    --ipod-h: max(var(--ipod-floor), min(calc(100vh - 96px), calc((100vw - 38px) * 103.5 / 61.8)));
     padding: 12px 10px 14px;
   }
   @supports (height: 1svh) {
-    .dt-content, .dt.is-zoomed .dt-content { --ipod-h: min(calc(100svh - 96px), calc((100vw - 38px) * 103.5 / 61.8)); }
+    .dt-content, .dt.is-zoomed .dt-content { --ipod-h: max(var(--ipod-floor), min(calc(100svh - 96px), calc((100vw - 38px) * 103.5 / 61.8))); }
   }
   .dt-title { max-width: 52vw; }
   .dt-status { display: none; }
@@ -248,6 +253,16 @@
   .dt-bar-links { display: none; } /* "Links" (focuses the iPod) makes room for the legal links */
   .dt-legal-link { padding: 0 4px; }
   .dt-clock { padding-left: 6px; }
+}
+
+/* ---------- short screens (a phone turned sideways, a netbook, a zoomed-in browser) ----------
+   Same height budget as the mobile sheet (90px + 6px air): compact padding, no status bar. */
+@media (min-width: 640px) and (max-height: 640px) {
+  .dt-content, .dt.is-zoomed .dt-content { --ipod-h: max(var(--ipod-floor), min(calc(100vh - 96px), 600px)); padding: 12px 46px 14px; }
+  @supports (height: 1svh) {
+    .dt-content, .dt.is-zoomed .dt-content { --ipod-h: max(var(--ipod-floor), min(calc(100svh - 96px), 600px)); }
+  }
+  .dt-status { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

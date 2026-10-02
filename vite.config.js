@@ -1,19 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
+import { safeHref as sharedSafeHref } from './src/shared/href.js';
 
 const CONFIG_PATH = fileURLToPath(new URL('./public/config.json', import.meta.url));
 
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+/** The runtime href rule (src/shared/href.js): relative paths stay page-relative ('./x'), base './'. */
+const safeHref = (href) => sharedSafeHref(href, './');
 
-/** Only http(s):, mailto:, tel: and relative hrefs (no scheme, no protocol-relative //host). */
-function safeHref(href) {
-  const s = String(href ?? '').trim();
-  if (!s) return null;
-  if (/^(https?:|mailto:|tel:)/i.test(s)) return s;
-  if (/^[a-z][a-z\d+.-]*:/i.test(s) || s.startsWith('//') || s.startsWith('\\')) return null;
-  return s.replace(/^\//, ''); // root-relative paths become page-relative (base './', sub-paths)
-}
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 const link = (label, href, extra = '') => {
   const h = safeHref(href);
@@ -66,7 +61,8 @@ function noscriptHtml(config) {
   `;
 }
 
-/** Fills <title>, the meta description, og:title/og:description and the <noscript> linktree from public/config.json. */
+/** Fills <title>, the meta description, the og: tags (absolute with config.siteUrl) and the <noscript>
+ *  linktree from public/config.json. */
 function configHtml() {
   return {
     name: 'config-html',
@@ -78,6 +74,11 @@ function configHtml() {
         const brand = config.brand ?? {};
         const title = esc(brand.name ? `${brand.name} · Links` : 'Links');
         const desc = esc(brand.tagline ?? '');
+        // link previews need absolute URLs: with config.siteUrl set, og:image and og:url are absolute
+        let site = null;
+        try { site = /^https?:\/\//i.test(config.siteUrl ?? '') ? new URL(String(config.siteUrl).replace(/\/?$/, '/')) : null; } catch { /* invalid: stay relative */ }
+        const ogImage = esc(site ? new URL('og-image.png', site).href : 'og-image.png');
+        const ogUrl = site ? `\n  <meta property="og:url" content="${esc(site.href)}" />` : '';
         // function replacements: a '$' in the content is never read as a replacement pattern
         const meta = (attr) => new RegExp(`(<meta ${attr} content=")[^"]*(")`);
         return html
@@ -85,6 +86,8 @@ function configHtml() {
           .replace(meta('name="description"'), (_, a, b) => a + desc + b)
           .replace(meta('property="og:title"'), (_, a, b) => a + title + b)
           .replace(meta('property="og:description"'), (_, a, b) => a + desc + b)
+          .replace(meta('property="og:image"'), (_, a, b) => a + ogImage + b)
+          .replace(/<meta property="og:image"[^>]*>/, (m) => m + ogUrl)
           .replace(/<noscript>[\s\S]*?<\/noscript>/, () => `<noscript>${noscriptHtml(config)}</noscript>`);
       },
     },

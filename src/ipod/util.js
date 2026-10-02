@@ -18,16 +18,8 @@ export const fmtTime = (sec) => {
   return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
 };
 
-/** Only web, mail and phone links plus relative paths (resolved against the site base). Anything
- *  else (javascript:, data:, …) is rejected with a console warning; its row is then plain text. */
-export function safeHref(href) {
-  const s = String(href ?? '').trim();
-  const m = /^([a-z][a-z\d+.-]*:|\/)/i.exec(s);
-  if (!s || /^(https?|mailto|tel):|^\//i.test(s)) return s || null;
-  if (!m) return (import.meta.env?.BASE_URL ?? './') + s.replace(/^\.\//, '');
-  console.warn('[ipod] link ignored:', s);
-  return null;
-}
+// href rule shared with the menu bar and the <noscript> build (src/shared/href.js)
+export { safeHref } from '../shared/href.js';
 
 /** Tracked timeouts: destroy() clears every pending one, nothing fires against detached DOM. */
 export function createTimers() {
