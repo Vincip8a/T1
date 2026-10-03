@@ -37,6 +37,12 @@ jobs:
       - name: Abhängigkeiten installieren
         run: npm ci
 
+      # Social-Vorschaubild, Icons und Standard-Cover mit Name und Kürzel aus public/config.json.
+      # Nutzt das Chrome des Runners; schlägt es fehl, bleiben die Bilder aus dem Repo.
+      - name: Vorschaubild und Icons erzeugen
+        run: node tools/make-og.mjs && node tools/make-icons.mjs
+        continue-on-error: true
+
       - name: Projekt bauen
         run: npm run build
         env:

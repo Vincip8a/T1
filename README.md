@@ -304,7 +304,10 @@ Einmalig einzurichten:
 2. Auf `main` pushen (oder den Workflow von Hand starten).
 3. Die Adresse der Seite steht danach unter Settings → Pages und in der Ausgabe des Workflows.
 
-Der Workflow verwendet Node 22, installiert mit `npm ci` und baut mit `npm run build`. Die
+Der Workflow verwendet Node 22, installiert mit `npm ci` und baut mit `npm run build`. Vorher
+erzeugt er `og-image.png`, die Icons und das Standard-Cover mit Name und Kürzel aus
+`public/config.json` neu (mit dem Chrome des Runners; klappt das nicht, bleiben die Bilder aus
+dem Repo). Die
 nötigen Rechte (`pages: write`, `id-token: write`) sind darin bereits gesetzt.
 
 > **Hinweis bei Projekt-Seiten:** `vite.config.js` nutzt `base: './'` (relative Pfade). Die Seite
